@@ -8,7 +8,7 @@ import {
 // --- CONFIG ---
 const ANILIST_URL = "https://graphql.anilist.co";
 const THEME_COLOR = "8B5CF6"; 
-const MAL_CLIENT_ID = "cffbcd61c5cf9d90a4eb2e7088c2de83"; // <--- Your Client ID is here!
+const MAL_CLIENT_ID = "cffbcd61c5cf9d90a4eb2e7088c2de83"; 
 
 // --- HELPERS ---
 const getDisplayTitle = (item: any) => {
@@ -89,13 +89,10 @@ export default function App() {
   const [playingStream, setPlayingStream] = useState<any>(null);
 
   const [watchHistory, setWatchHistory] = useState<any[]>([]);
-  
-  // MAL Auth State
   const [malToken, setMalToken] = useState<string | null>(null);
 
   // --- INIT & MAL OAUTH CALLBACK ---
   useEffect(() => {
-    // Check if returning from MAL login
     const urlParams = new URLSearchParams(window.location.search);
     const authCode = urlParams.get('code');
     const savedVerifier = localStorage.getItem('mal_code_verifier');
@@ -115,8 +112,10 @@ export default function App() {
   const loginMAL = () => {
     const verifier = generateCodeVerifier();
     localStorage.setItem('mal_code_verifier', verifier);
-    const redirectUri = window.location.origin;
-    window.location.href = `https://myanimelist.net/v1/oauth2/authorize?response_type=code&client_id=${MAL_CLIENT_ID}&code_challenge=${verifier}&code_challenge_method=plain&redirect_uri=${redirectUri}`;
+    // Force redirect URI to not have a trailing slash
+    const redirectUri = window.location.origin.replace(/\/$/, ""); 
+    const authUrl = `https://myanimelist.net/v1/oauth2/authorize?response_type=code&client_id=${MAL_CLIENT_ID}&code_challenge=${verifier}&code_challenge_method=plain&redirect_uri=${encodeURIComponent(redirectUri)}`;
+    window.location.href = authUrl;
   };
 
   const exchangeMalToken = async (code: string, verifier: string) => {
@@ -130,7 +129,8 @@ export default function App() {
       if (data.access_token) {
         localStorage.setItem('mal_access_token', data.access_token);
         setMalToken(data.access_token);
-        window.history.replaceState({}, document.title, "/"); // Clean URL
+        // Scrub the code from URL
+        window.history.replaceState({}, document.title, window.location.pathname);
       }
     } catch (e) {
       console.error("MAL Login failed", e);
@@ -153,7 +153,6 @@ export default function App() {
 
   const loadContent = useCallback(async () => {
     setLoading(true);
-    // Added idMal to the GraphQL queries!
     const query = `query { 
       trending: Page(page: 1, perPage: 10) { media(type: ANIME, sort: TRENDING_DESC) { id idMal title { english romaji } bannerImage coverImage { extraLarge } description episodes averageScore nextAiringEpisode { episode } } }
       action: Page(page: 1, perPage: 20) { media(type: ANIME, genre: "Action", sort: POPULARITY_DESC) { id idMal title { english romaji } bannerImage coverImage { extraLarge } description episodes averageScore nextAiringEpisode { episode } } }
@@ -192,7 +191,6 @@ export default function App() {
       localStorage.setItem("videasy_history", JSON.stringify(newHistory));
       return newHistory;
     });
-    // Trigger MAL Update!
     if (anime.idMal) syncEpisodeToMal(anime.idMal, ep);
   };
 
@@ -271,7 +269,7 @@ export default function App() {
           
           <div className="flex-grow" />
           
-        {/* MAL SYNC ICON */}
+          {/* MAL SYNC ICON */}
           {malToken ? (
             <button title="MyAnimeList Synced!" className="cursor-help">
               <UserCheck size={20} className="text-green-400" />
