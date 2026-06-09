@@ -271,11 +271,15 @@ export default function App() {
           
           <div className="flex-grow" />
           
-          {/* MAL SYNC ICON */}
+        {/* MAL SYNC ICON */}
           {malToken ? (
-            <UserCheck size={20} className="text-green-400 cursor-help" title="MyAnimeList Synced!" />
+            <button title="MyAnimeList Synced!" className="cursor-help">
+              <UserCheck size={20} className="text-green-400" />
+            </button>
           ) : (
-            <LogIn size={20} onClick={loginMAL} className="text-zinc-500 hover:text-blue-400 cursor-pointer" title="Login to MyAnimeList" />
+            <button title="Login to MyAnimeList" onClick={loginMAL} className="cursor-pointer group/login">
+              <LogIn size={20} className="text-zinc-500 group-hover/login:text-blue-400 transition-colors" />
+            </button>
           )}
 
           <button onClick={() => setIsFullscreenApp(!isFullscreenApp)} className="text-zinc-500 hover:text-white">
