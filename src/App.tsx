@@ -90,14 +90,19 @@ export default function App() {
 
   const [watchHistory, setWatchHistory] = useState<any[]>([]);
   const [malToken, setMalToken] = useState<string | null>(null);
+  const authProcessedRef = useRef(false); // 🔥 NEW: Prevent reprocessing auth code
 
   // --- INIT & MAL OAUTH CALLBACK ---
   useEffect(() => {
+    // 🔥 NEW: Exit early if already processed
+    if (authProcessedRef.current) return;
+
     const urlParams = new URLSearchParams(window.location.search);
     const authCode = urlParams.get('code');
     const savedVerifier = localStorage.getItem('mal_code_verifier');
 
     if (authCode && savedVerifier) {
+      authProcessedRef.current = true; // 🔥 NEW: Mark as processed
       exchangeMalToken(authCode, savedVerifier);
     } else {
       const savedToken = localStorage.getItem('mal_access_token');
@@ -112,7 +117,6 @@ export default function App() {
   const loginMAL = () => {
     const verifier = generateCodeVerifier();
     localStorage.setItem('mal_code_verifier', verifier);
-    // Force redirect URI to not have a trailing slash
     const redirectUri = window.location.origin.replace(/\/$/, ""); 
     const authUrl = `https://myanimelist.net/v1/oauth2/authorize?response_type=code&client_id=${MAL_CLIENT_ID}&code_challenge=${verifier}&code_challenge_method=plain&redirect_uri=${encodeURIComponent(redirectUri)}`;
     window.location.href = authUrl;
@@ -120,6 +124,9 @@ export default function App() {
 
   const exchangeMalToken = async (code: string, verifier: string) => {
     try {
+      // 🔥 NEW: Clear URL IMMEDIATELY before anything else
+      window.history.replaceState({}, document.title, window.location.pathname);
+      
       const res = await fetch('/api/mal-token', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -129,11 +136,12 @@ export default function App() {
       if (data.access_token) {
         localStorage.setItem('mal_access_token', data.access_token);
         setMalToken(data.access_token);
-        // Scrub the code from URL
-        window.history.replaceState({}, document.title, window.location.pathname);
+        console.log("✅ MAL Login successful!");
+      } else {
+        console.error("❌ No access token received:", data);
       }
     } catch (e) {
-      console.error("MAL Login failed", e);
+      console.error("❌ MAL Login failed:", e);
     }
   };
 
