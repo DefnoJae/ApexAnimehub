@@ -1,4 +1,4 @@
-import type { SyncStatus, AnimeEntry } from '@/types/sync';
+import type { SyncStatus, AnimeEntry } from '../types/sync';
 
 const MAL_CLIENT_ID = process.env.REACT_APP_MAL_CLIENT_ID || '';
 const MAL_REDIRECT_URI = process.env.REACT_APP_MAL_REDIRECT_URI || 'http://localhost:3000/oauth/mal';

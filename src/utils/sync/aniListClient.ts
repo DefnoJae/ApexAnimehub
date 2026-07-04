@@ -1,4 +1,4 @@
-import type { SyncStatus, AnimeEntry } from '@/types/sync';
+import type { SyncStatus, AnimeEntry } from '../types/sync';
 
 const ANILIST_CLIENT_ID = process.env.REACT_APP_ANILIST_CLIENT_ID || '';
 const ANILIST_REDIRECT_URI = process.env.REACT_APP_ANILIST_REDIRECT_URI || 'http://localhost:3000/oauth/anilist';

@@ -1,7 +1,7 @@
 import { malClient } from './malClient';
 import { aniListClient } from './aniListClient';
 import { kitsuClient } from './kitsuClient';
-import type { SyncSettings, SyncStatus, AnimeEntry } from '@/types/sync';
+import type { SyncSettings, SyncStatus, AnimeEntry } from '../types/sync';
 
 export class SyncManager {
   private settings: SyncSettings;

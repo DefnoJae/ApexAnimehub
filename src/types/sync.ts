@@ -1,4 +1,4 @@
-// src/types/sync.ts
+// Type definitions for sync
 export interface SyncProvider {
   id: 'mal' | 'anilist' | 'kitsu';
   name: string;

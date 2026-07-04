@@ -1,4 +1,4 @@
-import type { SyncStatus, AnimeEntry } from '@/types/sync';
+import type { SyncStatus, AnimeEntry } from '../types/sync';
 
 const KITSU_API = 'https://kitsu.io/api/edge';
 
