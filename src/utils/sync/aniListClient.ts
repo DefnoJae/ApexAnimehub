@@ -38,7 +38,9 @@ export class AniListClient {
 
       const data = await response.json();
       this.accessToken = data.access_token;
-      localStorage.setItem('anilist_access_token', this.accessToken);
+      if (this.accessToken) {
+        localStorage.setItem('anilist_access_token', this.accessToken);
+      }
       return true;
     } catch (error) {
       console.error('AniList authentication error:', error);
