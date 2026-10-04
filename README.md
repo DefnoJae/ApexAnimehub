@@ -6,7 +6,7 @@ Anime discovery and playback dashboard with dub schedules and provider-sync inte
 
 Use Node 20+ and npm ci --legacy-peer-deps, then npm start. Run npm run build, npm run typecheck, npm run test:ci and npm run test:server to validate changes.
 
-See [SYNC_INTEGRATION_GUIDE.md](SYNC_INTEGRATION_GUIDE.md) for the same-origin AniList OAuth backend and provider compatibility notes. Account-connect and automatic sync UI are not wired into the dashboard yet.
+See [SYNC_INTEGRATION_GUIDE.md](SYNC_INTEGRATION_GUIDE.md) for the same-origin AniList OAuth backend and provider compatibility notes. Connect AniList and MyAnimeList from Settings, then save list statuses on anime details. The player includes Next episode, Mark watched and frame fullscreen controls.
 
 The dub schedule caches the last valid response and shows stale/offline and last-updated states. Calendar headers start Monday; weekly view starts Sunday at local midnight.
 

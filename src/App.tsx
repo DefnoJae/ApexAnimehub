@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   Search,
   Home,
@@ -25,9 +25,15 @@ import { fetchAnilist } from "./utils/anilist";
 import { getDisplayTitle, getShortTitle } from "./utils/schedule";
 import { DubScheduleView } from "./components/DubScheduleView";
 import { AnimeRow } from "./components/AnimeRow";
+import { useAccounts, ListAnime } from './hooks/useAccounts';
+import { AccountSettings } from './components/AccountSettings';
+import { ListControls } from './components/ListControls';
+import { VideoPlayer } from './components/VideoPlayer';
 const THEME_COLOR = "8B5CF6";
 
 export default function App() {
+  const accounts = useAccounts();
+  const [showAccounts, setShowAccounts] = useState(false);
   const [view, setView] = useState("all");
   const [loading, setLoading] = useState(true);
   const [contentError, setContentError] = useState<string | null>(null);
@@ -47,14 +53,38 @@ export default function App() {
   const [playingStream, setPlayingStream] = useState<any>(null);
 
   const [watchHistory, setWatchHistory] = useState<any[]>([]);
+  const lastPlayingAnime = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (accounts.checking) return;
+    if (!playingStream) { lastPlayingAnime.current = null; return; }
+    if (selectedAnime?.id && lastPlayingAnime.current !== selectedAnime.id) {
+      lastPlayingAnime.current = selectedAnime.id;
+      void syncWatching(selectedAnime);
+    }
+    // Beginning playback changes status; episode navigation records progress separately.
+
+  }, [playingStream?.url, accounts.checking, accounts.connected.anilist, accounts.connected.mal]);
+
+  const syncWatching = (anime: ListAnime) => accounts.sync(anime, 'watching', undefined, true);
+  const markWatched = (automatic: boolean) => {
+    if (!selectedAnime) return Promise.resolve([]);
+    const completed = !!selectedAnime.episodes && activeEpisode >= selectedAnime.episodes;
+    return accounts.sync(selectedAnime, completed ? 'completed' : 'watching', activeEpisode, automatic);
+  };
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.has('oauth')) { setShowAccounts(true); window.history.replaceState({}, '', window.location.pathname); }
+  }, []);
 
   // --- DATA FETCHING ---
   const loadContent = useCallback(async () => {
     setLoading(true);
-    const query = `query { 
-      trending: Page(page: 1, perPage: 10) { media(type: ANIME, sort: TRENDING_DESC) { id title { english romaji } bannerImage coverImage { extraLarge } description episodes averageScore nextAiringEpisode { episode } } }
-      action: Page(page: 1, perPage: 20) { media(type: ANIME, genre: "Action", sort: POPULARITY_DESC) { id title { english romaji } bannerImage coverImage { extraLarge } description episodes averageScore nextAiringEpisode { episode } } }
-      romance: Page(page: 1, perPage: 20) { media(type: ANIME, genre: "Romance", sort: POPULARITY_DESC) { id title { english romaji } bannerImage coverImage { extraLarge } description episodes averageScore nextAiringEpisode { episode } } }
+    const query = `query {
+      trending: Page(page: 1, perPage: 10) { media(type: ANIME, sort: TRENDING_DESC) { id idMal title { english romaji } bannerImage coverImage { extraLarge } description episodes averageScore nextAiringEpisode { episode } } }
+      action: Page(page: 1, perPage: 20) { media(type: ANIME, genre: "Action", sort: POPULARITY_DESC) { id idMal title { english romaji } bannerImage coverImage { extraLarge } description episodes averageScore nextAiringEpisode { episode } } }
+      romance: Page(page: 1, perPage: 20) { media(type: ANIME, genre: "Romance", sort: POPULARITY_DESC) { id idMal title { english romaji } bannerImage coverImage { extraLarge } description episodes averageScore nextAiringEpisode { episode } } }
     }`;
     setContentError(null);
     try {
@@ -101,7 +131,7 @@ export default function App() {
     setSearchError(null);
     const delay = setTimeout(async () => {
       try {
-      const q = `query ($search: String) { Page(page: 1, perPage: 10) { media(search: $search, type: ANIME) { id title { english romaji } coverImage { extraLarge } episodes nextAiringEpisode { episode } } } }`;
+      const q = `query ($search: String) { Page(page: 1, perPage: 10) { media(search: $search, type: ANIME) { id idMal title { english romaji } coverImage { extraLarge } episodes nextAiringEpisode { episode } } } }`;
       const data = await fetchAnilist<{ Page: { media: any[] } }>(q, { search: searchQuery }, controller.signal);
       if (!controller.signal.aborted) setSearchResults(data.Page.media);
       } catch (error) { if (!controller.signal.aborted) { setSearchResults([]); setSearchError(error instanceof Error ? error.message : "Search failed"); } }
@@ -163,6 +193,7 @@ export default function App() {
     startStream: string | null = null
   ) => {
     if (!anime?.id) return;
+    if (!startStream) setPlayingStream(null);
     setSelectedAnime(anime);
     setView("details");
     setActiveEpisode(startEpisode);
@@ -180,12 +211,12 @@ export default function App() {
     try {
       const query = `query ($id: Int) {
         Media(id: $id, type: ANIME) {
-          id title { english romaji } bannerImage coverImage { extraLarge } description episodes averageScore 
+          id idMal title { english romaji } bannerImage coverImage { extraLarge } description episodes averageScore
           nextAiringEpisode { episode }
           relations {
             edges {
               relationType
-              node { id title { english romaji } coverImage { extraLarge } type bannerImage description episodes averageScore nextAiringEpisode { episode } }
+              node { id idMal title { english romaji } coverImage { extraLarge } type bannerImage description episodes averageScore nextAiringEpisode { episode } }
             }
           }
         }
@@ -200,6 +231,8 @@ export default function App() {
 
   const changeEpisode = (direction: "next" | "prev") => {
     const newEp = direction === "next" ? activeEpisode + 1 : activeEpisode - 1;
+    if (!selectedAnime || newEp < 1 || (direction === 'next' && !canNextEpisode)) return;
+    if (direction === 'next') void markWatched(true);
     setActiveEpisode(newEp);
     resolveStreams(selectedAnime, newEp);
 
@@ -218,6 +251,9 @@ export default function App() {
     : selectedAnime?.nextAiringEpisode?.episode
     ? selectedAnime.nextAiringEpisode.episode - 1
     : 1;
+
+  const availableEpisodes = selectedAnime?.nextAiringEpisode?.episode ? selectedAnime.nextAiringEpisode.episode - 1 : selectedAnime?.episodes;
+  const canNextEpisode = availableEpisodes == null || activeEpisode < availableEpisodes;
 
   return (
     <div
@@ -279,63 +315,14 @@ export default function App() {
           >
             {isFullscreenApp ? <Minimize size={20} /> : <Maximize size={20} />}
           </button>
-          <Settings className="text-zinc-500 hover:text-white cursor-pointer" />
+          <button aria-label="Account settings" onClick={() => setShowAccounts(true)}><Settings className="text-zinc-500 hover:text-white" /></button>
         </div>
       </div>
 
-      {/* 🎬 PLAYER MODAL */}
-      {playingStream && (
-        <div className="fixed inset-0 z-[500] bg-black flex flex-col animate-in fade-in">
-          <div className="absolute top-0 left-0 w-full p-8 flex justify-between items-start z-[502] pointer-events-none">
-            <div className="bg-[#1c1c1c]/90 backdrop-blur-md p-5 px-8 rounded-[16px] border border-white/5 flex flex-col gap-1 shadow-2xl pointer-events-auto">
-              <h2 className="text-white font-black text-lg italic uppercase tracking-tighter">
-                {getDisplayTitle(selectedAnime)}
-              </h2>
-              <p className="text-purple-400 font-bold tracking-[0.3em] uppercase text-[10px]">
-                Episode {activeEpisode} • {playingStream.name}
-              </p>
-            </div>
-            <button
-              onClick={() => setPlayingStream(null)}
-              className="p-5 bg-black/60 border border-white/10 hover:bg-red-600 rounded-full transition-all text-white backdrop-blur-md shadow-2xl pointer-events-auto"
-            >
-              <X size={24} />
-            </button>
-          </div>
-
-          <iframe
-            src={playingStream.url}
-            className="flex-1 w-full h-full border-none z-[500]"
-            allowFullScreen
-            allow="autoplay; encrypted-media"
-          />
-
-          <div className="absolute bottom-10 right-10 z-[502] flex gap-4 pointer-events-none">
-            {activeEpisode > 1 && (
-              <button
-                onClick={() => changeEpisode("prev")}
-                className="px-8 py-5 bg-[#1c1c1c]/90 border border-white/5 hover:bg-purple-600 hover:border-purple-400 rounded-[16px] transition-all text-white flex items-center gap-3 backdrop-blur-md shadow-2xl pointer-events-auto"
-              >
-                <SkipBack size={20} />
-                <span className="font-black text-[13px] uppercase tracking-[0.2em] hidden md:block">
-                  Prev
-                </span>
-              </button>
-            )}
-            {(selectedAnime && activeEpisode < totalEpisodes) && (
-              <button
-                onClick={() => changeEpisode("next")}
-                className="px-8 py-5 bg-[#1c1c1c]/90 border border-white/5 hover:bg-purple-600 hover:border-purple-400 rounded-[16px] transition-all text-white flex items-center gap-3 backdrop-blur-md shadow-2xl pointer-events-auto"
-              >
-                <span className="font-black text-[13px] uppercase tracking-[0.2em] hidden md:block">
-                  Next
-                </span>
-                <SkipForward size={20} />
-              </button>
-            )}
-          </div>
-        </div>
-      )}
+      {showAccounts && <AccountSettings accounts={accounts} onClose={() => setShowAccounts(false)} />}
+      {playingStream && <VideoPlayer title={getDisplayTitle(selectedAnime)} episode={activeEpisode} stream={playingStream} canNext={canNextEpisode}
+        onPrevious={() => changeEpisode('prev')} onNext={() => changeEpisode('next')} onWatched={() => void markWatched(false)}
+        onClose={() => setPlayingStream(null)} accounts={accounts} />}
 
       {(contentError || searchError) && <div role="alert" className="fixed top-4 z-[400] bg-slate-900 text-white p-4 rounded-xl">{contentError || searchError} {contentError && <button className="text-purple-400 underline" onClick={loadContent}>Retry</button>}</div>}
       {/* MAIN CONTAINER */}
@@ -497,6 +484,7 @@ export default function App() {
                     </div>
                   </div>
 
+                  <ListControls key={selectedAnime.id} anime={selectedAnime} accounts={accounts} onConnect={() => setShowAccounts(true)} />
                   <div className="animate-in slide-in-from-bottom-10 duration-700">
                     <p className="text-purple-500 font-black text-[11px] uppercase tracking-[0.6em] mb-8 text-center">
                       Episodes ({totalEpisodes})

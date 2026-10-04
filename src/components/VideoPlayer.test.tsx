@@ -1,0 +1,33 @@
+import React from 'react';
+import { createRoot } from 'react-dom/client';
+(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+import { act } from 'react-dom/test-utils';
+import { VideoPlayer } from './VideoPlayer';
+import { sendListUpdate, useAccounts } from '../hooks/useAccounts';
+const accounts = { busy: false, checking: false, message: '', results: [] } as unknown as ReturnType<typeof useAccounts>;
+test('player exposes next and watched actions, preserves source and disables boundaries', () => {
+  const node = document.createElement('div'); document.body.appendChild(node);
+  const root = createRoot(node);
+  const next = jest.fn(), watched = jest.fn();
+  const props = { title: 'Example', episode: 1, stream: { name: 'MegaPlay (Dub)', url: 'about:blank' }, canNext: true, onPrevious: jest.fn(), onNext: next, onWatched: watched, onClose: jest.fn(), accounts };
+  act(() => { root.render(<VideoPlayer {...props} />); });
+  const buttons = Array.from(node.querySelectorAll('button'));
+  expect(buttons.find(b => b.textContent === 'Previous')?.disabled).toBe(true);
+  expect(node.textContent).toContain('MegaPlay (Dub)');
+  act(() => { buttons.find(b => b.textContent === 'Next episode')?.click(); buttons.find(b => b.textContent?.includes('Mark episode'))?.click(); });
+  expect(next).toHaveBeenCalledTimes(1); expect(watched).toHaveBeenCalledTimes(1);
+  act(() => { root.render(<VideoPlayer {...props} episode={12} canNext={false} />); });
+  expect(Array.from(node.querySelectorAll('button')).find(b => b.textContent === 'Next episode')?.disabled).toBe(true);
+  act(() => { root.unmount(); }); node.remove();
+});
+test('MAL uses confirmed idMal, exposes server errors, and refuses unmapped IDs', async () => {
+  global.fetch = jest.fn().mockResolvedValue({ ok: true, json: async () => ({ success: true }) });
+  const anime = { id: 16498, idMal: 1001 };
+  expect((await sendListUpdate('mal', anime, 'planning')).success).toBe(true);
+  expect(JSON.parse((global.fetch as jest.Mock).mock.calls[0][1].body)).toEqual({ id: 1001, status: 'planning', automatic: false });
+  (global.fetch as jest.Mock).mockClear();
+  expect((await sendListUpdate('mal', { id: 1 }, 'dropped')).error).toContain('confirmed MyAnimeList ID');
+  expect(global.fetch).not.toHaveBeenCalled();
+  (global.fetch as jest.Mock).mockResolvedValue({ ok: false, json: async () => ({ error: 'Please reconnect' }) });
+  expect((await sendListUpdate('anilist', anime, 'watching', 3)).error).toBe('Please reconnect');
+});
