@@ -32,14 +32,14 @@ export interface SyncStatus {
 }
 
 export interface MALResponse {
-  data?: any[];
+  data?: unknown[];
 }
 
 export interface AniListResponse {
-  data?: any;
+  data?: unknown;
   errors?: Array<{ message: string }>;
 }
 
 export interface KitsuResponse {
-  data?: Array<any>;
+  data?: Array<unknown>;
 }

@@ -1,4 +1,5 @@
-import type { SyncStatus, AnimeEntry } from '../types/sync';
+import { randomToken, beginOAuth, validateOAuth } from './oauth';
+import type { SyncStatus, AnimeEntry } from '../../types/sync';
 
 const MAL_CLIENT_ID = process.env.REACT_APP_MAL_CLIENT_ID || '';
 const MAL_REDIRECT_URI = process.env.REACT_APP_MAL_REDIRECT_URI || 'http://localhost:3000/oauth/mal';
@@ -14,10 +15,9 @@ export class MALClient {
   }
 
   getAuthorizationUrl(): string {
-    const state = Math.random().toString(36).substring(7);
-    localStorage.setItem('mal_oauth_state', state);
+    const state = beginOAuth('mal');
     const codeVerifier = this.generateCodeVerifier();
-    localStorage.setItem('mal_code_verifier', codeVerifier);
+    sessionStorage.setItem('mal_code_verifier', codeVerifier);
 
     const params = new URLSearchParams({
       response_type: 'code',
@@ -31,9 +31,12 @@ export class MALClient {
     return `https://myanimelist.net/v1/oauth2/authorize?${params.toString()}`;
   }
 
-  async authenticate(code: string): Promise<boolean> {
+  async authenticate(code: string, state: string): Promise<boolean> {
     try {
-      const codeVerifier = localStorage.getItem('mal_code_verifier') || '';
+      validateOAuth('mal', state);
+      const codeVerifier = sessionStorage.getItem('mal_code_verifier') || '';
+      sessionStorage.removeItem('mal_code_verifier');
+      if (!codeVerifier || !code) throw new Error('Missing OAuth code or verifier');
       const response = await fetch('https://myanimelist.net/v1/oauth2/token', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -49,8 +52,9 @@ export class MALClient {
       if (!response.ok) throw new Error('Authentication failed');
 
       const data = await response.json();
+      if (typeof data.access_token !== 'string' || typeof data.refresh_token !== 'string') throw new Error('Invalid token response');
       this.setTokens(data.access_token, data.refresh_token, data.expires_in || 3600);
-      localStorage.removeItem('mal_code_verifier');
+      sessionStorage.removeItem('mal_code_verifier');
       return true;
     } catch (error) {
       console.error('MAL authentication error:', error);
@@ -63,6 +67,7 @@ export class MALClient {
     episodeWatched: number,
     totalEpisodes?: number
   ): Promise<SyncStatus> {
+    await this.refreshTokenIfNeeded();
     if (!this.isAuthenticated()) {
       return {
         success: false,
@@ -72,8 +77,6 @@ export class MALClient {
         error: 'Not authenticated',
       };
     }
-
-    await this.refreshTokenIfNeeded();
 
     try {
       const status = totalEpisodes && episodeWatched >= totalEpisodes ? 'completed' : 'watching';
@@ -111,17 +114,18 @@ export class MALClient {
   }
 
   async searchAnime(query: string): Promise<AnimeEntry[]> {
+    await this.refreshTokenIfNeeded();
     if (!this.isAuthenticated()) return [];
 
     try {
       const response = await fetch(
-        `${MAL_API_BASE}/anime?query=${encodeURIComponent(query)}&limit=10&fields=id,title,num_episodes,main_picture`,
+        `${MAL_API_BASE}/anime?q=${encodeURIComponent(query)}&limit=10&fields=id,title,num_episodes,main_picture`,
         { headers: { Authorization: `Bearer ${this.accessToken}` } }
       );
 
       if (!response.ok) throw new Error('Search failed');
       const data = await response.json();
-      return data.data?.map((item: any) => ({
+      return data.data?.map((item: { node: { id: number; title?: string; num_episodes?: number; main_picture?: { large?: string } } }) => ({
         id: item.node?.id,
         title: item.node?.title || '',
         episodes: item.node?.num_episodes || 0,
@@ -178,7 +182,7 @@ export class MALClient {
   }
 
   private generateCodeVerifier(): string {
-    return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+    return randomToken(32);
   }
 
   logout(): void {
