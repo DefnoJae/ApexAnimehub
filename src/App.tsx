@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   Search,
   Home,
@@ -25,7 +25,7 @@ import { fetchAnilist } from "./utils/anilist";
 import { getDisplayTitle, getShortTitle } from "./utils/schedule";
 import { DubScheduleView } from "./components/DubScheduleView";
 import { AnimeRow } from "./components/AnimeRow";
-import { useAccounts, ListAnime } from './hooks/useAccounts';
+import { useAccounts } from './hooks/useAccounts';
 import { AccountSettings } from './components/AccountSettings';
 import { ListControls } from './components/ListControls';
 import { VideoPlayer } from './components/VideoPlayer';
@@ -53,20 +53,6 @@ export default function App() {
   const [playingStream, setPlayingStream] = useState<any>(null);
 
   const [watchHistory, setWatchHistory] = useState<any[]>([]);
-  const lastPlayingAnime = useRef<number | null>(null);
-
-  useEffect(() => {
-    if (accounts.checking) return;
-    if (!playingStream) { lastPlayingAnime.current = null; return; }
-    if (selectedAnime?.id && lastPlayingAnime.current !== selectedAnime.id) {
-      lastPlayingAnime.current = selectedAnime.id;
-      void syncWatching(selectedAnime);
-    }
-    // Beginning playback changes status; episode navigation records progress separately.
-
-  }, [playingStream?.url, accounts.checking, accounts.connected.anilist, accounts.connected.mal]);
-
-  const syncWatching = (anime: ListAnime) => accounts.sync(anime, 'watching', undefined, true);
   const markWatched = (automatic: boolean) => {
     if (!selectedAnime) return Promise.resolve([]);
     const completed = !!selectedAnime.episodes && activeEpisode >= selectedAnime.episodes;
@@ -236,7 +222,6 @@ export default function App() {
   const changeEpisode = (direction: "next" | "prev") => {
     const newEp = direction === "next" ? activeEpisode + 1 : activeEpisode - 1;
     if (!selectedAnime || newEp < 1 || (direction === 'next' && !canNextEpisode)) return;
-    if (direction === 'next') void markWatched(true);
     setActiveEpisode(newEp);
     resolveStreams(selectedAnime, newEp);
 
@@ -325,7 +310,7 @@ export default function App() {
 
       {showAccounts && <AccountSettings accounts={accounts} onClose={() => setShowAccounts(false)} />}
       {playingStream && <VideoPlayer title={getDisplayTitle(selectedAnime)} episode={activeEpisode} stream={playingStream} canNext={canNextEpisode}
-        onPrevious={() => changeEpisode('prev')} onNext={() => changeEpisode('next')} onWatched={() => void markWatched(false)}
+        onPrevious={() => changeEpisode('prev')} onNext={() => changeEpisode('next')} onWatched={() => void markWatched(true)}
         onClose={() => setPlayingStream(null)} accounts={accounts} />}
 
       {(contentError || searchError) && <div role="alert" className="fixed top-4 z-[400] bg-slate-900 text-white p-4 rounded-xl">{contentError || searchError} {contentError && <button className="text-purple-400 underline" onClick={loadContent}>Retry</button>}</div>}

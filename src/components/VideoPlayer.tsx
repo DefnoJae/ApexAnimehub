@@ -1,64 +1,88 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { SkipForward, X, Maximize, Volume2, VolumeX, Play, Pause } from 'lucide-react';
 import type { useAccounts } from '../hooks/useAccounts';
 interface PlayerProps { title: string; episode: number; stream: { url: string; name: string }; canNext: boolean; onPrevious: () => void; onNext: () => void; onWatched: () => void; onClose: () => void; accounts: ReturnType<typeof useAccounts> }
 export function trustedPlaybackMessage(event: MessageEvent, source: Window | null, origin: string): Record<string, unknown> | null {
   if (!source || event.source !== source || event.origin !== origin) return null;
   try { const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data; return data && typeof data === 'object' && !Array.isArray(data) ? data : null; } catch { return null; }
 }
-const timeLabel = (value: number) => Math.floor(value / 60) + ':' + String(Math.floor(value % 60)).padStart(2, '0');
-export function VideoPlayer({ title, episode, stream, canNext, onNext, onWatched, onClose, accounts }: PlayerProps) {
+export function VideoPlayer({ title, episode, stream, canNext, onPrevious, onNext, onWatched, onClose, accounts }: PlayerProps) {
   const frame = useRef<HTMLDivElement>(null), iframe = useRef<HTMLIFrameElement>(null);
   const watched = useRef(false);
-  const lastSample = useRef<number | null>(null);
-  const [visible, setVisible] = useState(true), [ready, setReady] = useState(false), [muted, setMuted] = useState(false), [playing, setPlaying] = useState(false);
-  const [position, setPosition] = useState(0), [duration, setDuration] = useState(0), [error, setError] = useState('');
-  const idle = useRef<ReturnType<typeof setTimeout>>();
-  const callbacks = useRef({ onWatched, autoSync: accounts.autoSync }); callbacks.current = { onWatched, autoSync: accounts.autoSync };
+  const loaded = useRef(false);
+  const restoreFullscreen = useRef(false);
+  const restoreTimer = useRef<ReturnType<typeof setTimeout>>();
+  const [fullscreen, setFullscreen] = useState(false), [error, setError] = useState('');
+  const callbacks = useRef({ onWatched, autoSync: accounts.autoSync, onPrevious, onNext, onClose, canNext, episode });
+  callbacks.current = { onWatched, autoSync: accounts.autoSync, onPrevious, onNext, onClose, canNext, episode };
   const origin = new URL(stream.url, window.location.origin).origin;
-  const command = (cmd: string, value?: number) => iframe.current?.contentWindow?.postMessage({ cmd, ...(value !== undefined ? { value } : {}) }, origin);
-  const wake = () => { setVisible(true); clearTimeout(idle.current); idle.current = setTimeout(() => setVisible(false), 3000); };
+  const focusShortcuts = () => frame.current?.focus({ preventScroll: true });
+  const enterFullscreen = () => { focusShortcuts(); void frame.current?.requestFullscreen().catch(() => setError('Fullscreen is unavailable in this browser.')); };
   useEffect(() => {
-    watched.current = false; lastSample.current = null; setReady(false); setPosition(0); setDuration(0); setError(''); setMuted(false); setPlaying(false);
+    watched.current = false; loaded.current = false; setError('');
     const listener = (event: MessageEvent) => {
       const data = trustedPlaybackMessage(event, iframe.current?.contentWindow || null, origin);
-      if (!data) return;
-      if (data.event === 'PLAYER_READY') setReady(true);
+      if (!data || !loaded.current) return;
       if (data.event === 'time' || data.event === 'CURRENT_TIME' || data.type === 'watching-log') {
-        const time = Number(data.time ?? data.currentTime), length = Number(data.duration);
-        if (data.event === 'CURRENT_TIME' && Number.isFinite(time)) {
-          if (lastSample.current !== null) setPlaying(Math.abs(time - lastSample.current) > 0.05);
-          lastSample.current = time;
+        const position = Number(data.time ?? data.currentTime), duration = Number(data.duration);
+        if (!watched.current && callbacks.current.autoSync && Number.isFinite(position) && Number.isFinite(duration) && duration > 0 && position >= duration * 0.8 && position <= duration + 5) {
+          watched.current = true; callbacks.current.onWatched();
         }
-        if (Number.isFinite(time) && time >= 0) setPosition(time);
-        if (Number.isFinite(length) && length > 0) { setDuration(length); setReady(true); }
       }
-      if (data.event === 'complete' && !watched.current && callbacks.current.autoSync) { watched.current = true; callbacks.current.onWatched(); }
       if (data.event === 'error') setError('The video source failed. Close the player and try another source.');
     };
     window.addEventListener('message', listener);
-    const poll = setInterval(() => command('GET_TIME'), 1000);
-    return () => { window.removeEventListener('message', listener); clearInterval(poll); clearTimeout(idle.current); };
+    const poll = setInterval(() => { if (origin !== 'null') iframe.current?.contentWindow?.postMessage({ cmd: 'GET_TIME' }, origin); }, 1000);
+    return () => { window.removeEventListener('message', listener); clearInterval(poll); };
   }, [stream.url, origin]);
-  const fullscreen = async () => { try { if (document.fullscreenElement) await document.exitFullscreen(); else await frame.current?.requestFullscreen(); } catch { setError('Fullscreen is unavailable in this browser.'); } };
-  return <div ref={frame} role="dialog" aria-modal="true" aria-label="Anime video player" onPointerMove={wake} onPointerDown={wake} onFocusCapture={wake} className="fixed inset-0 z-[500] bg-black text-white">
-    <iframe ref={iframe} key={stream.url} title={title + ' episode ' + episode} src={stream.url} className="absolute inset-0 w-full h-full border-none" allow="autoplay; encrypted-media" />
-    <div className={'absolute top-0 inset-x-0 p-4 bg-gradient-to-b from-black/80 to-transparent flex justify-between pointer-events-none transition-opacity ' + (visible ? 'opacity-100' : 'opacity-0')}>
-      <div><h2 className="font-bold">{title}</h2><p className="text-sm text-purple-300">Episode {episode} · {stream.name}</p></div>
-      <button aria-label="Close video player" onClick={onClose} className="pointer-events-auto p-2"><X size={24} /></button>
-    </div>
-    <div className={'absolute bottom-0 inset-x-0 px-4 pt-10 pb-3 bg-gradient-to-t from-black via-black/90 to-transparent transition-opacity ' + (visible ? 'opacity-100' : 'opacity-0')} onPointerEnter={() => { clearTimeout(idle.current); setVisible(true); }}>
-      {duration > 0 && <input aria-label="Seek video" type="range" min={0} max={duration} step={1} value={Math.min(position, duration)} onChange={event => { const time = Number(event.target.value); setPosition(time); command('SEEK', time); }} className="w-full accent-purple-500 h-1 mb-3" />}
-      <div className="flex items-center gap-3">
-        <button aria-label={playing ? 'Pause video' : 'Play video'} disabled={!ready} onClick={() => { command('PLAY_TOGGLE'); setPlaying(!playing); }} className="p-2 disabled:opacity-40">{playing ? <Pause size={22} /> : <Play size={22} />}</button>
-        <button aria-label={muted ? 'Unmute video' : 'Mute video'} disabled={!ready} onClick={() => { command('MUTE'); setMuted(!muted); }} className="p-2 disabled:opacity-40">{muted ? <VolumeX size={22} /> : <Volume2 size={22} />}</button>
-        <button aria-label="Next episode" title="Next episode" disabled={!canNext} onClick={onNext} className="p-2 hover:text-purple-300 disabled:opacity-30"><SkipForward size={22} /></button>
-        <span className="text-xs text-slate-300">{timeLabel(position)}{duration > 0 ? ' / ' + timeLabel(duration) : ''}</span>
-        <div className="flex-1" />
-        <button aria-label="Mark episode watched" title="Mark episode watched" disabled={accounts.busy || accounts.checking} onClick={onWatched} className="text-xs text-slate-300 disabled:opacity-30">Watched</button>
-        <button aria-label="Fullscreen player" onClick={() => void fullscreen()} className="p-2"><Maximize size={22} /></button>
-      </div>
-      {error && <p role="alert" className="text-sm text-amber-300">{error}</p>}
-    </div>
+  useEffect(() => {
+    let reclaim: ReturnType<typeof setTimeout> | undefined;
+    // Keyboard events cannot cross the provider's iframe. Keep shortcut focus on its host;
+    // mouse interaction with the native video controls remains available.
+    const blur = () => { reclaim = setTimeout(() => { if (document.activeElement === iframe.current) focusShortcuts(); }, 0); };
+    const changed = () => {
+      setFullscreen(!!document.fullscreenElement); focusShortcuts();
+      // Native iframe fullscreen hides the host and traps keyboard events in the
+      // cross-origin document. Promote it immediately while the click is active.
+      if (document.fullscreenElement === iframe.current && frame.current?.requestFullscreen) {
+        void frame.current.requestFullscreen().then(focusShortcuts).catch(() => setError('Use F or the Fullscreen button above the player to enable episode shortcuts.'));
+      }
+      if (!document.fullscreenElement && restoreFullscreen.current) { restoreFullscreen.current = false; enterFullscreen(); }
+    };
+    const navigate = (action: () => void) => {
+      restoreFullscreen.current = !!document.fullscreenElement;
+      // Promote iframe fullscreen to the persistent host before replacing an episode iframe.
+      if (document.fullscreenElement && document.fullscreenElement !== frame.current && frame.current?.requestFullscreen) void frame.current.requestFullscreen().then(action).catch(action);
+      else action();
+    };
+    const keyboard = (event: KeyboardEvent) => {
+      if (event.repeat || event.ctrlKey || event.metaKey || event.altKey) return;
+      const target = event.target instanceof HTMLElement ? event.target : null;
+      if (target?.closest('input, textarea, select, [contenteditable="true"]')) return;
+      switch (event.key.toLowerCase()) {
+        case 'n': if (callbacks.current.canNext) { event.preventDefault(); navigate(callbacks.current.onNext); } break;
+        case 'b': if (callbacks.current.episode > 1) { event.preventDefault(); navigate(callbacks.current.onPrevious); } break;
+        case 'f': event.preventDefault(); restoreFullscreen.current = false; if (document.fullscreenElement) void document.exitFullscreen(); else enterFullscreen(); break;
+        case 'escape': restoreFullscreen.current = false; if (!document.fullscreenElement) callbacks.current.onClose(); break;
+      }
+    };
+    focusShortcuts();
+    window.addEventListener('blur', blur); window.addEventListener('keydown', keyboard);
+    document.addEventListener('fullscreenchange', changed);
+    return () => { clearTimeout(reclaim); clearTimeout(restoreTimer.current); window.removeEventListener('blur', blur); window.removeEventListener('keydown', keyboard); document.removeEventListener('fullscreenchange', changed); };
+  }, []);
+  return <div ref={frame} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Anime video player" className="fixed inset-0 z-[500] bg-black text-white flex flex-col outline-none">
+    {!fullscreen && <div className="shrink-0 flex items-center gap-4 px-4 py-2 bg-zinc-950 text-sm">
+      <span className="truncate flex-1">{title} · Episode {episode} · {stream.name}</span>
+      <span className="text-zinc-400">N: Next · B: Previous · F: Fullscreen</span>
+      <button onClick={enterFullscreen} aria-label="Fullscreen player">Fullscreen</button>
+      <button onClick={onClose} aria-label="Close video player">Close</button>
+    </div>}
+    {error && <p role="alert" className="shrink-0 px-4 text-amber-300">{error}</p>}
+    <iframe ref={iframe} tabIndex={-1} onLoad={() => {
+      loaded.current = true; focusShortcuts();
+      if (restoreFullscreen.current && !document.fullscreenElement) { restoreFullscreen.current = false; enterFullscreen(); }
+      clearTimeout(restoreTimer.current);
+      restoreTimer.current = setTimeout(() => { restoreFullscreen.current = false; }, 1000);
+    }} title={title + ' episode ' + episode} src={stream.url} className="w-full flex-1 min-h-0 border-none" allow="autoplay; encrypted-media; fullscreen; picture-in-picture" allowFullScreen />
   </div>;
 }
