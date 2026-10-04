@@ -1,0 +1,18 @@
+import React from 'react';
+import type { useAccounts } from '../hooks/useAccounts';
+export function AccountSettings({ accounts, onClose }: { accounts: ReturnType<typeof useAccounts>; onClose: () => void }) {
+  return <div role="dialog" aria-modal="true" aria-label="Account settings" className="fixed inset-0 z-[600] bg-black/80 flex items-center justify-center p-4">
+    <div className="bg-[#151515] border border-purple-500/30 rounded-3xl p-8 w-full max-w-lg text-white">
+      <div className="flex justify-between items-center mb-6"><h2 className="text-2xl font-bold">Account settings</h2><button onClick={onClose} aria-label="Close account settings">✕</button></div>
+      <p className="text-slate-400 mb-6">Connect your accounts to update your lists from anime details and the player.</p>
+      {(['anilist', 'mal'] as const).map(provider => <div key={provider} className="flex justify-between items-center gap-4 py-4 border-b border-white/10">
+        <div><p>{provider === 'mal' ? 'MyAnimeList' : 'AniList'}</p><p className="text-sm text-slate-400">{accounts.checking ? 'Checking…' : !accounts.configured[provider] ? 'Not configured on this deployment' : accounts.connected[provider] ? 'Connected' : 'Disconnected'}</p></div>
+        {accounts.connected[provider] ? <button disabled={accounts.busy} onClick={() => void accounts.disconnect(provider)} className="text-purple-300 disabled:opacity-50">Disconnect</button> : accounts.configured[provider] ? <a className="bg-purple-600 px-4 py-2 rounded-xl" href={'/api/oauth/' + provider + '/start'}>Connect</a> : <span className="text-xs text-amber-300">Setup required</span>}
+      </div>)}
+      <label className="flex gap-3 items-start my-6"><input type="checkbox" checked={accounts.autoSync} onChange={accounts.toggleAutoSync} /><span>Sync watching automatically<p className="text-sm text-slate-400 mt-1">An episode updates your connected lists only after playback reaches 80%. Skipping episodes does not record them as watched.</p></span></label>
+      {accounts.loginNotice && <p role="status" className="text-purple-300 mb-4">{accounts.loginNotice}</p>}
+      {accounts.accountError && <p role="alert" className="text-amber-300 mb-4">{accounts.accountError}</p>}
+      <button className="text-purple-300 underline" onClick={() => void accounts.refresh()}>Refresh connections</button>
+    </div>
+  </div>;
+}

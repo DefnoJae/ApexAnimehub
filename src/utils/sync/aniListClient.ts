@@ -1,51 +1,20 @@
-import type { SyncStatus, AnimeEntry } from '../types/sync';
+import { fetchAnilist } from '../anilist';
+import type { SyncStatus, AnimeEntry } from '../../types/sync';
 
-const ANILIST_CLIENT_ID = process.env.REACT_APP_ANILIST_CLIENT_ID || '';
-const ANILIST_REDIRECT_URI = process.env.REACT_APP_ANILIST_REDIRECT_URI || 'http://localhost:3000/oauth/anilist';
-const ANILIST_API = 'https://graphql.anilist.co';
 
 export class AniListClient {
-  private accessToken: string | null = null;
 
   constructor() {
-    this.accessToken = localStorage.getItem('anilist_access_token');
+    localStorage.removeItem('anilist_access_token');
   }
 
   getAuthorizationUrl(): string {
-    const params = new URLSearchParams({
-      client_id: ANILIST_CLIENT_ID,
-      redirect_uri: ANILIST_REDIRECT_URI,
-      response_type: 'code',
-    });
-    return `https://anilist.co/api/v2/oauth/authorize?${params.toString()}`;
+    return "/api/oauth/anilist/start";
   }
 
-  async authenticate(code: string): Promise<boolean> {
-    try {
-      const response = await fetch('https://anilist.co/api/v2/oauth/token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          grant_type: 'authorization_code',
-          client_id: ANILIST_CLIENT_ID,
-          client_secret: process.env.REACT_APP_ANILIST_CLIENT_SECRET,
-          redirect_uri: ANILIST_REDIRECT_URI,
-          code,
-        }),
-      });
-
-      if (!response.ok) throw new Error('Authentication failed');
-
-      const data = await response.json();
-      this.accessToken = data.access_token;
-      if (this.accessToken) {
-        localStorage.setItem('anilist_access_token', this.accessToken);
-      }
-      return true;
-    } catch (error) {
-      console.error('AniList authentication error:', error);
-      return false;
-    }
+  async authenticate(): Promise<boolean> {
+    const response = await fetch('/api/oauth/anilist/session', { credentials: 'same-origin' });
+    return response.ok;
   }
 
   async updateAnimeProgress(
@@ -53,7 +22,7 @@ export class AniListClient {
     episodeWatched: number,
     totalEpisodes?: number
   ): Promise<SyncStatus> {
-    if (!this.accessToken) {
+    if (!(await this.authenticate())) {
       return {
         success: false,
         provider: 'anilist',
@@ -76,25 +45,13 @@ export class AniListClient {
 
       const status = totalEpisodes && episodeWatched >= totalEpisodes ? 'COMPLETED' : 'CURRENT';
 
-      const response = await fetch(ANILIST_API, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${this.accessToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          query: mutation,
-          variables: {
-            mediaId: aniListId,
-            progress: episodeWatched,
-            status,
-          },
-        }),
+      const response = await fetch('/api/oauth/anilist/graphql', {
+        method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: mutation, variables: { mediaId: aniListId, progress: episodeWatched, status } }),
       });
-
+      if (!response.ok) throw new Error('AniList sync failed (' + response.status + ')');
       const data = await response.json();
-
-      if (data.errors) throw new Error(data.errors[0].message);
+      if (data.errors?.length || !data.data?.SaveMediaListEntry) throw new Error(data.errors?.[0]?.message || 'Missing AniList update result');
 
       return {
         success: true,
@@ -115,7 +72,7 @@ export class AniListClient {
   }
 
   async searchAnime(query: string): Promise<AnimeEntry[]> {
-    if (!this.accessToken) return [];
+
 
     try {
       const searchQuery = `
@@ -131,23 +88,8 @@ export class AniListClient {
         }
       `;
 
-      const response = await fetch(ANILIST_API, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${this.accessToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          query: searchQuery,
-          variables: { search: query },
-        }),
-      });
-
-      const data = await response.json();
-
-      if (data.errors) throw new Error(data.errors[0].message);
-
-      return data.data?.Page?.media?.map((item: any) => ({
+      const data = await fetchAnilist<{ Page: { media: Array<{ id: number; title: { english?: string; romaji?: string }; episodes?: number; coverImage?: { large: string } }> } }>(searchQuery, { search: query });
+      return data.Page.media?.map((item) => ({
         id: item.id,
         title: item.title?.english || item.title?.romaji || '',
         episodes: item.episodes || 0,
@@ -160,8 +102,8 @@ export class AniListClient {
   }
 
   logout(): void {
-    this.accessToken = null;
     localStorage.removeItem('anilist_access_token');
+    void fetch('/api/oauth/anilist/logout', { method: 'POST' });
   }
 }
 

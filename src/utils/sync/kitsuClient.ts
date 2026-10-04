@@ -1,4 +1,4 @@
-import type { SyncStatus, AnimeEntry } from '../types/sync';
+import type { SyncStatus, AnimeEntry } from '../../types/sync';
 
 const KITSU_API = 'https://kitsu.io/api/edge';
 
@@ -13,7 +13,7 @@ export class KitsuClient {
 
   async authenticate(email: string, password: string): Promise<boolean> {
     try {
-      const response = await fetch(`${KITSU_API}/auth/token`, {
+      const response = await fetch('https://kitsu.io/api/oauth/token', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams({
@@ -26,11 +26,16 @@ export class KitsuClient {
       if (!response.ok) throw new Error('Authentication failed');
 
       const data = await response.json();
+      if (typeof data.access_token !== 'string') throw new Error('Invalid Kitsu token');
+      const userResponse = await fetch(KITSU_API + '/users?filter[self]=true', { headers: { Authorization: 'Bearer ' + data.access_token, Accept: 'application/vnd.api+json' } });
+      if (!userResponse.ok) throw new Error('Kitsu user lookup failed');
+      const users = await userResponse.json();
+      if (typeof users.data?.[0]?.id !== 'string') throw new Error('Missing Kitsu user ID');
       this.accessToken = data.access_token;
-      this.userId = data.user_id;
+      this.userId = users.data[0].id;
 
-      localStorage.setItem('kitsu_access_token', this.accessToken);
-      localStorage.setItem('kitsu_user_id', this.userId);
+      localStorage.setItem('kitsu_access_token', data.access_token);
+      localStorage.setItem('kitsu_user_id', users.data[0].id);
       return true;
     } catch (error) {
       console.error('Kitsu authentication error:', error);
@@ -105,7 +110,7 @@ export class KitsuClient {
       if (!response.ok) throw new Error('Search failed');
 
       const data = await response.json();
-      return data.data?.map((item: any) => ({
+      return data.data?.map((item: { id: string; attributes?: { canonicalTitle?: string; episodeCount?: number; posterImage?: { small?: string } } }) => ({
         id: parseInt(item.id),
         title: item.attributes?.canonicalTitle || '',
         episodes: item.attributes?.episodeCount || 0,
@@ -117,18 +122,18 @@ export class KitsuClient {
     }
   }
 
-  private async getLibraryEntry(animeId: string): Promise<any | null> {
+  private async getLibraryEntry(animeId: string): Promise<{ id: string } | null> {
     try {
       const response = await fetch(
         `${KITSU_API}/library-entries?filter[userId]=${this.userId}&filter[animeId]=${animeId}`,
         { headers: { Authorization: `Bearer ${this.accessToken}` } }
       );
 
+      if (!response.ok) throw new Error('Kitsu library lookup failed');
       const data = await response.json();
       return data.data?.[0] || null;
     } catch (error) {
-      console.error('Kitsu get entry error:', error);
-      return null;
+      throw error;
     }
   }
 
