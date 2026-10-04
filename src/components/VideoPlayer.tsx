@@ -10,6 +10,7 @@ const timeLabel = (value: number) => Math.floor(value / 60) + ':' + String(Math.
 export function VideoPlayer({ title, episode, stream, canNext, onNext, onWatched, onClose, accounts }: PlayerProps) {
   const frame = useRef<HTMLDivElement>(null), iframe = useRef<HTMLIFrameElement>(null);
   const watched = useRef(false);
+  const lastSample = useRef<number | null>(null);
   const [visible, setVisible] = useState(true), [ready, setReady] = useState(false), [muted, setMuted] = useState(false), [playing, setPlaying] = useState(false);
   const [position, setPosition] = useState(0), [duration, setDuration] = useState(0), [error, setError] = useState('');
   const idle = useRef<ReturnType<typeof setTimeout>>();
@@ -18,17 +19,20 @@ export function VideoPlayer({ title, episode, stream, canNext, onNext, onWatched
   const command = (cmd: string, value?: number) => iframe.current?.contentWindow?.postMessage({ cmd, ...(value !== undefined ? { value } : {}) }, origin);
   const wake = () => { setVisible(true); clearTimeout(idle.current); idle.current = setTimeout(() => setVisible(false), 3000); };
   useEffect(() => {
-    watched.current = false; setReady(false); setPosition(0); setDuration(0); setError(''); setMuted(false); setPlaying(false);
+    watched.current = false; lastSample.current = null; setReady(false); setPosition(0); setDuration(0); setError(''); setMuted(false); setPlaying(false);
     const listener = (event: MessageEvent) => {
       const data = trustedPlaybackMessage(event, iframe.current?.contentWindow || null, origin);
       if (!data) return;
       if (data.event === 'PLAYER_READY') setReady(true);
       if (data.event === 'time' || data.event === 'CURRENT_TIME' || data.type === 'watching-log') {
         const time = Number(data.time ?? data.currentTime), length = Number(data.duration);
+        if (data.event === 'CURRENT_TIME' && Number.isFinite(time)) {
+          if (lastSample.current !== null) setPlaying(Math.abs(time - lastSample.current) > 0.05);
+          lastSample.current = time;
+        }
         if (Number.isFinite(time) && time >= 0) setPosition(time);
         if (Number.isFinite(length) && length > 0) { setDuration(length); setReady(true); }
       }
-      if (data.event === 'time' || data.type === 'watching-log') setPlaying(true);
       if (data.event === 'complete' && !watched.current && callbacks.current.autoSync) { watched.current = true; callbacks.current.onWatched(); }
       if (data.event === 'error') setError('The video source failed. Close the player and try another source.');
     };
