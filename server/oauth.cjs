@@ -2,7 +2,7 @@
 const http = require('node:http');
 const { randomBytes } = require('node:crypto');
 const { updateList, validateUpdate } = require('./list.cjs');
-const origin = process.env.APP_ORIGIN || 'http://localhost:3000';
+const origin = process.env.APP_ORIGIN || ((process.env.VERCEL_BRANCH_URL || process.env.VERCEL_URL) ? 'https://' + (process.env.VERCEL_BRANCH_URL || process.env.VERCEL_URL) : 'http://localhost:3000');
 const sessions = new Map();
 const locks = new Map();
 const token = () => randomBytes(32).toString('hex');
@@ -10,13 +10,14 @@ function cookie(res, id, age = 86400) {
   res.setHeader('Set-Cookie', 'apex_session=' + id + '; HttpOnly; SameSite=Lax; Path=/; Max-Age=' + age + (origin.startsWith('https:') ? '; Secure' : ''));
 }
 async function body(req) {
+  if (req.body !== undefined) { const serialized = typeof req.body === 'string' ? req.body : JSON.stringify(req.body); if (serialized.length > 32768) throw new Error('Request too large'); return JSON.parse(serialized); }
   let data = '';
   for await (const chunk of req) { data += chunk; if (data.length > 32768) throw new Error('Request too large'); }
   return JSON.parse(data);
 }
 function config(provider) {
   const prefix = provider === 'mal' ? 'MAL' : 'ANILIST';
-  return { clientId: process.env[prefix + '_CLIENT_ID'], secret: process.env[prefix + '_CLIENT_SECRET'], redirect: process.env[prefix + '_REDIRECT_URI'], tokenUrl: provider === 'mal' ? 'https://myanimelist.net/v1/oauth2/token' : 'https://anilist.co/api/v2/oauth/token' };
+  return { clientId: process.env[prefix + '_CLIENT_ID'], secret: process.env[prefix + '_CLIENT_SECRET'], redirect: process.env[prefix + '_REDIRECT_URI'] || origin + '/api/oauth/' + provider + '/callback', tokenUrl: provider === 'mal' ? 'https://myanimelist.net/v1/oauth2/token' : 'https://anilist.co/api/v2/oauth/token' };
 }
 async function accessAccount(session, provider) {
   const account = session?.accounts?.[provider];
@@ -42,12 +43,20 @@ function createServer() {
     const send = (status, data) => { res.writeHead(status, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(data)); };
     try {
       if (req.method === 'POST' && req.headers.origin !== origin) return send(403, { error: 'Invalid origin' });
+      if (url.pathname === '/api/accounts' && req.method === 'GET') {
+        const info = {};
+        for (const provider of ['anilist', 'mal']) {
+          const cfg = config(provider);
+          info[provider] = { configured: req.apexSessionReady !== false && !!cfg.clientId && (provider !== 'anilist' || !!cfg.secret), callback: cfg.redirect, connected: !!(await accessAccount(current, provider)) };
+        }
+        return send(200, { providers: info });
+      }
       const route = /^\/api\/oauth\/(anilist|mal)\/(start|callback|session|logout|graphql)$/.exec(url.pathname);
       if (route) {
         const [, provider, action] = route;
         const cfg = config(provider);
         if (action === 'start' && req.method === 'GET') {
-          if (!cfg.clientId || !cfg.redirect || (provider === 'anilist' && !cfg.secret)) return send(503, { error: provider + ' OAuth server is not configured' });
+          if (req.apexSessionReady === false || !cfg.clientId || !cfg.redirect || (provider === 'anilist' && !cfg.secret)) return send(503, { error: provider + ' OAuth server is not configured' });
           // Retain the other provider when connecting a second account.
           const nextId = id && current ? id : token();
           const session = current || { accounts: {}, pending: {}, expiresAt: Date.now() + 86400000 };

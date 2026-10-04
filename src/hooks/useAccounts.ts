@@ -16,6 +16,7 @@ export async function sendListUpdate(provider: AccountProvider, anime: ListAnime
 }
 export function useAccounts() {
   const [connected, setConnected] = useState<Record<AccountProvider, boolean>>({ anilist: false, mal: false });
+  const [configured, setConfigured] = useState<Record<AccountProvider, boolean>>({ anilist: false, mal: false });
   const [checking, setChecking] = useState(true);
   const [accountError, setAccountError] = useState('');
   const [loginNotice] = useState(() => {
@@ -29,13 +30,15 @@ export function useAccounts() {
   const queue = useRef<Promise<unknown>>(Promise.resolve());
   const refresh = useCallback(async () => {
     setChecking(true); setAccountError('');
-    const checks = await Promise.allSettled(providers.map(async provider => {
-      const response = await fetch('/api/oauth/' + provider + '/session');
-      if (!response.ok && response.status !== 401) throw new Error('Account service unavailable. Please try again.');
-      const data = await response.json(); return !!data.authenticated;
-    }));
-    setConnected({ anilist: checks[0].status === 'fulfilled' && checks[0].value, mal: checks[1].status === 'fulfilled' && checks[1].value });
-    if (checks.some(r => r.status === 'rejected')) setAccountError('Could not check account connections. The account service may be unavailable.');
+    try {
+      const response = await fetch('/api/accounts');
+      if (!response.ok) throw new Error('Account service unavailable');
+      const data = await response.json();
+      if (!data.providers) throw new Error('Account backend is missing from this deployment');
+      setConnected({ anilist: !!data.providers.anilist.connected, mal: !!data.providers.mal.connected });
+      setConfigured({ anilist: !!data.providers.anilist.configured, mal: !!data.providers.mal.configured });
+      if (!data.providers.anilist.configured || !data.providers.mal.configured) setAccountError('Some account connections need developer credentials configured by the site owner.');
+    } catch (error) { setAccountError(error instanceof Error ? error.message : 'Account service unavailable'); }
     setChecking(false);
   }, []);
   useEffect(() => { void refresh(); }, [refresh]);
@@ -69,5 +72,5 @@ export function useAccounts() {
     queue.current = task;
     return task;
   };
-  return { connected, checking, accountError, loginNotice, autoSync, toggleAutoSync, refresh, disconnect, sync, results, message, busy: pending > 0 };
+  return { connected, configured, checking, accountError, loginNotice, autoSync, toggleAutoSync, refresh, disconnect, sync, results, message, busy: pending > 0 };
 }

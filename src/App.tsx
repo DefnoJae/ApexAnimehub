@@ -192,7 +192,11 @@ export default function App() {
     startEpisode: number = 1,
     startStream: string | null = null
   ) => {
-    if (!anime?.id) return;
+    if (!anime?.id && anime?.idMal) {
+      try { const result = await fetchAnilist<{ Media: any }>('query($idMal:Int){Media(idMal:$idMal,type:ANIME){id idMal title{english romaji} coverImage{extraLarge} episodes}}', { idMal: anime.idMal }); anime = result.Media; }
+      catch { setContentError('Could not match this dub release to its anime details.'); return; }
+    }
+    if (!anime?.id) { setContentError('No confirmed anime details are available for this release.'); return; }
     if (!startStream) setPlayingStream(null);
     setSelectedAnime(anime);
     setView("details");

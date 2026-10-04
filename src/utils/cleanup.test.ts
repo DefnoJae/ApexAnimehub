@@ -78,3 +78,12 @@ test('Kitsu resolves authenticated user ID and avoids writes after library looku
   expect((await client.updateAnimeProgress('1', 2)).success).toBe(false);
   expect(mock).toHaveBeenCalledTimes(3);
 });
+
+test('weekly timetable includes every dated dub and never uses Asuna media IDs as AniList IDs', async () => {
+  const { timetableEntry, isoWeek } = await import('./dubSchedule');
+  const item = {title:'Example',route:'example',episode_date:'2026-10-05T12:00:00Z',episode_number:2,air_type:'dub',media:{mal_id:123}};
+  expect(timetableEntry(item)?.media?.media.id).toBe(0);
+  expect(timetableEntry(item)?.media?.media.idMal).toBe(123);
+  expect(isoWeek(new Date(2026,9,5))).toEqual({year:2026,week:41});
+  expect(timetableEntry({...item,air_type:'sub'})).toBeNull();
+});

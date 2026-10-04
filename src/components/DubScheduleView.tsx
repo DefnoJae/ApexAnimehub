@@ -2,16 +2,17 @@ import React, { useState, useEffect } from "react";
 import { Search, Settings, Play, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import type { ScheduleEntry } from "../types/schedule";
 import { getDisplayTitle, getShortTitle, formatAirTime, getDayOfWeek, getCurrentDateFormatted, isSameDay, getWeekStart, mondayOffset } from "../utils/schedule";
-import { fetchDubSchedule, ScheduleResult } from "../utils/dubSchedule";
+import { fetchDubRange, ScheduleResult } from "../utils/dubSchedule";
 // FULL CALENDAR VIEW
 interface FullCalendarViewProps {
   dubSchedule: ScheduleEntry[];
   onSelectMedia: (media: any, startEpisode?: number, startStream?: string | null) => void;
   onBack: () => void;
+  currentMonth: Date;
+  setCurrentMonth: (date: Date) => void;
 }
 
-const FullCalendarView = ({ dubSchedule, onSelectMedia, onBack }: FullCalendarViewProps) => {
-  const [currentMonth, setCurrentMonth] = useState(new Date());
+const FullCalendarView = ({ dubSchedule, onSelectMedia, onBack, currentMonth, setCurrentMonth }: FullCalendarViewProps) => {
 
   const daysInMonth = new Date(
     currentMonth.getFullYear(),
@@ -162,10 +163,10 @@ const FullCalendarView = ({ dubSchedule, onSelectMedia, onBack }: FullCalendarVi
 
                     {/* ENTRIES FOR THIS DAY */}
                     <div className="space-y-2 max-h-[230px] overflow-y-auto no-scrollbar">
-                      {entries.slice(0, 4).map((entry, eIdx) => {
+                      {entries.map((entry, eIdx) => {
                         const totalEpisodes = entry.media?.media?.episodes;
                         const isFinale =
-                          totalEpisodes &&
+                          !!totalEpisodes &&
                           entry.episodeNumber === totalEpisodes;
 
                         return (
@@ -200,11 +201,6 @@ const FullCalendarView = ({ dubSchedule, onSelectMedia, onBack }: FullCalendarVi
                           </div>
                         );
                       })}
-                      {entries.length > 4 && (
-                        <div className="text-[10px] text-slate-500 font-black px-2">
-                          + {entries.length - 4} more
-                        </div>
-                      )}
                     </div>
                   </>
                 )}
@@ -309,6 +305,7 @@ export const DubScheduleView = ({ onSelectMedia }: DubScheduleViewProps) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [viewMode, setViewMode] = useState("weekly"); // 'weekly' or 'calendar'
   const [weekOffset, setWeekOffset] = useState(0);
+  const [calendarMonth, setCalendarMonth] = useState(new Date());
   const [scheduleStatus, setScheduleStatus] = useState<ScheduleResult | null>(null);
   const [reload, setReload] = useState(0);
 
@@ -316,22 +313,16 @@ export const DubScheduleView = ({ onSelectMedia }: DubScheduleViewProps) => {
     let active = true;
     const loadSchedule = async () => {
       setLoading(true);
-      const result = await fetchDubSchedule();
+      const first = viewMode === 'calendar' ? new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), 1) : getWeekStart(new Date());
+      if (viewMode !== 'calendar') first.setDate(first.getDate() + weekOffset * 7);
+      const last = viewMode === 'calendar' ? new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 0, 23, 59) : new Date(first);
+      if (viewMode !== 'calendar') last.setDate(last.getDate() + 6);
+      const result = await fetchDubRange(first, last, reload > 0);
       if (!active) return;
       setScheduleStatus(result);
       const schedule = result.entries;
 
-      const now = new Date();
-      const ninetyDaysAhead = new Date(
-        now.getTime() + 90 * 24 * 60 * 60 * 1000
-      );
-      const ninetyDaysAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
-
       const filtered = schedule
-        .filter((entry) => {
-          const airDate = new Date(entry.episodeDate);
-          return airDate >= ninetyDaysAgo && airDate <= ninetyDaysAhead;
-        })
         .map((entry) => ({
           ...entry,
           displayTime: formatAirTime(entry.episodeDate),
@@ -354,7 +345,7 @@ export const DubScheduleView = ({ onSelectMedia }: DubScheduleViewProps) => {
 
     loadSchedule();
     return () => { active = false; };
-  }, [reload]);
+  }, [reload, weekOffset, viewMode, calendarMonth]);
 
   const filteredSchedule = dubSchedule.filter((entry) =>
     getDisplayTitle(entry.media?.media)
@@ -411,7 +402,7 @@ export const DubScheduleView = ({ onSelectMedia }: DubScheduleViewProps) => {
 
   const status = <div role="status" className="px-6 py-3 text-sm text-slate-400">
     {scheduleStatus?.error && <span>{scheduleStatus.error} {scheduleStatus.cached ? "Showing saved schedule. " : ""}</span>}
-    {scheduleStatus?.updatedAt && <span>Last updated: {new Date(scheduleStatus.updatedAt).toLocaleString()} · Times are local. </span>}
+    {scheduleStatus?.updatedAt && <span>Dub timetable via AsunaTracks / AnimeSchedule · Last updated: {new Date(scheduleStatus.updatedAt).toLocaleString()} · Times are local. </span>}
     {!dubSchedule.length && <span>No schedule data available. </span>}
     <button className="text-purple-400 underline" onClick={() => setReload(n => n + 1)}>Refresh</button>
   </div>;
@@ -421,6 +412,7 @@ export const DubScheduleView = ({ onSelectMedia }: DubScheduleViewProps) => {
       <>{status}<FullCalendarView
         dubSchedule={filteredSchedule}
         onSelectMedia={onSelectMedia}
+        currentMonth={calendarMonth} setCurrentMonth={setCalendarMonth}
         onBack={() => setViewMode("weekly")}
       /></>
     );
@@ -556,4 +548,3 @@ export const DubScheduleView = ({ onSelectMedia }: DubScheduleViewProps) => {
     </div>
   );
 };
-

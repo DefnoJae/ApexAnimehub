@@ -11,6 +11,7 @@ export interface DubEntry {
   media?: {
     media: {
       id: number;
+      idMal?: number;
       title: { english?: string; romaji?: string };
       coverImage: { extraLarge: string };
       description: string;

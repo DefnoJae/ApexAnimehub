@@ -6,7 +6,7 @@ Use Node 20+ and copy .env.local.example to .env.local. Set APP_ORIGIN to the ex
 
 Start the backend with node --env-file=.env.local server/oauth.cjs, and the app with npm start. Development uses the CRA proxy to port 3001. In production, serve the frontend and route /api/oauth/* and /api/list/* to the backend on the SAME origin over HTTPS. The backend binds to loopback for a reverse proxy. Register that origin's /api/oauth/anilist/callback and /api/oauth/mal/callback with the respective provider.
 
-Both dashboard connections use authorization-code exchange on the server, with one-use state expiring after ten minutes, HttpOnly SameSite cookies, Origin checks on POST, bounded bodies and upstream timeouts. MAL uses a cryptographically random 64-character plain PKCE verifier for provider compatibility and refreshes expired access tokens server-side. Tokens never enter dashboard browser storage. Both account connections coexist in a session; disconnecting one retains the other. Sessions are in memory, expire within one day, and are lost on restart. Use a shared expiring session store for multi-instance deployment.
+Both dashboard connections use authorization-code exchange on the server, with one-use state expiring after ten minutes, HttpOnly SameSite cookies, Origin checks on POST, bounded bodies and upstream timeouts. MAL uses a cryptographically random 64-character plain PKCE verifier for provider compatibility and refreshes expired access tokens server-side. Tokens never enter dashboard browser storage. Both account connections coexist in a session; disconnecting one retains the other. Local standalone sessions are in memory. Vercel uses encrypted authenticated cookies that survive instance changes; see VERCEL_SETUP.md for deployment settings and session limits.
 
 ## User flow
 
@@ -14,7 +14,7 @@ Open Settings, connect AniList and/or MyAnimeList, and return to the app. Connec
 
 Automatic watching sync is enabled by default and can be disabled in Settings. Starting playback marks Watching without counting an unfinished episode. Next episode records the episode being left before opening the next source. Mark watched records the current episode explicitly, including the final one, and marks Completed only when the actual total episode count is known. Progress reports never lower existing provider progress. Automatic playback updates preserve a provider's existing Completed status. Actions are queued, with provider calls run concurrently, and server updates to each anime are serialized.
 
-The player is a third-party cross-origin iframe. ApexAnimehub supplies its own persistent Previous, Next episode, Mark watched and Fullscreen controls within the player frame. Fullscreen uses the entire frame so these controls remain visible. The embed does not supply a verified playback-completion API; opening, pausing or closing it is not treated as proof that an episode was finished.
+The player is a third-party cross-origin iframe. ApexAnimehub supplies compact on-video controls with Next beside volume, Mark watched and Fullscreen within the player frame. Fullscreen uses the entire frame so these controls remain visible. MegaPlay supplies completion messages; ApexAnimehub validates the exact iframe window and origin before recording completion. Opening, pausing or closing it is not treated as proof of completion.
 
 ## Other integration APIs
 
