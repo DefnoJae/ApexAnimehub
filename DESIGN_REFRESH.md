@@ -10,15 +10,19 @@ Latest Episodes uses recent AniList airing schedules for Sub and the existing As
 
 Discovery uses horizontal portrait rows (seven posters across on wide desktop, fewer on tablets and mobile), titles below, hover/focus detail hints, and list status menus connected to the existing AniList/MAL sync path. There is no Top Airing side panel. Native scrolling remains available, with scrollbar tracks hidden throughout the first-party app.
 
-## Optional anime title logos
+## Anime title logos
 
-AniList does not supply transparent title logos. Add approved title artwork under `public/`, then map AniList IDs to paths in `public/anime-logos.json`, for example:
+Hero title artwork is resolved automatically through [AniZip](https://api.ani.zip/mappings?anilist_id=16498), using the exact AniList ID. Its response supplies TheTVDB clearlogos and IMDb mappings. Explicitly English clearlogos are preferred, followed by Metahub's default logo and the remaining TVDB clearlogo. Metahub's English title treatment was verified for Attack on Titan. No API key is required. Artwork coverage and language vary by title, especially for upcoming seasons.
+
+Lookups run only for the active hero, time out after 4.5 seconds, deduplicate requests, cache metadata for seven days, and reuse stale metadata on failure. Candidate image hosts are restricted. Missing images try the next candidate and finally fall back to readable text. Requests omit credentials and user account data.
+
+For a curated override, add approved title artwork under `public/`, then map AniList IDs to paths in `public/anime-logos.json`, for example:
 
 ```json
 { "16498": "/logos/attack-on-titan.png" }
 ```
 
-The default catalog is empty. Missing or failed logo images fall back to readable italic title text. No third-party API key is required.
+The default override catalog is empty; automatic sourcing remains active. A configured override takes priority. Clearlogos may identify the overall series when season-specific artwork is unavailable.
 
 ## Publishing
 

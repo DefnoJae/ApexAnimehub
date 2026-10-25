@@ -5,8 +5,10 @@ import { HomeDashboard, QuickList, FloatingNavigation } from "./HomeDashboard";
 import { useAccounts } from "../hooks/useAccounts";
 import { fetchAnilist } from "../utils/anilist";
 import { fetchDubRange } from "../utils/dubSchedule";
+import { fetchHeroArtwork } from "../utils/heroArtwork";
 jest.mock("../utils/anilist");
 jest.mock("../utils/dubSchedule");
+jest.mock("../utils/heroArtwork");
 (
   globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }
 ).IS_REACT_ACT_ENVIRONMENT = true;
@@ -18,6 +20,7 @@ const anime = {
 };
 let node: HTMLDivElement, root: Root;
 beforeEach(() => {
+  (fetchHeroArtwork as jest.Mock).mockResolvedValue([]);
   node = document.createElement("div");
   document.body.appendChild(node);
   root = createRoot(node);
@@ -44,6 +47,38 @@ function fakeAccounts() {
     sync: jest.fn().mockResolvedValue([{ provider: "anilist", success: true }]),
   } as unknown as ReturnType<typeof useAccounts>;
 }
+
+test("hero tries alternative logo artwork and returns to text if both images fail", async () => {
+  (fetchHeroArtwork as jest.Mock).mockResolvedValue([
+    "https://images.metahub.space/logo/medium/tt123/img",
+    "https://artworks.thetvdb.com/logo.png",
+  ]);
+  await act(async () => {
+    root.render(
+      <HomeDashboard
+        slides={[anime]}
+        rows={[]}
+        history={[]}
+        accounts={fakeAccounts()}
+        onSelect={jest.fn()}
+        onWatch={jest.fn()}
+        onResume={jest.fn()}
+        onRemove={jest.fn()}
+        onCalendar={jest.fn()}
+      />,
+    );
+  });
+  expect(node.querySelector("h1 img")?.getAttribute("src")).toContain(
+    "metahub",
+  );
+  act(() => node.querySelector("h1 img")!.dispatchEvent(new Event("error")));
+  expect(node.querySelector("h1 img")?.getAttribute("src")).toContain(
+    "thetvdb",
+  );
+  act(() => node.querySelector("h1 img")!.dispatchEvent(new Event("error")));
+  expect(node.querySelector("h1 img")).toBeNull();
+  expect(node.querySelector("h1")?.textContent).toBe("Example anime");
+});
 test("quick status actions preserve progress unless explicitly completing an anime", async () => {
   const accounts = fakeAccounts();
   act(() => root.render(<QuickList anime={anime} accounts={accounts} />));

@@ -12,6 +12,7 @@ import {
   X,
 } from "lucide-react";
 import { fetchAnilist } from "../utils/anilist";
+import { fetchHeroArtwork } from "../utils/heroArtwork";
 import { fetchDubRange } from "../utils/dubSchedule";
 import { getDisplayTitle } from "../utils/schedule";
 import type { ListAnime, ListStatus, useAccounts } from "../hooks/useAccounts";
@@ -442,6 +443,29 @@ export function HomeDashboard({
     }
   });
   const [logoFailed, setLogoFailed] = useState(false);
+  const [artwork, setArtwork] = useState<{
+    id: number;
+    logos: string[];
+  } | null>(null);
+  const [logoIndex, setLogoIndex] = useState(0);
+  const anime = slides[slide % Math.max(1, slides.length)],
+    resume = history.find((item) => item.anime.id === anime?.id);
+  useEffect(() => {
+    let active = true;
+    setLogoFailed(false);
+    setLogoIndex(0);
+    if (anime?.id && !anime.logoImage) {
+      void fetchHeroArtwork(anime.id).then((logos) => {
+        if (active) setArtwork({ id: anime.id, logos });
+      });
+    }
+    return () => {
+      active = false;
+    };
+  }, [anime?.id, anime?.logoImage]);
+  const titleLogo =
+    anime?.logoImage ||
+    (artwork?.id === anime?.id ? artwork?.logos[logoIndex] : undefined);
   useEffect(() => {
     const changed = () => setPageHidden(document.hidden);
     document.addEventListener("visibilitychange", changed);
@@ -462,11 +486,6 @@ export function HomeDashboard({
     );
     return () => clearInterval(timer);
   }, [paused, manual, pageHidden, slides.length]);
-  useEffect(() => {
-    setLogoFailed(false);
-  }, [slide]);
-  const anime = slides[slide % Math.max(1, slides.length)],
-    resume = history.find((item) => item.anime.id === anime?.id);
   return (
     <div className="home-dashboard">
       {anime && (
@@ -499,13 +518,17 @@ export function HomeDashboard({
           </picture>
           <div className="hero-shade" />
           <div className="hero-copy" key={"copy-" + anime.id}>
-            {anime.logoImage && !logoFailed ? (
+            {titleLogo && !logoFailed ? (
               <h1>
                 <img
                   className="hero-logo"
-                  src={anime.logoImage}
+                  key={titleLogo}
+                  src={titleLogo}
                   alt={getDisplayTitle(anime)}
-                  onError={() => setLogoFailed(true)}
+                  onError={() => {
+                    if (anime.logoImage) setLogoFailed(true);
+                    else setLogoIndex((index) => index + 1);
+                  }}
                 />
               </h1>
             ) : (
