@@ -1,34 +1,18 @@
 import React, { useState, useEffect, useCallback } from "react";
+import { ChevronLeft, ExternalLink, Mic, Search, Star, X } from "lucide-react";
 import {
-  Search,
-  Home,
-  Settings,
-  Play,
-  LayoutGrid,
-  Maximize,
-  Minimize,
-  X,
-  SkipBack,
-  SkipForward,
-  Loader2,
-  ChevronLeft,
-  ChevronRight,
-  Star,
-  History,
-  ExternalLink,
-  Sparkles,
-  Mic,
-  Calendar,
-} from "lucide-react";
-
+  HomeDashboard,
+  FloatingNavigation,
+  WatchEntry,
+} from "./components/HomeDashboard";
 import { fetchAnilist } from "./utils/anilist";
-import { getDisplayTitle, getShortTitle } from "./utils/schedule";
+import { getDisplayTitle } from "./utils/schedule";
 import { DubScheduleView } from "./components/DubScheduleView";
-import { AnimeRow } from "./components/AnimeRow";
-import { useAccounts } from './hooks/useAccounts';
-import { AccountSettings } from './components/AccountSettings';
-import { ListControls } from './components/ListControls';
-import { VideoPlayer } from './components/VideoPlayer';
+
+import { useAccounts } from "./hooks/useAccounts";
+import { AccountSettings } from "./components/AccountSettings";
+import { ListControls } from "./components/ListControls";
+import { VideoPlayer } from "./components/VideoPlayer";
 const THEME_COLOR = "8B5CF6";
 
 export default function App() {
@@ -38,13 +22,14 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [contentError, setContentError] = useState<string | null>(null);
   const [searchError, setSearchError] = useState<string | null>(null);
-  const [isFullscreenApp, setIsFullscreenApp] = useState(false);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [navHidden, setNavHidden] = useState(false);
   const [isSearchExpanded, setIsSearchExpanded] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<any[]>([]);
 
   const [heroSlides, setHeroSlides] = useState<any[]>([]);
-  const [currentSlide, setCurrentSlide] = useState(0);
+
   const [rows, setRows] = useState<any[]>([]);
 
   const [selectedAnime, setSelectedAnime] = useState<any>(null);
@@ -52,16 +37,25 @@ export default function App() {
   const [availableStreams, setAvailableStreams] = useState<any[]>([]);
   const [playingStream, setPlayingStream] = useState<any>(null);
 
-  const [watchHistory, setWatchHistory] = useState<any[]>([]);
+  const [watchHistory, setWatchHistory] = useState<WatchEntry[]>([]);
   const markWatched = (automatic: boolean) => {
     if (!selectedAnime) return Promise.resolve([]);
-    const completed = !!selectedAnime.episodes && activeEpisode >= selectedAnime.episodes;
-    return accounts.sync(selectedAnime, completed ? 'completed' : 'watching', activeEpisode, automatic);
+    const completed =
+      !!selectedAnime.episodes && activeEpisode >= selectedAnime.episodes;
+    return accounts.sync(
+      selectedAnime,
+      completed ? "completed" : "watching",
+      activeEpisode,
+      automatic,
+    );
   };
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.has('oauth')) { setShowAccounts(true); window.history.replaceState({}, '', window.location.pathname); }
+    if (params.has("oauth")) {
+      setShowAccounts(true);
+      window.history.replaceState({}, "", window.location.pathname);
+    }
   }, []);
 
   // --- DATA FETCHING ---
@@ -74,15 +68,37 @@ export default function App() {
     }`;
     setContentError(null);
     try {
-    const data = await fetchAnilist<{ trending: { media: any[] }; action: { media: any[] }; romance: { media: any[] } }>(query);
-    setHeroSlides(data.trending.media);
-    setRows([
-      { title: "Trending Now", animes: data.trending.media },
-      { title: "Action Picks", animes: data.action.media },
-      { title: "Romance Hits", animes: data.romance.media },
-    ]);
-    } catch (error) { setContentError(error instanceof Error ? error.message : "Could not load anime"); }
-    finally { setLoading(false); }
+      const data = await fetchAnilist<{
+        trending: { media: any[] };
+        action: { media: any[] };
+        romance: { media: any[] };
+      }>(query);
+      // AniList has no transparent title-logo field. Allow an optional local art
+      // catalog keyed by AniList ID, with readable text when an asset is missing.
+      let logos: Record<string, string> = {};
+      try {
+        const response = await fetch("/anime-logos.json");
+        if (response.ok) logos = await response.json();
+      } catch {}
+      setHeroSlides(
+        data.trending.media.map((anime) => ({
+          ...anime,
+          logoImage:
+            typeof logos?.[anime.id] === "string" ? logos[anime.id] : undefined,
+        })),
+      );
+      setRows([
+        { title: "Trending Now", animes: data.trending.media },
+        { title: "Action Picks", animes: data.action.media },
+        { title: "Romance Hits", animes: data.romance.media },
+      ]);
+    } catch (error) {
+      setContentError(
+        error instanceof Error ? error.message : "Could not load anime",
+      );
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -90,39 +106,85 @@ export default function App() {
     const savedHistory = localStorage.getItem("videasy_history");
     if (savedHistory) {
       try {
-        setWatchHistory(JSON.parse(savedHistory));
+        const saved = JSON.parse(savedHistory);
+        if (Array.isArray(saved))
+          setWatchHistory(
+            saved.filter((item) => item?.anime?.id && item.episode > 0),
+          );
       } catch (e) {
         console.error("Failed to parse history", e);
       }
     }
   }, [loadContent]);
 
-  // --- AUTO SLIDESHOW ---
   useEffect(() => {
-    if (heroSlides.length === 0 || view !== "all") return;
-    const slideTimer = setInterval(() => {
-      setCurrentSlide((prev) => (prev + 1) % heroSlides.length);
-    }, 6000);
-    return () => clearInterval(slideTimer);
-  }, [heroSlides.length, view]);
+    let previous = window.scrollY;
+    const scroll = () => {
+      const current = window.scrollY;
+      if (Math.abs(current - previous) > 8) {
+        setNavHidden(current > previous && current > 120);
+        previous = current;
+      }
+    };
+    window.addEventListener("scroll", scroll, { passive: true });
+    return () => window.removeEventListener("scroll", scroll);
+  }, []);
+  useEffect(() => {
+    window.scrollTo({ top: 0 });
+    setNavHidden(false);
+  }, [view]);
+  useEffect(() => {
+    if (!isSearchExpanded) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const close = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsSearchExpanded(false);
+        setSearchQuery("");
+      }
+    };
+    window.addEventListener("keydown", close);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", close);
+    };
+  }, [isSearchExpanded]);
 
   // --- SEARCH ---
   useEffect(() => {
     if (searchQuery.length < 3) {
+      setSearchLoading(false);
       setSearchResults([]);
       setSearchError(null);
       return;
     }
     const controller = new AbortController();
+    setSearchLoading(true);
     setSearchError(null);
     const delay = setTimeout(async () => {
       try {
-      const q = `query ($search: String) { Page(page: 1, perPage: 10) { media(search: $search, type: ANIME) { id idMal title { english romaji } coverImage { extraLarge } episodes nextAiringEpisode { episode } } } }`;
-      const data = await fetchAnilist<{ Page: { media: any[] } }>(q, { search: searchQuery }, controller.signal);
-      if (!controller.signal.aborted) setSearchResults(data.Page.media);
-      } catch (error) { if (!controller.signal.aborted) { setSearchResults([]); setSearchError(error instanceof Error ? error.message : "Search failed"); } }
+        const q = `query ($search: String) { Page(page: 1, perPage: 10) { media(search: $search, type: ANIME) { id idMal title { english romaji } coverImage { extraLarge } episodes nextAiringEpisode { episode } } } }`;
+        const data = await fetchAnilist<{ Page: { media: any[] } }>(
+          q,
+          { search: searchQuery },
+          controller.signal,
+        );
+        if (!controller.signal.aborted) setSearchResults(data.Page.media);
+      } catch (error) {
+        if (!controller.signal.aborted) {
+          setSearchResults([]);
+          setSearchError(
+            error instanceof Error ? error.message : "Search failed",
+          );
+        }
+      } finally {
+        if (!controller.signal.aborted) setSearchLoading(false);
+      }
     }, 400);
-    return () => { clearTimeout(delay); controller.abort(); };
+    return () => {
+      clearTimeout(delay);
+      controller.abort();
+    };
   }, [searchQuery]);
 
   // --- WATCH HISTORY MGMT ---
@@ -130,7 +192,15 @@ export default function App() {
     setWatchHistory((prev) => {
       const filtered = prev.filter((h) => h.anime.id !== anime.id);
       const newHistory = [
-        { anime, episode: ep, streamName, timestamp: Date.now() },
+        {
+          ...(prev.find(
+            (item) => item.anime.id === anime.id && item.episode === ep,
+          ) || {}),
+          anime,
+          episode: ep,
+          streamName,
+          timestamp: Date.now(),
+        },
         ...filtered,
       ].slice(0, 15);
       localStorage.setItem("videasy_history", JSON.stringify(newHistory));
@@ -150,7 +220,7 @@ export default function App() {
     onSelectMedia(
       historyItem.anime,
       historyItem.episode,
-      historyItem.streamName
+      historyItem.streamName,
     );
   };
 
@@ -176,20 +246,36 @@ export default function App() {
   const onSelectMedia = async (
     anime: any,
     startEpisode: number = 1,
-    startStream: string | null = null
+    startStream: string | null = null,
   ) => {
     if (!anime?.id && anime?.idMal) {
-      try { const result = await fetchAnilist<{ Media: any }>('query($idMal:Int){Media(idMal:$idMal,type:ANIME){id idMal title{english romaji} coverImage{extraLarge} episodes}}', { idMal: anime.idMal }); anime = result.Media; }
-      catch { setContentError('Could not match this dub release to its anime details.'); return; }
+      try {
+        const result = await fetchAnilist<{ Media: any }>(
+          "query($idMal:Int){Media(idMal:$idMal,type:ANIME){id idMal title{english romaji} coverImage{extraLarge} episodes}}",
+          { idMal: anime.idMal },
+        );
+        anime = result.Media;
+      } catch {
+        setContentError(
+          "Could not match this dub release to its anime details.",
+        );
+        return;
+      }
     }
-    if (!anime?.id) { setContentError('No confirmed anime details are available for this release.'); return; }
+    if (!anime?.id) {
+      setContentError(
+        "No confirmed anime details are available for this release.",
+      );
+      return;
+    }
     if (!startStream) setPlayingStream(null);
     setSelectedAnime(anime);
     setView("details");
     setActiveEpisode(startEpisode);
-    const resolved = resolveStreams(anime, startEpisode);
+    resolveStreams(anime, startEpisode);
 
     if (startStream) {
+      updateHistory(anime, startEpisode, startStream);
       const isDub = startStream.includes("Dub");
       setPlayingStream({
         name: startStream,
@@ -211,9 +297,13 @@ export default function App() {
           }
         }
       }`;
-      const fullData = await fetchAnilist<{ Media: any }>(query, { id: anime.id });
+      const fullData = await fetchAnilist<{ Media: any }>(query, {
+        id: anime.id,
+      });
       if (!fullData.Media?.id) throw new Error("AniList returned no media");
-      setSelectedAnime((current: { id: number } | null) => current?.id === anime.id ? fullData.Media : current);
+      setSelectedAnime((current: { id: number } | null) =>
+        current?.id === anime.id ? fullData.Media : current,
+      );
     } catch (e) {
       console.error("Failed to fetch relations", e);
     }
@@ -221,7 +311,12 @@ export default function App() {
 
   const changeEpisode = (direction: "next" | "prev") => {
     const newEp = direction === "next" ? activeEpisode + 1 : activeEpisode - 1;
-    if (!selectedAnime || newEp < 1 || (direction === 'next' && !canNextEpisode)) return;
+    if (
+      !selectedAnime ||
+      newEp < 1 ||
+      (direction === "next" && !canNextEpisode)
+    )
+      return;
     setActiveEpisode(newEp);
     resolveStreams(selectedAnime, newEp);
 
@@ -238,152 +333,158 @@ export default function App() {
   const totalEpisodes = selectedAnime?.episodes
     ? selectedAnime.episodes
     : selectedAnime?.nextAiringEpisode?.episode
+      ? selectedAnime.nextAiringEpisode.episode - 1
+      : 1;
+
+  const availableEpisodes = selectedAnime?.nextAiringEpisode?.episode
     ? selectedAnime.nextAiringEpisode.episode - 1
-    : 1;
+    : selectedAnime?.episodes;
+  const canNextEpisode =
+    availableEpisodes == null || activeEpisode < availableEpisodes;
 
-  const availableEpisodes = selectedAnime?.nextAiringEpisode?.episode ? selectedAnime.nextAiringEpisode.episode - 1 : selectedAnime?.episodes;
-  const canNextEpisode = availableEpisodes == null || activeEpisode < availableEpisodes;
-
+  const recordProgress = (position: number, duration: number) => {
+    if (!selectedAnime || !playingStream) return;
+    setWatchHistory((previous) => {
+      const next = previous.map((item) =>
+        item.anime.id === selectedAnime.id && item.episode === activeEpisode
+          ? { ...item, position, duration }
+          : item,
+      );
+      try {
+        localStorage.setItem("videasy_history", JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  };
   return (
-    <div
-      className={`bg-[#050505] text-white selection:bg-purple-500 overflow-hidden transition-all duration-700 ${
-        isFullscreenApp
-          ? "fixed inset-0"
-          : "min-h-screen p-4 flex items-center justify-center"
-      }`}
-    >
-      {/* 🚀 SIDEBAR */}
-      <div className="fixed left-0 top-0 w-[5px] h-full z-[450] group/trigger">
+    <div className="apex-shell">
+      <FloatingNavigation
+        view={view}
+        hidden={navHidden}
+        onView={(next) => {
+          setView(next);
+          setPlayingStream(null);
+          window.scrollTo({ top: 0 });
+          setNavHidden(false);
+        }}
+        onSearch={() => setIsSearchExpanded(true)}
+        onSettings={() => setShowAccounts(true)}
+      />
+      {showAccounts && (
+        <AccountSettings
+          accounts={accounts}
+          onClose={() => setShowAccounts(false)}
+        />
+      )}
+      {playingStream && (
+        <VideoPlayer
+          title={getDisplayTitle(selectedAnime)}
+          episode={activeEpisode}
+          stream={playingStream}
+          canNext={canNextEpisode}
+          onPrevious={() => changeEpisode("prev")}
+          onNext={() => changeEpisode("next")}
+          onWatched={() => void markWatched(true)}
+          onClose={() => setPlayingStream(null)}
+          onProgress={recordProgress}
+          accounts={accounts}
+        />
+      )}
+
+      {(contentError || searchError) && (
         <div
-          className={`fixed z-[400] top-1/2 -translate-y-1/2 w-20 h-[750px] bg-white/5 backdrop-blur-3xl border border-white/10 rounded-full flex flex-col items-center py-12 space-y-10 shadow-2xl transition-all duration-500 ${
-            isFullscreenApp
-              ? "-left-24 group-hover/trigger:left-4 opacity-0 group-hover/trigger:opacity-100"
-              : "left-6 opacity-100 hover:bg-white/10"
-          }`}
+          role="alert"
+          className="fixed top-4 z-[400] bg-slate-900 text-white p-4 rounded-xl"
         >
-          <div className="w-12 h-12 bg-purple-600 rounded-full flex items-center justify-center animate-pulse">
-            <LayoutGrid size={22} />
-          </div>
-          <Home
-            onClick={() => {
-              setView("all");
-              setPlayingStream(null);
-            }}
-            className={`cursor-pointer transition-all ${
-              view === "all"
-                ? "text-purple-500 scale-150"
-                : "text-zinc-500 hover:text-white"
-            }`}
-          />
-          <Calendar
-            onClick={() => {
-              setView("dub-releases");
-              setPlayingStream(null);
-            }}
-            className={`cursor-pointer transition-all ${
-              view === "dub-releases"
-                ? "text-purple-500 scale-150"
-                : "text-zinc-500 hover:text-white"
-            }`}
-          />
-          <Mic
-            onClick={() => {
-              setView("dub-tracker");
-              setPlayingStream(null);
-            }}
-            className={`cursor-pointer transition-all ${
-              view === "dub-tracker"
-                ? "text-purple-500 scale-150"
-                : "text-zinc-500 hover:text-white"
-            }`}
-          />
-          <div className="flex-grow" />
-          <button
-            onClick={() => setIsFullscreenApp(!isFullscreenApp)}
-            className="text-zinc-500 hover:text-white"
-          >
-            {isFullscreenApp ? <Minimize size={20} /> : <Maximize size={20} />}
-          </button>
-          <button aria-label="Account settings" onClick={() => setShowAccounts(true)}><Settings className="text-zinc-500 hover:text-white" /></button>
+          {contentError || searchError}{" "}
+          {contentError && (
+            <button className="text-purple-400 underline" onClick={loadContent}>
+              Retry
+            </button>
+          )}
         </div>
-      </div>
-
-      {showAccounts && <AccountSettings accounts={accounts} onClose={() => setShowAccounts(false)} />}
-      {playingStream && <VideoPlayer title={getDisplayTitle(selectedAnime)} episode={activeEpisode} stream={playingStream} canNext={canNextEpisode}
-        onPrevious={() => changeEpisode('prev')} onNext={() => changeEpisode('next')} onWatched={() => void markWatched(true)}
-        onClose={() => setPlayingStream(null)} accounts={accounts} />}
-
-      {(contentError || searchError) && <div role="alert" className="fixed top-4 z-[400] bg-slate-900 text-white p-4 rounded-xl">{contentError || searchError} {contentError && <button className="text-purple-400 underline" onClick={loadContent}>Retry</button>}</div>}
-      {/* MAIN CONTAINER */}
-      <div
-        className={`bg-[#121212] border border-white/5 shadow-2xl transition-all duration-700 overflow-hidden flex flex-col ${
-          isFullscreenApp
-            ? "w-full h-full"
-            : "w-full max-w-7xl h-[92vh] rounded-[56px]"
-        }`}
-      >
-        {/* 🔍 SEARCH */}
-        {view === "all" && (
-          <div className="fixed bottom-12 left-1/2 -translate-x-1/2 z-[310] pointer-events-none">
-            <div
-              className={`flex items-center bg-white/5 backdrop-blur-4xl border border-white/10 rounded-[32px] transition-all duration-500 pointer-events-auto shadow-2xl ${
-                isSearchExpanded
-                  ? "w-[500px] px-6 py-2"
-                  : "w-16 h-16 justify-center cursor-pointer"
-              }`}
-              onClick={() => !isSearchExpanded && setIsSearchExpanded(true)}
-            >
-              <Search className="text-purple-400" size={24} />
-              {isSearchExpanded && (
-                <>
-                  <input
-                    autoFocus
-                    className="flex-1 bg-transparent px-6 py-4 outline-none text-xs font-black text-white"
-                    placeholder="SEARCH ANIME..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                  />
-                  <X
-                    className="text-zinc-500 cursor-pointer"
-                    size={20}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setIsSearchExpanded(false);
-                      setSearchQuery("");
-                    }}
-                  />
-                </>
-              )}
+      )}
+      {isSearchExpanded && (
+        <div
+          className="search-backdrop"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Search anime"
+          onKeyDown={(event) => {
+            if (event.key !== "Tab") return;
+            const controls = Array.from(
+              event.currentTarget.querySelectorAll<HTMLElement>(
+                "input, button:not(:disabled), a[href]",
+              ),
+            );
+            const first = controls[0],
+              last = controls[controls.length - 1];
+            if (event.shiftKey && document.activeElement === first) {
+              event.preventDefault();
+              last?.focus();
+            } else if (!event.shiftKey && document.activeElement === last) {
+              event.preventDefault();
+              first?.focus();
+            }
+          }}
+          onClick={(event) => {
+            if (event.target === event.currentTarget)
+              setIsSearchExpanded(false);
+          }}
+        >
+          <div className="search-panel glass">
+            <div className="search-field">
+              <Search size={24} />
+              <input
+                autoFocus
+                aria-label="Search anime titles"
+                placeholder="Find your next obsession…"
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+              />
+              <button
+                aria-label="Close search"
+                onClick={() => {
+                  setIsSearchExpanded(false);
+                  setSearchQuery("");
+                }}
+              >
+                <X size={23} />
+              </button>
             </div>
-            {searchResults.length > 0 && isSearchExpanded && (
-              <div className="absolute bottom-24 left-0 w-full bg-[#0a0a0a]/95 border border-white/10 rounded-[40px] overflow-hidden shadow-2xl pointer-events-auto max-h-[400px] overflow-y-auto">
-                {searchResults.map((r) => (
-                  <div
-                    key={r.id}
-                    onClick={() => {
-                      onSelectMedia(r);
-                      setIsSearchExpanded(false);
-                      setSearchQuery("");
-                    }}
-                    className="p-5 flex gap-6 hover:bg-purple-600/20 cursor-pointer border-b border-white/5"
-                  >
-                    <img
-                      src={r.coverImage?.extraLarge}
-                      className="w-12 h-18 object-cover rounded-2xl"
-                    />
-                    <div className="flex flex-col justify-center">
-                      <p className="font-black text-[12px] uppercase">
-                        {getDisplayTitle(r)}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
+            <div className="search-results">
+              {searchResults.map((result) => (
+                <button
+                  className="search-result"
+                  key={result.id}
+                  onClick={() => {
+                    onSelectMedia(result);
+                    setIsSearchExpanded(false);
+                    setSearchQuery("");
+                  }}
+                >
+                  <img src={result.coverImage?.extraLarge} alt="" />
+                  <span>{getDisplayTitle(result)}</span>
+                </button>
+              ))}
+            </div>
+            {!searchResults.length && (
+              <p className="search-help" role="status">
+                {searchError ||
+                  (searchQuery.length < 3
+                    ? "Type at least 3 characters to search anime."
+                    : searchLoading
+                      ? "Searching anime…"
+                      : "No matches. Try another title.")}
+              </p>
             )}
           </div>
-        )}
-
-        <div className="flex-1 overflow-y-auto no-scrollbar scroll-smooth relative">
+        </div>
+      )}
+      <main className="apex-main">
+        <div
+          className={"apex-scroll " + (view !== "all" ? "apex-other-view" : "")}
+        >
           {/* DUB RELEASES VIEW */}
           {view === "dub-releases" && (
             <DubScheduleView onSelectMedia={onSelectMedia} />
@@ -391,7 +492,7 @@ export default function App() {
 
           {/* DUB TRACKER VIEW */}
           {view === "dub-tracker" && (
-            <div className="h-full flex flex-col p-10 animate-fade-in relative z-10">
+            <div className="apex-tracker h-full flex flex-col p-10 animate-fade-in relative z-10">
               <div className="flex items-center justify-between mb-8">
                 <div className="flex items-center gap-5">
                   <div className="w-14 h-14 bg-purple-600 rounded-[20px] flex items-center justify-center shadow-lg shadow-purple-500/20">
@@ -428,8 +529,8 @@ export default function App() {
 
           {/* DETAILS VIEW */}
           {view === "details" && selectedAnime && (
-            <div className="animate-fade-in flex h-full">
-              <div className="flex-1 overflow-y-auto no-scrollbar relative pb-40">
+            <div className="apex-details animate-fade-in flex h-full">
+              <div className="apex-details-main flex-1 overflow-y-auto no-scrollbar relative pb-40">
                 <div className="relative h-[650px] w-full">
                   <img
                     src={
@@ -441,14 +542,14 @@ export default function App() {
                   <div className="absolute inset-0 bg-gradient-to-t from-[#121212] via-transparent" />
                   <button
                     onClick={() => setView("all")}
-                    className="absolute top-10 left-10 p-5 bg-black/50 rounded-full hover:bg-purple-600 transition-all z-20"
+                    className="details-back absolute top-10 left-10 p-5 bg-black/50 rounded-full hover:bg-purple-600 transition-all z-20"
                   >
                     <ChevronLeft size={28} />
                   </button>
                 </div>
-                <div className="px-20 -mt-80 relative z-10 flex flex-col gap-16">
+                <div className="details-info px-20 -mt-80 relative z-10 flex flex-col gap-16">
                   <div className="flex gap-14">
-                    <div className="w-80 aspect-[2/3] rounded-[64px] overflow-hidden shadow-2xl border border-white/10 bg-zinc-900 shrink-0">
+                    <div className="details-poster w-80 aspect-[2/3] rounded-[64px] overflow-hidden shadow-2xl border border-white/10 bg-zinc-900 shrink-0">
                       <img
                         src={selectedAnime.coverImage?.extraLarge}
                         className="w-full h-full object-cover"
@@ -461,11 +562,11 @@ export default function App() {
                           {selectedAnime.averageScore / 10 || "N/A"}
                         </div>
                       </div>
-                      <h1 className="text-[80px] font-black italic uppercase tracking-tighter leading-[0.75] mb-12">
+                      <h1 className="details-title text-[80px] font-black italic uppercase tracking-tighter leading-[0.75] mb-12">
                         {getDisplayTitle(selectedAnime)}
                       </h1>
                       <p
-                        className="text-zinc-400 text-[18px] leading-relaxed max-w-4xl opacity-70"
+                        className="details-text text-zinc-400 text-[18px] leading-relaxed max-w-4xl opacity-70"
                         dangerouslySetInnerHTML={{
                           __html: selectedAnime.description,
                         }}
@@ -473,7 +574,12 @@ export default function App() {
                     </div>
                   </div>
 
-                  <ListControls key={selectedAnime.id} anime={selectedAnime} accounts={accounts} onConnect={() => setShowAccounts(true)} />
+                  <ListControls
+                    key={selectedAnime.id}
+                    anime={selectedAnime}
+                    accounts={accounts}
+                    onConnect={() => setShowAccounts(true)}
+                  />
                   <div className="animate-in slide-in-from-bottom-10 duration-700">
                     <p className="text-purple-500 font-black text-[11px] uppercase tracking-[0.6em] mb-8 text-center">
                       Episodes ({totalEpisodes})
@@ -499,7 +605,7 @@ export default function App() {
                   </div>
 
                   {selectedAnime.relations?.edges?.some(
-                    (e: any) => e.node.type === "ANIME"
+                    (e: any) => e.node.type === "ANIME",
                   ) && (
                     <div className="mt-20 animate-fade-in pb-12">
                       <p className="text-purple-500 font-black text-[11px] uppercase tracking-[0.6em] mb-8">
@@ -537,7 +643,7 @@ export default function App() {
                   )}
                 </div>
               </div>
-              <div className="w-[450px] bg-[#080808]/90 backdrop-blur-5xl border-l border-white/10 overflow-y-auto no-scrollbar p-12 flex flex-col shrink-0 h-full sticky top-0">
+              <div className="apex-details-sources w-[450px] bg-[#080808]/90 backdrop-blur-5xl border-l border-white/10 overflow-y-auto no-scrollbar p-12 flex flex-col shrink-0 h-full sticky top-0">
                 <h3 className="text-[11px] font-black uppercase tracking-[0.6em] text-purple-500 mb-10 sticky top-0 bg-[#080808] py-4 z-10">
                   Sources
                 </h3>
@@ -566,179 +672,37 @@ export default function App() {
             </div>
           )}
 
-          {/* HOME VIEW */}
           {view === "all" && (
             <>
-              {heroSlides?.[currentSlide] && (
-                <div className="px-12 mt-10 mb-10">
-                  <div className="relative w-full h-[700px] rounded-[72px] overflow-hidden group shadow-2xl border border-white/5 bg-[#0a0a0a]">
-                    <div
-                      key={currentSlide}
-                      className="absolute inset-0 animate-in fade-in duration-1000"
-                    >
-                      <img
-                        src={
-                          heroSlides[currentSlide].bannerImage ||
-                          heroSlides[currentSlide].coverImage?.extraLarge
-                        }
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-[20s]"
-                        alt={getDisplayTitle(heroSlides[currentSlide])}
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-[#121212] via-[#121212]/40 p-20 flex flex-col justify-end">
-                        <div className="flex items-center gap-3 mb-6 animate-in slide-in-from-bottom-5 duration-700">
-                          <Sparkles size={16} className="text-purple-400" />
-                          <span className="text-purple-400 font-black text-[11px] uppercase tracking-[0.8em]">
-                            Quantum Spotlight
-                          </span>
-                        </div>
-
-                        <h1 className="text-[90px] font-black italic uppercase tracking-tighter leading-[0.7] mb-14 max-w-5xl animate-in slide-in-from-bottom-10 duration-700 drop-shadow-2xl">
-                          {getShortTitle(heroSlides[currentSlide])}
-                        </h1>
-
-                        <div className="flex gap-6 animate-in slide-in-from-bottom-10 duration-1000">
-                          <button
-                            onClick={() =>
-                              onSelectMedia(heroSlides[currentSlide])
-                            }
-                            className="px-20 py-6 bg-white text-black rounded-[24px] font-black text-[18px] uppercase tracking-[0.2em] hover:bg-purple-600 hover:text-white transition-colors shadow-2xl flex items-center justify-center"
-                          >
-                            Watch Now
-                          </button>
-
-                          <div className="px-8 py-6 bg-white/10 backdrop-blur-md border border-white/10 rounded-[24px] flex items-center gap-3 shadow-2xl cursor-default">
-                            <span className="text-yellow-400 text-3xl leading-none">
-                              ★
-                            </span>
-                            <span className="font-black text-white text-2xl leading-none">
-                              {heroSlides[currentSlide].averageScore
-                                ? (
-                                    heroSlides[currentSlide].averageScore / 10
-                                  ).toFixed(1)
-                                : "N/A"}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="absolute bottom-16 right-20 flex items-center gap-8 z-20">
-                      <div className="flex gap-4">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setCurrentSlide((prev) =>
-                              prev === 0 ? heroSlides.length - 1 : prev - 1
-                            );
-                          }}
-                          className="p-4 rounded-full bg-black/40 text-white hover:bg-purple-600 transition-all backdrop-blur-md"
-                        >
-                          <ChevronLeft size={20} />
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setCurrentSlide(
-                              (prev) => (prev + 1) % heroSlides.length
-                            );
-                          }}
-                          className="p-4 rounded-full bg-black/40 text-white hover:bg-purple-600 transition-all backdrop-blur-md rotate-180"
-                        >
-                          <ChevronLeft size={20} />
-                        </button>
-                      </div>
-                      <div className="flex gap-3">
-                        {heroSlides.map((_, idx) => (
-                          <button
-                            key={idx}
-                            onClick={() => setCurrentSlide(idx)}
-                            className={`h-2 rounded-full transition-all duration-500 ${
-                              currentSlide === idx
-                                ? "w-12 bg-purple-500"
-                                : "w-4 bg-white/30 hover:bg-white/60"
-                            }`}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  </div>
+              {loading && (
+                <div
+                  className="row-loading"
+                  style={{ paddingTop: 130 }}
+                  role="status"
+                >
+                  Loading your next obsession…
                 </div>
               )}
-
-              {watchHistory.length > 0 && (
-                <div className="mb-16 px-12 animate-fade-in mt-6">
-                  <div className="flex items-center gap-5 mb-8">
-                    <div className="w-12 h-12 bg-[#2a1b3d] text-[#b794f4] rounded-[18px] flex items-center justify-center shadow-lg">
-                      <History size={20} />
-                    </div>
-                    <h2 className="text-zinc-400 text-[11px] font-black tracking-[0.6em] uppercase">
-                      Continue Watching
-                    </h2>
-                  </div>
-                  <div className="flex gap-6 overflow-x-auto no-scrollbar pb-6 scroll-smooth">
-                    {watchHistory.map((item) => (
-                      <div
-                        key={item.anime.id}
-                        className="relative group shrink-0"
-                      >
-                        <div
-                          onClick={() => resumePlayback(item)}
-                          className="w-[400px] bg-[#151515] border border-white/5 rounded-[40px] p-4 flex flex-col gap-4 hover:border-purple-500/50 transition-all duration-500 cursor-pointer shadow-xl"
-                        >
-                          <div className="relative w-full aspect-video rounded-[32px] overflow-hidden bg-zinc-900 border border-white/5">
-                            <img
-                              src={
-                                item.anime.bannerImage ||
-                                item.anime.coverImage?.extraLarge
-                              }
-                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
-                              alt={getDisplayTitle(item.anime)}
-                            />
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                removeFromHistory(item.anime.id);
-                              }}
-                              className="absolute top-4 right-4 w-9 h-9 bg-red-500 hover:bg-red-600 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 z-10 hover:scale-110 shadow-xl"
-                            >
-                              <X size={16} className="text-white" />
-                            </button>
-                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-500 flex items-center justify-center">
-                              <div className="w-14 h-14 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center shadow-2xl scale-75 group-hover:scale-100 transition-transform duration-500 border border-white/20">
-                                <Play
-                                  fill="white"
-                                  size={24}
-                                  className="ml-1 text-white"
-                                />
-                              </div>
-                            </div>
-                          </div>
-                          <div className="flex items-center justify-between px-3 pb-2 gap-4">
-                            <p className="font-black text-[13px] uppercase truncate flex-1 text-zinc-200 group-hover:text-white transition-colors">
-                              {getDisplayTitle(item.anime)}
-                            </p>
-                            <div className="bg-[#2a1b3d] text-[#d6bcfa] px-5 py-2 rounded-full text-[10px] font-black shrink-0 tracking-widest uppercase">
-                              Ep {item.episode}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+              {!loading && !heroSlides.length && (
+                <div className="row-loading" style={{ paddingTop: 130 }}>
+                  Anime discovery is unavailable. Please retry loading.
                 </div>
               )}
-
-              {rows.map((row, i) => (
-                <AnimeRow
-                  key={i}
-                  title={row.title}
-                  animes={row.animes}
-                  onSelect={(a: any) => onSelectMedia(a)}
-                />
-              ))}
+              <HomeDashboard
+                slides={heroSlides}
+                rows={rows}
+                history={watchHistory}
+                accounts={accounts}
+                onSelect={onSelectMedia}
+                onWatch={(anime) => onSelectMedia(anime, 1, "MegaPlay (Sub)")}
+                onResume={resumePlayback}
+                onRemove={removeFromHistory}
+                onCalendar={() => setView("dub-releases")}
+              />
             </>
           )}
         </div>
-      </div>
+      </main>
     </div>
   );
 }
