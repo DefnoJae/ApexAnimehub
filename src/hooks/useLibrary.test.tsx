@@ -38,7 +38,7 @@ test("imports every page, retains successful provider when another fails, and re
     root.render(<Harness />);
   });
   await act(async () => {
-    await new Promise((resolve) => setTimeout(resolve, 1200));
+    await new Promise((resolve) => setTimeout(resolve, 2400));
   });
   expect(global.fetch).toHaveBeenCalledWith(
     "/api/list/anilist?page=2",
@@ -74,4 +74,12 @@ test("an account change cannot expose a previous account cache", async () => {
   });
   expect(library.libraryEntries).toHaveLength(0);
   expect(library.lists.anilist?.identity).toBe("bob");
+});
+test('resumes a verified account checkpoint instead of restarting a large import', async () => {
+  localStorage.setItem('apex_library_v1_anilist_alice', JSON.stringify({ identity: 'alice', name: 'alice', entries: [{ anime, status: 'planning', progress: 0, updatedAt: 1 }], complete: false, nextPage: 30, updatedAt: Date.now() }));
+  global.fetch = jest.fn(async (url) => ({ ok: true, json: async () => ({ ...page('alice', 'planning'), entries: [], hasNextPage: String(url).endsWith('page=1') }) })) as jest.Mock;
+  await act(async () => { root.render(<Harness mal={false} />); });
+  expect(global.fetch).toHaveBeenCalledWith('/api/list/anilist?page=30', expect.anything());
+  expect(library.libraryEntries).toHaveLength(1);
+  expect(library.lists.anilist?.complete).toBe(true);
 });

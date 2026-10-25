@@ -12,6 +12,7 @@ export interface LibraryEntry {
 }
 interface Snapshot {
   complete?: boolean;
+  nextPage?: number;
   identity: string;
   name: string;
   entries: LibraryEntry[];
@@ -85,11 +86,23 @@ export function useLibrary(connected: Record<AccountProvider, boolean>) {
                   if (
                     cached?.identity === identity &&
                     Array.isArray(cached.entries)
-                  )
+                  ) {
                     setLists((previous) => ({
                       ...previous,
                       [provider]: cached,
                     }));
+                    if (
+                      cached.complete === false &&
+                      Number.isSafeInteger(cached.nextPage) &&
+                      cached.nextPage > 1 &&
+                      cached.nextPage <= 10000 &&
+                      Date.now() - cached.updatedAt < 3600000
+                    ) {
+                      entries = cached.entries;
+                      page = cached.nextPage;
+                      continue;
+                    }
+                  }
                 } catch {}
               }
               entries.push(...data.entries);
@@ -99,14 +112,21 @@ export function useLibrary(connected: Record<AccountProvider, boolean>) {
                 entries: [...entries],
                 updatedAt: Date.now(),
                 complete: !data.hasNextPage,
+                nextPage: page + 1,
               };
+              try {
+                localStorage.setItem(
+                  "apex_library_v1_" + provider + "_" + identity,
+                  JSON.stringify(partial),
+                );
+              } catch {}
               setLists((previous) =>
                 previous[provider]?.complete
                   ? previous
                   : { ...previous, [provider]: partial },
               );
               if (!data.hasNextPage) break;
-              await new Promise((resolve) => setTimeout(resolve, 1100));
+              await new Promise((resolve) => setTimeout(resolve, 2200));
               if (run !== generation.current) return;
               page++;
               if (page > 10000)
