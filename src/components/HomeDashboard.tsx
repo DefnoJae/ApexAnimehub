@@ -17,6 +17,7 @@ import { fetchDubRange } from "../utils/dubSchedule";
 import { getDisplayTitle } from "../utils/schedule";
 import type { ListAnime, ListStatus, useAccounts } from "../hooks/useAccounts";
 import { ListFeedback } from "./ListControls";
+import { HeroBackdrop } from "./HeroBackdrop";
 import "./dashboard.css";
 
 export interface DashboardAnime extends ListAnime {
@@ -431,7 +432,7 @@ export function HomeDashboard({
 }) {
   const [slide, setSlide] = useState(0),
     [paused, setPaused] = useState(false),
-    [manual, setManual] = useState(false),
+    [focusPaused, setFocusPaused] = useState(false),
     [pageHidden, setPageHidden] = useState(document.hidden);
   const [language, setLanguage] = useState<"sub" | "dub">(() => {
     try {
@@ -475,7 +476,7 @@ export function HomeDashboard({
   useEffect(() => {
     if (
       paused ||
-      manual ||
+      focusPaused ||
       pageHidden ||
       slides.length < 2 ||
       window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
@@ -486,37 +487,28 @@ export function HomeDashboard({
       8000,
     );
     return () => clearInterval(timer);
-  }, [paused, manual, pageHidden, slides.length]);
+  }, [paused, focusPaused, pageHidden, slides.length, slide]);
   return (
     <div className="home-dashboard">
       {anime && (
         <section
           className={
-            "cinematic-hero " + (paused || manual ? "motion-paused" : "")
+            "cinematic-hero " + (paused || focusPaused ? "motion-paused" : "")
           }
           aria-label="Featured anime"
           aria-roledescription="carousel"
-          onMouseEnter={() => setPaused(true)}
-          onMouseLeave={() => setPaused(false)}
-          onFocusCapture={() => setPaused(true)}
+          onPointerDownCapture={() => setFocusPaused(false)}
+          onFocusCapture={(event) =>
+            setFocusPaused(
+              (event.target as HTMLElement).matches(":focus-visible"),
+            )
+          }
           onBlurCapture={(event) => {
             if (!event.currentTarget.contains(event.relatedTarget as Node))
-              setPaused(false);
+              setFocusPaused(false);
           }}
         >
-          <picture>
-            <source
-              media="(max-width: 640px)"
-              srcSet={anime.coverImage?.extraLarge || anime.bannerImage}
-            />
-            <img
-              key={anime.id}
-              className="hero-backdrop"
-              src={anime.bannerImage || anime.coverImage?.extraLarge}
-              alt=""
-              loading="eager"
-            />
-          </picture>
+          <HeroBackdrop key={anime.id} anime={anime} />
           <div className="hero-shade" />
           <div className="hero-copy" key={"copy-" + anime.id}>
             <h1
@@ -555,11 +547,14 @@ export function HomeDashboard({
                 />
               )}
             </h1>
-            <div className="hero-actions">
+            <div
+              className="hero-actions"
+              onMouseEnter={() => setPaused(true)}
+              onMouseLeave={() => setPaused(false)}
+            >
               <button
                 className="hero-primary"
                 onClick={() => {
-                  setManual(true);
                   if (resume) onResume(resume);
                   else onWatch(anime);
                 }}
@@ -577,6 +572,8 @@ export function HomeDashboard({
           </div>
           <div
             className="hero-dots glass"
+            onMouseEnter={() => setPaused(true)}
+            onMouseLeave={() => setPaused(false)}
             role="group"
             aria-label="Featured anime slides"
           >
@@ -586,7 +583,6 @@ export function HomeDashboard({
                 aria-label={"Show " + getDisplayTitle(item)}
                 aria-pressed={slide === index}
                 onClick={() => {
-                  setManual(true);
                   setSlide(index);
                 }}
               >

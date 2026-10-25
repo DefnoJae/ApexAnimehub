@@ -10,6 +10,7 @@ interface ArtworkPayload {
 }
 interface CachedArtwork {
   logos: string[];
+  backdrops: string[];
   updatedAt: number;
 }
 const DAY = 86400000;
@@ -23,7 +24,7 @@ export function isTitleTreatment(width: number, height: number): boolean {
     width / height <= 16
   );
 }
-const pending = new Map<number, Promise<string[]>>();
+const pending = new Map<number, Promise<CachedArtwork>>();
 const imageHosts = new Set([
   "images.metahub.space",
   "artworks.thetvdb.com",
@@ -73,10 +74,42 @@ export function artworkLogos(
     new Set([...english, ...metahub, ...images.map((image) => image.url!)]),
   );
 }
-export function fetchHeroArtwork(anilistId: number): Promise<string[]> {
-  if (!Number.isSafeInteger(anilistId) || anilistId <= 0)
-    return Promise.resolve([]);
-  const key = "apex_hero_artwork_v1_" + anilistId;
+export function artworkBackdrops(
+  data: ArtworkPayload,
+  anilistId: number,
+): string[] {
+  if (
+    Number(data.mappings?.anilist_id) !== anilistId ||
+    !Array.isArray(data.images)
+  )
+    return [];
+  return Array.from(
+    new Set(
+      data.images
+        .filter(
+          (image) =>
+            typeof image?.coverType === "string" &&
+            ["fanart", "background", "backdrop"].includes(
+              image.coverType.toLowerCase(),
+            ) &&
+            safeImage(image.url),
+        )
+        .map((image) => image.url!),
+    ),
+  );
+}
+export function isHeroBackdrop(width: number, height: number): boolean {
+  return (
+    width >= 1280 &&
+    height >= 720 &&
+    width / height >= 1.5 &&
+    width / height <= 2.4
+  );
+}
+async function fetchHeroMedia(anilistId: number): Promise<CachedArtwork> {
+  const empty = { logos: [], backdrops: [], updatedAt: 0 };
+  if (!Number.isSafeInteger(anilistId) || anilistId <= 0) return empty;
+  const key = "apex_hero_artwork_v2_" + anilistId;
   let cached: CachedArtwork | null = null;
   try {
     const value = JSON.parse(localStorage.getItem(key) || "null");
@@ -84,15 +117,18 @@ export function fetchHeroArtwork(anilistId: number): Promise<string[]> {
       value &&
       Array.isArray(value.logos) &&
       value.logos.every(safeImage) &&
+      Array.isArray(value.backdrops) &&
+      value.backdrops.every(safeImage) &&
       Number.isFinite(value.updatedAt)
     )
       cached = value;
   } catch {}
   if (
     cached &&
-    Date.now() - cached.updatedAt < (cached.logos.length ? 7 * DAY : DAY / 4)
+    Date.now() - cached.updatedAt <
+      (cached.logos.length || cached.backdrops.length ? 7 * DAY : DAY / 4)
   )
-    return Promise.resolve(cached.logos);
+    return cached;
   const existing = pending.get(anilistId);
   if (existing) return existing;
   const request = (async () => {
@@ -108,15 +144,17 @@ export function fetchHeroArtwork(anilistId: number): Promise<string[]> {
       if (!data || Number(data.mappings?.anilist_id) !== anilistId)
         throw new Error("Artwork ID mismatch");
       const logos = artworkLogos(data, anilistId);
+      const result = {
+        logos,
+        backdrops: artworkBackdrops(data, anilistId),
+        updatedAt: Date.now(),
+      };
       try {
-        localStorage.setItem(
-          key,
-          JSON.stringify({ logos, updatedAt: Date.now() }),
-        );
+        localStorage.setItem(key, JSON.stringify(result));
       } catch {}
-      return logos;
+      return result;
     } catch {
-      return cached?.logos || [];
+      return cached || empty;
     } finally {
       clearTimeout(timer);
       pending.delete(anilistId);
@@ -124,4 +162,10 @@ export function fetchHeroArtwork(anilistId: number): Promise<string[]> {
   })();
   pending.set(anilistId, request);
   return request;
+}
+export async function fetchHeroArtwork(anilistId: number): Promise<string[]> {
+  return (await fetchHeroMedia(anilistId)).logos;
+}
+export async function fetchHeroBackdrops(anilistId: number): Promise<string[]> {
+  return (await fetchHeroMedia(anilistId)).backdrops;
 }

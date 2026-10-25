@@ -166,6 +166,49 @@ input:focus-visible {
   animation: hero-drift 24s ease-in-out infinite alternate;
   z-index: -3;
 }
+.hero-artwork {
+  position: absolute;
+  inset: 0;
+  z-index: -3;
+  background: radial-gradient(ellipse at 75% 35%, #342744, #111017 70%);
+}
+.hero-artwork .hero-backdrop {
+  z-index: auto;
+  transition: opacity 0.5s ease;
+}
+.hero-mobile-art {
+  display: none;
+}
+.hero-poster-fallback {
+  position: absolute;
+  right: 9%;
+  top: 14%;
+  height: 65%;
+  width: 29%;
+  max-width: 330px;
+}
+.hero-poster-fallback img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: right center;
+  border-radius: 18px;
+}
+@media (max-width: 640px) {
+  .hero-mobile-art {
+    display: block;
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center 30%;
+  }
+  .hero-artwork .hero-backdrop,
+  .hero-poster-fallback {
+    display: none;
+  }
+}
 .hero-shade {
   position: absolute;
   inset: 0;

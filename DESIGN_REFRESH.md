@@ -1,6 +1,10 @@
 # October 2026 design refresh
 
-The home page follows the approved questionnaire: a moderate refresh with a cinematic, edge-to-edge artwork hero; purple accents; near-black surfaces; medium corners; glass controls; and heavy italic headings. The hero contains only its title and Watch/Resume and Add to Planning actions. It rotates automatically, pauses on hover/focus, stops after manual slide selection, and respects reduced-motion preferences.
+The home page follows the approved questionnaire: a moderate refresh with a cinematic, edge-to-edge artwork hero; purple accents; near-black surfaces; medium corners; glass controls; and heavy italic headings. The hero contains only its title and Watch/Resume and Add to Planning actions. It advances every eight seconds, temporarily pauses while its controls are hovered or keyboard-focused, and resumes after interaction. Hovering the artwork itself does not stop rotation. Manual dot selection restarts the interval rather than permanently disabling autoplay. Hidden tabs and reduced-motion preferences pause rotation.
+
+## Hero backdrops
+
+Desktop hero artwork prefers TheTVDB Fanart/backgrounds resolved by exact AniList ID through AniZip, sharing the metadata request and cache with title logos. A 1920×1080 background was verified for A Wild Last Boss Appeared! Season 2, whose AniList banner is missing. Loaded images must be at least 1280×720 with a landscape aspect ratio; thin banners, thumbnails, and portrait covers cannot fill the desktop hero. If no suitable landscape is available, the page shows a bounded poster against a gradient instead of stretching it across the screen. Mobile retains portrait artwork appropriate to the narrow display.
 
 Desktop navigation floats at the top, uses accessible icon buttons with tooltips, hides when scrolling down and returns on upward scrolling. On mobile it becomes a bottom bar. Search opens a large panel with keyboard focus containment and Escape dismissal.
 

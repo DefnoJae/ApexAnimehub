@@ -5,7 +5,13 @@ import { HomeDashboard, QuickList, FloatingNavigation } from "./HomeDashboard";
 import { useAccounts } from "../hooks/useAccounts";
 import { fetchAnilist } from "../utils/anilist";
 import { fetchDubRange } from "../utils/dubSchedule";
-import { fetchHeroArtwork, isTitleTreatment } from "../utils/heroArtwork";
+import {
+  fetchHeroArtwork,
+  fetchHeroBackdrops,
+  isTitleTreatment,
+  isHeroBackdrop,
+} from "../utils/heroArtwork";
+import { HeroBackdrop } from "./HeroBackdrop";
 jest.mock("../utils/anilist");
 jest.mock("../utils/dubSchedule");
 jest.mock("../utils/heroArtwork");
@@ -20,6 +26,14 @@ const anime = {
 };
 let node: HTMLDivElement, root: Root;
 beforeEach(() => {
+  (isHeroBackdrop as jest.Mock).mockImplementation(
+    (width: number, height: number) =>
+      width >= 1280 &&
+      height >= 720 &&
+      width / height >= 1.5 &&
+      width / height <= 2.4,
+  );
+  (fetchHeroBackdrops as jest.Mock).mockResolvedValue([]);
   (isTitleTreatment as jest.Mock).mockImplementation(
     (width: number, height: number) => width / height >= 1.5,
   );
@@ -51,16 +65,117 @@ function fakeAccounts() {
   } as unknown as ReturnType<typeof useAccounts>;
 }
 
-test('a mislabeled square poster stays hidden and leaves a readable hero title', async () => {
-  (fetchHeroArtwork as jest.Mock).mockResolvedValue(['https://artworks.thetvdb.com/bad-cover.png']);
-  await act(async () => { root.render(<HomeDashboard slides={[anime]} rows={[]} history={[]} accounts={fakeAccounts()} onSelect={jest.fn()} onWatch={jest.fn()} onResume={jest.fn()} onRemove={jest.fn()} onCalendar={jest.fn()} />); });
-  const image = node.querySelector('h1 img') as HTMLImageElement;
-  expect(image.style.display).toBe('none');
-  expect(node.querySelector('h1')?.textContent).toBe('Example anime');
-  Object.defineProperties(image, { naturalWidth: { value: 1024 }, naturalHeight: { value: 1024 } });
-  act(() => image.dispatchEvent(new Event('load')));
-  expect(node.querySelector('h1 img')).toBeNull();
-  expect(node.querySelector('h1')?.textContent).toBe('Example anime');
+test("a mislabeled square poster stays hidden and leaves a readable hero title", async () => {
+  (fetchHeroArtwork as jest.Mock).mockResolvedValue([
+    "https://artworks.thetvdb.com/bad-cover.png",
+  ]);
+  await act(async () => {
+    root.render(
+      <HomeDashboard
+        slides={[anime]}
+        rows={[]}
+        history={[]}
+        accounts={fakeAccounts()}
+        onSelect={jest.fn()}
+        onWatch={jest.fn()}
+        onResume={jest.fn()}
+        onRemove={jest.fn()}
+        onCalendar={jest.fn()}
+      />,
+    );
+  });
+  const image = node.querySelector("h1 img") as HTMLImageElement;
+  expect(image.style.display).toBe("none");
+  expect(node.querySelector("h1")?.textContent).toBe("Example anime");
+  Object.defineProperties(image, {
+    naturalWidth: { value: 1024 },
+    naturalHeight: { value: 1024 },
+  });
+  act(() => image.dispatchEvent(new Event("load")));
+  expect(node.querySelector("h1 img")).toBeNull();
+  expect(node.querySelector("h1")?.textContent).toBe("Example anime");
+});
+
+test("backdrop rejects thin banners and displays a verified HD landscape", async () => {
+  (fetchHeroBackdrops as jest.Mock).mockResolvedValue([
+    "https://artworks.thetvdb.com/thin.jpg",
+    "https://artworks.thetvdb.com/hd.jpg",
+  ]);
+  await act(async () => {
+    root.render(<HeroBackdrop anime={anime} />);
+  });
+  let image = node.querySelector(".hero-backdrop") as HTMLImageElement;
+  Object.defineProperties(image, {
+    naturalWidth: { value: 1920 },
+    naturalHeight: { value: 400 },
+  });
+  act(() => image.dispatchEvent(new Event("load")));
+  image = node.querySelector(".hero-backdrop") as HTMLImageElement;
+  expect(image.src).toContain("hd.jpg");
+  expect(image.style.opacity).toBe("0");
+  Object.defineProperties(image, {
+    naturalWidth: { value: 1920 },
+    naturalHeight: { value: 1080 },
+  });
+  act(() => image.dispatchEvent(new Event("load")));
+  expect(image.style.opacity).toBe("1");
+  expect(node.querySelector(".hero-poster-fallback")).toBeNull();
+});
+
+test("carousel progresses again after manual dot selection instead of permanently stopping", async () => {
+  jest.useFakeTimers();
+  const visibility = Object.getOwnPropertyDescriptor(document, "hidden");
+  Object.defineProperty(document, "hidden", {
+    configurable: true,
+    value: false,
+  });
+  try {
+    await act(async () => {
+      root.render(
+        <HomeDashboard
+          slides={[
+            anime,
+            { ...anime, id: 43, title: { english: "Second anime" } },
+          ]}
+          rows={[]}
+          history={[]}
+          accounts={fakeAccounts()}
+          onSelect={jest.fn()}
+          onWatch={jest.fn()}
+          onResume={jest.fn()}
+          onRemove={jest.fn()}
+          onCalendar={jest.fn()}
+        />,
+      );
+    });
+    await act(async () => {
+      jest.advanceTimersByTime(8000);
+    });
+    expect(
+      node
+        .querySelector('[aria-label="Show Second anime"]')
+        ?.getAttribute("aria-pressed"),
+    ).toBe("true");
+    act(() =>
+      (
+        node.querySelector(
+          '[aria-label="Show Example anime"]',
+        ) as HTMLButtonElement
+      ).click(),
+    );
+    await act(async () => {
+      jest.advanceTimersByTime(8000);
+    });
+    expect(
+      node
+        .querySelector('[aria-label="Show Second anime"]')
+        ?.getAttribute("aria-pressed"),
+    ).toBe("true");
+  } finally {
+    if (visibility) Object.defineProperty(document, "hidden", visibility);
+    else delete (document as unknown as { hidden?: boolean }).hidden;
+    jest.useRealTimers();
+  }
 });
 
 test("hero tries alternative logo artwork and returns to text if both images fail", async () => {

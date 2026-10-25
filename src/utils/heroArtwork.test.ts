@@ -1,5 +1,8 @@
 import {
   artworkLogos,
+  artworkBackdrops,
+  fetchHeroBackdrops,
+  isHeroBackdrop,
   fetchHeroArtwork,
   isTitleTreatment,
 } from "./heroArtwork";
@@ -53,10 +56,58 @@ test("an unavailable source uses stale validated cache without overwriting it", 
     logos: ["https://artworks.thetvdb.com/stale.png"],
     updatedAt: Date.now() - 8 * 86400000,
   };
-  localStorage.setItem("apex_hero_artwork_v1_44", JSON.stringify(saved));
+  localStorage.setItem(
+    "apex_hero_artwork_v2_44",
+    JSON.stringify({ ...saved, backdrops: [] }),
+  );
   global.fetch = jest.fn().mockRejectedValue(new Error("Offline"));
   expect(await fetchHeroArtwork(44)).toEqual(saved.logos);
-  expect(JSON.parse(localStorage.getItem("apex_hero_artwork_v1_44")!)).toEqual(
-    saved,
-  );
+  expect(JSON.parse(localStorage.getItem("apex_hero_artwork_v2_44")!)).toEqual({
+    ...saved,
+    backdrops: [],
+  });
+});
+
+test("backdrops select landscape art rather than poster or thin banner categories", () => {
+  const data = {
+    mappings: { anilist_id: 9 },
+    images: [
+      { coverType: "Poster", url: "https://artworks.thetvdb.com/poster.jpg" },
+      { coverType: "Banner", url: "https://artworks.thetvdb.com/banner.jpg" },
+      {
+        coverType: "Fanart",
+        url: "https://artworks.thetvdb.com/background.jpg",
+      },
+      { coverType: "Fanart", url: "https://untrusted.example/image.jpg" },
+    ],
+  };
+  expect(artworkBackdrops(data, 9)).toEqual([
+    "https://artworks.thetvdb.com/background.jpg",
+  ]);
+  expect(artworkBackdrops(data, 10)).toEqual([]);
+  expect(isHeroBackdrop(1920, 1080)).toBe(true);
+  expect(isHeroBackdrop(460, 690)).toBe(false);
+  expect(isHeroBackdrop(1920, 400)).toBe(false);
+  expect(isHeroBackdrop(640, 360)).toBe(false);
+});
+
+test("logos and backdrops share one metadata fetch", async () => {
+  global.fetch = jest
+    .fn()
+    .mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        mappings: { anilist_id: 45, imdb_id: "tt45" },
+        images: [
+          { coverType: "Fanart", url: "https://artworks.thetvdb.com/hd.jpg" },
+        ],
+      }),
+    });
+  const [logos, backdrops] = await Promise.all([
+    fetchHeroArtwork(45),
+    fetchHeroBackdrops(45),
+  ]);
+  expect(logos[0]).toContain("tt45");
+  expect(backdrops).toEqual(["https://artworks.thetvdb.com/hd.jpg"]);
+  expect(global.fetch).toHaveBeenCalledTimes(1);
 });
