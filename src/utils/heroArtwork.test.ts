@@ -1,4 +1,14 @@
-import { artworkLogos, fetchHeroArtwork } from "./heroArtwork";
+import {
+  artworkLogos,
+  fetchHeroArtwork,
+  isTitleTreatment,
+} from "./heroArtwork";
+test("square and portrait covers cannot replace a hero title", () => {
+  expect(isTitleTreatment(1024, 1024)).toBe(false);
+  expect(isTitleTreatment(600, 900)).toBe(false);
+  expect(isTitleTreatment(800, 310)).toBe(true);
+  expect(isTitleTreatment(1, 0)).toBe(false);
+});
 const originalFetch = global.fetch;
 beforeEach(() => {
   localStorage.clear();
@@ -22,15 +32,13 @@ test("artwork requires the exact anime ID and excludes non-logo or untrusted ima
   ]);
 });
 test("artwork requests deduplicate and reuse the successful cache", async () => {
-  global.fetch = jest
-    .fn()
-    .mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        mappings: { anilist_id: 43, imdb_id: "tt12346" },
-        images: [],
-      }),
-    });
+  global.fetch = jest.fn().mockResolvedValue({
+    ok: true,
+    json: async () => ({
+      mappings: { anilist_id: 43, imdb_id: "tt12346" },
+      images: [],
+    }),
+  });
   const [first, second] = await Promise.all([
     fetchHeroArtwork(43),
     fetchHeroArtwork(43),

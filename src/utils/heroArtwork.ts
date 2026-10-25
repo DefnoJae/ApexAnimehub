@@ -13,6 +13,16 @@ interface CachedArtwork {
   updatedAt: number;
 }
 const DAY = 86400000;
+// Some provider records label square cover art as a clearlogo. Only accept
+// wide title treatments; uncertain artwork keeps the readable text fallback.
+export function isTitleTreatment(width: number, height: number): boolean {
+  return (
+    width >= 160 &&
+    height >= 24 &&
+    width / height >= 1.5 &&
+    width / height <= 16
+  );
+}
 const pending = new Map<number, Promise<string[]>>();
 const imageHosts = new Set([
   "images.metahub.space",

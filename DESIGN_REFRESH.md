@@ -22,7 +22,7 @@ For a curated override, add approved title artwork under `public/`, then map Ani
 { "16498": "/logos/attack-on-titan.png" }
 ```
 
-The default override catalog is empty; automatic sourcing remains active. A configured override takes priority. Clearlogos may identify the overall series when season-specific artwork is unavailable.
+The default override catalog is empty; automatic sourcing remains active. A configured override takes priority. Clearlogos may identify the overall series when season-specific artwork is unavailable. Source records can mislabel covers as clearlogos: artwork remains hidden until its loaded dimensions confirm a wide title treatment. Square and portrait candidates are rejected, even when labeled Clearlogo. This deliberately favors readable text over uncertain artwork.
 
 ## Publishing
 

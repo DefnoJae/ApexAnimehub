@@ -5,7 +5,7 @@ import { HomeDashboard, QuickList, FloatingNavigation } from "./HomeDashboard";
 import { useAccounts } from "../hooks/useAccounts";
 import { fetchAnilist } from "../utils/anilist";
 import { fetchDubRange } from "../utils/dubSchedule";
-import { fetchHeroArtwork } from "../utils/heroArtwork";
+import { fetchHeroArtwork, isTitleTreatment } from "../utils/heroArtwork";
 jest.mock("../utils/anilist");
 jest.mock("../utils/dubSchedule");
 jest.mock("../utils/heroArtwork");
@@ -20,6 +20,9 @@ const anime = {
 };
 let node: HTMLDivElement, root: Root;
 beforeEach(() => {
+  (isTitleTreatment as jest.Mock).mockImplementation(
+    (width: number, height: number) => width / height >= 1.5,
+  );
   (fetchHeroArtwork as jest.Mock).mockResolvedValue([]);
   node = document.createElement("div");
   document.body.appendChild(node);
@@ -47,6 +50,18 @@ function fakeAccounts() {
     sync: jest.fn().mockResolvedValue([{ provider: "anilist", success: true }]),
   } as unknown as ReturnType<typeof useAccounts>;
 }
+
+test('a mislabeled square poster stays hidden and leaves a readable hero title', async () => {
+  (fetchHeroArtwork as jest.Mock).mockResolvedValue(['https://artworks.thetvdb.com/bad-cover.png']);
+  await act(async () => { root.render(<HomeDashboard slides={[anime]} rows={[]} history={[]} accounts={fakeAccounts()} onSelect={jest.fn()} onWatch={jest.fn()} onResume={jest.fn()} onRemove={jest.fn()} onCalendar={jest.fn()} />); });
+  const image = node.querySelector('h1 img') as HTMLImageElement;
+  expect(image.style.display).toBe('none');
+  expect(node.querySelector('h1')?.textContent).toBe('Example anime');
+  Object.defineProperties(image, { naturalWidth: { value: 1024 }, naturalHeight: { value: 1024 } });
+  act(() => image.dispatchEvent(new Event('load')));
+  expect(node.querySelector('h1 img')).toBeNull();
+  expect(node.querySelector('h1')?.textContent).toBe('Example anime');
+});
 
 test("hero tries alternative logo artwork and returns to text if both images fail", async () => {
   (fetchHeroArtwork as jest.Mock).mockResolvedValue([

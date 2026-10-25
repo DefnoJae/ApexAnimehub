@@ -12,7 +12,7 @@ import {
   X,
 } from "lucide-react";
 import { fetchAnilist } from "../utils/anilist";
-import { fetchHeroArtwork } from "../utils/heroArtwork";
+import { fetchHeroArtwork, isTitleTreatment } from "../utils/heroArtwork";
 import { fetchDubRange } from "../utils/dubSchedule";
 import { getDisplayTitle } from "../utils/schedule";
 import type { ListAnime, ListStatus, useAccounts } from "../hooks/useAccounts";
@@ -443,6 +443,7 @@ export function HomeDashboard({
     }
   });
   const [logoFailed, setLogoFailed] = useState(false);
+  const [validatedLogo, setValidatedLogo] = useState<string | null>(null);
   const [artwork, setArtwork] = useState<{
     id: number;
     logos: string[];
@@ -518,30 +519,42 @@ export function HomeDashboard({
           </picture>
           <div className="hero-shade" />
           <div className="hero-copy" key={"copy-" + anime.id}>
-            {titleLogo && !logoFailed ? (
-              <h1>
+            <h1
+              className={
+                !titleLogo || validatedLogo !== titleLogo || logoFailed
+                  ? getDisplayTitle(anime).length > 60
+                    ? "hero-long-title"
+                    : undefined
+                  : undefined
+              }
+            >
+              {(!titleLogo || validatedLogo !== titleLogo || logoFailed) &&
+                getDisplayTitle(anime)}
+              {titleLogo && !logoFailed && (
                 <img
                   className="hero-logo"
                   key={titleLogo}
                   src={titleLogo}
                   alt={getDisplayTitle(anime)}
+                  style={{
+                    display: validatedLogo === titleLogo ? "block" : "none",
+                  }}
+                  onLoad={(event) => {
+                    const image = event.currentTarget;
+                    if (
+                      isTitleTreatment(image.naturalWidth, image.naturalHeight)
+                    )
+                      setValidatedLogo(titleLogo);
+                    else if (anime.logoImage) setLogoFailed(true);
+                    else setLogoIndex((index) => index + 1);
+                  }}
                   onError={() => {
                     if (anime.logoImage) setLogoFailed(true);
                     else setLogoIndex((index) => index + 1);
                   }}
                 />
-              </h1>
-            ) : (
-              <h1
-                className={
-                  getDisplayTitle(anime).length > 60
-                    ? "hero-long-title"
-                    : undefined
-                }
-              >
-                {getDisplayTitle(anime)}
-              </h1>
-            )}
+              )}
+            </h1>
             <div className="hero-actions">
               <button
                 className="hero-primary"
