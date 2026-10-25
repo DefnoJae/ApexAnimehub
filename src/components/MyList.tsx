@@ -92,16 +92,19 @@ export function MyList({
       </div>
       {Object.entries(accounts.libraryErrors).map(([p, error]) => (
         <p role="alert" key={p}>
-          {p === "mal" ? "MyAnimeList" : "AniList"}: {error} Saved entries are
-          kept when available. Retry with Refresh lists.
+          {p === "mal" ? "MyAnimeList" : "AniList"}: {error}{" "}
+          {error?.includes("429") &&
+            "The provider is busy; automatically retrying in about a minute. "}{" "}
+          Saved entries are kept when available. Retry with Refresh lists.
         </p>
       ))}
       {Object.entries(accounts.lists)
-        .filter(([p]) => accounts.connected[p as "mal" | "anilist"])
+        .filter(([p, list]) => !!list && accounts.connected[p as "mal" | "anilist"])
         .map(([p, list]) => (
           <p className="library-updated" key={p}>
             {p === "mal" ? "MyAnimeList" : "AniList"} · {list?.name} ·{" "}
-            {list?.entries.length} anime · Updated{" "}
+            {list?.entries.length} anime{" "}
+            {list?.complete === false ? "· Partial import" : ""} · Updated{" "}
             {list && new Date(list.updatedAt).toLocaleString()}
           </p>
         ))}
@@ -156,3 +159,4 @@ export function MyList({
     </section>
   );
 }
+

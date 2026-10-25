@@ -28,6 +28,10 @@ export async function sendListUpdate(
   automatic = false,
 ): Promise<AccountResult> {
   try {
+    if (provider === "anilist" && !anime.id)
+      throw new Error(
+        "This anime has no confirmed AniList match. MyAnimeList can still update independently.",
+      );
     if (provider === "mal" && !anime.idMal)
       throw new Error(
         "This anime has no confirmed MyAnimeList ID. Reopen its details and try again.",
@@ -159,6 +163,17 @@ export function useAccounts() {
       .catch(() => {})
       .then(async () => {
         let mapped = anime;
+        if (enabled.includes("anilist") && !mapped.id && mapped.idMal) {
+          try {
+            const data = await fetchAnilist<{ Media: ListAnime }>(
+              "query($idMal:Int){Media(idMal:$idMal,type:ANIME){id idMal episodes title{english romaji}}}",
+              { idMal: mapped.idMal },
+            );
+            if (data.Media) mapped = { ...mapped, ...data.Media };
+          } catch {
+            /* A failed AniList match must not block MAL updates. */
+          }
+        }
         if (enabled.includes("mal") && !mapped.idMal) {
           try {
             const data = await fetchAnilist<{ Media: ListAnime }>(
@@ -203,6 +218,8 @@ export function useAccounts() {
           .forEach((result) =>
             library.record(result.provider, mapped, effectiveStatus, progress),
           );
+        if (next.some((result) => result.success))
+          void library.refreshLibrary();
         setResults(next);
         setMessage(
           (anime.title?.english || anime.title?.romaji || "Anime") +

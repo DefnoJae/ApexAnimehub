@@ -11,6 +11,7 @@ export interface LibraryEntry {
   updatedAt: number;
 }
 interface Snapshot {
+  complete?: boolean;
   identity: string;
   name: string;
   entries: LibraryEntry[];
@@ -92,12 +93,32 @@ export function useLibrary(connected: Record<AccountProvider, boolean>) {
                 } catch {}
               }
               entries.push(...data.entries);
+              const partial = {
+                identity,
+                name,
+                entries: [...entries],
+                updatedAt: Date.now(),
+                complete: !data.hasNextPage,
+              };
+              setLists((previous) =>
+                previous[provider]?.complete
+                  ? previous
+                  : { ...previous, [provider]: partial },
+              );
               if (!data.hasNextPage) break;
+              await new Promise((resolve) => setTimeout(resolve, 1100));
+              if (run !== generation.current) return;
               page++;
               if (page > 10000)
                 throw new Error("List import exceeded page limit");
             }
-            const snapshot = { identity, name, entries, updatedAt: Date.now() };
+            const snapshot = {
+              identity,
+              name,
+              entries,
+              updatedAt: Date.now(),
+              complete: true,
+            };
             if (run !== generation.current) return;
             setLists((previous) => ({ ...previous, [provider]: snapshot }));
             try {
@@ -124,6 +145,11 @@ export function useLibrary(connected: Record<AccountProvider, boolean>) {
       generation.current++;
     };
   }, [refreshLibrary]);
+  useEffect(() => {
+    if (!Object.values(errors).some((error) => error?.includes("429"))) return;
+    const timer = window.setTimeout(() => void refreshLibrary(), 65000);
+    return () => window.clearTimeout(timer);
+  }, [errors, refreshLibrary]);
   const record = (
     provider: AccountProvider,
     anime: ListAnime,
@@ -172,4 +198,3 @@ export function useLibrary(connected: Record<AccountProvider, boolean>) {
       entries.find((entry) => sameAnime(entry.anime, anime))?.status,
   };
 }
-

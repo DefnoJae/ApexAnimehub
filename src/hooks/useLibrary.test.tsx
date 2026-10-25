@@ -37,6 +37,9 @@ test("imports every page, retains successful provider when another fails, and re
   await act(async () => {
     root.render(<Harness />);
   });
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 1200));
+  });
   expect(global.fetch).toHaveBeenCalledWith(
     "/api/list/anilist?page=2",
     expect.anything(),

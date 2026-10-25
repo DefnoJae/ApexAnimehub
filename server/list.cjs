@@ -116,10 +116,10 @@ async function readList(provider, account, page = 1) {
     Object.keys(statusMap).find((key) => statusMap[key][provider] === value) ||
     "watching";
   if (provider === "anilist") {
-    const { Viewer } = await graphql(
-      account.accessToken,
-      "query{Viewer{id name}}",
-    );
+    const { Viewer } = account.identity
+      ? { Viewer: account.identity }
+      : await graphql(account.accessToken, "query{Viewer{id name}}");
+    account.identity = Viewer;
     const data = await graphql(
       account.accessToken,
       "query($user:Int,$page:Int){Page(page:$page,perPage:50){pageInfo{hasNextPage} mediaList(userId:$user,type:ANIME){status progress updatedAt media{id idMal episodes title{english romaji} coverImage{extraLarge} bannerImage}}}}",
@@ -138,9 +138,12 @@ async function readList(provider, account, page = 1) {
     };
   }
   const headers = { Authorization: "Bearer " + account.accessToken };
-  const user = await upstream("https://api.myanimelist.net/v2/users/@me", {
-    headers,
-  });
+  const user =
+    account.identity ||
+    (await upstream("https://api.myanimelist.net/v2/users/@me", {
+      headers,
+    }));
+  account.identity = { id: user.id, name: user.name };
   const data = await upstream(
     "https://api.myanimelist.net/v2/users/@me/animelist?limit=100&offset=" +
       (page - 1) * 100 +
