@@ -172,6 +172,16 @@ input:focus-visible {
   z-index: -3;
   background: radial-gradient(ellipse at 75% 35%, #342744, #111017 70%);
 }
+.cinematic-hero::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 6px;
+  background: var(--apex-bg);
+  pointer-events: none;
+}
 .hero-artwork .hero-backdrop {
   z-index: auto;
   transition: opacity 0.5s ease;
