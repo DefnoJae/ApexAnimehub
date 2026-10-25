@@ -52,13 +52,16 @@ input:focus-visible {
 .glass {
   background: linear-gradient(
     135deg,
-    rgba(59, 54, 69, 0.48),
-    rgba(24, 24, 30, 0.65)
+    rgba(59, 54, 69, 0.24),
+    rgba(24, 24, 30, 0.38)
   );
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
+  backdrop-filter: blur(5px) saturate(150%);
+  -webkit-backdrop-filter: blur(5px) saturate(150%);
   border: 1px solid var(--apex-border);
-  box-shadow: 0 12px 40px #0002;
+  box-shadow:
+    inset 0 1px 0 #ffffff24,
+    inset 0 -1px 0 #0005,
+    0 12px 40px #0002;
 }
 .apex-nav {
   position: fixed;
@@ -590,7 +593,7 @@ input:focus-visible {
   color: #e0ccff;
   font-size: 10px;
   font-weight: 800;
-  backdrop-filter: blur(12px);
+  backdrop-filter: blur(4px);
 }
 .continue-info {
   padding: 12px 6px 10px;
@@ -770,7 +773,7 @@ input:focus-visible {
   position: fixed;
   inset: 0;
   background: #08070dd9;
-  backdrop-filter: blur(25px);
+  backdrop-filter: blur(6px);
   z-index: 420;
   padding: 110px 20px 30px;
   overflow: auto;
@@ -1107,5 +1110,113 @@ input:focus-visible {
     transform: translateX(-50%);
     opacity: 1;
     pointer-events: auto;
+  }
+}
+
+/* Clear glass inspired by seunghan91/ios27-design-system; deliberately less frost. */
+.my-library {
+  padding: 24px clamp(20px, 5vw, 80px) 120px;
+}
+.my-library h1 {
+  font-size: 36px;
+  font-weight: 900;
+  font-style: italic;
+}
+.my-library > p {
+  color: #bbb5c9;
+  margin: 12px 0;
+}
+.library-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 24px 0;
+}
+.library-filters input,
+.library-filters select {
+  background: #211b2c;
+  border: 1px solid #ffffff24;
+  color: white;
+  padding: 12px;
+  border-radius: 12px;
+  max-width: 100%;
+}
+.library-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 24px 18px;
+}
+.library-grid .poster-card {
+  width: auto;
+  min-width: 0;
+}
+.library-status {
+  display: block;
+  color: #c2b6d8;
+  margin-top: 6px;
+  font-size: 11px;
+}
+.library-updated {
+  font-size: 12px;
+}
+.anime-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-height: 20px;
+  margin-top: 6px;
+  font-size: 10px;
+  font-weight: 700;
+}
+.anime-badges span,
+.anime-badges a {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 6px;
+  border-radius: 6px;
+  background: #b887ff20;
+  color: #dfcaff;
+}
+.anime-badges a {
+  color: #f7d67c;
+  background: #f7d67c12;
+}
+.quick-add[title="Watching"] {
+  color: #bd9aff;
+}
+.quick-add[title="Completed"] {
+  color: #79e3b3;
+}
+@media (max-width: 1100px) {
+  .library-grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
+@media (max-width: 700px) {
+  .library-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 20px 12px;
+  }
+  .apex-nav.glass {
+    background: linear-gradient(135deg, #3b364540, #18181e61);
+  }
+}
+@media (max-width: 420px) {
+  .library-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .glass,
+  .apex-nav.glass {
+    background: #211d29;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+@supports not (backdrop-filter: blur(1px)) {
+  .glass {
+    background: #211d29ee;
   }
 }

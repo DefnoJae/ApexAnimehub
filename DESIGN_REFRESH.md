@@ -31,3 +31,10 @@ The default override catalog is empty; automatic sourcing remains active. A conf
 ## Publishing
 
 The existing `codex/apex-v1-cleanup` branch is linked to the user's Vercel deployment and its configured OAuth callback origin. Pushes update that hosted branch deployment. Keep that callback origin intact when publishing the refresh; moving to a different hostname also requires updating the OAuth app registrations and deployment configuration.
+
+## Library and clearer glass
+- My List replaces the external dub-tracker iframe in navigation. Authenticated imports read every provider page without writing to either list. Provider statuses/progress remain independently visible when they differ.
+- Local library snapshots are versioned and keyed by provider + verified account ID. They contain anime metadata, status and progress, never OAuth credentials. Disconnect hides the library; reconnect/import retrieves the account's current list. Cross-device durability comes from AniList/MAL themselves; the app cache is device-local, not a new cloud database.
+- Status icons: bookmark = Planning, play = Watching, check = Completed, pause = On hold, minus-circle = Dropped. Quick actions update only providers that confirmed success.
+- Clearer controls use 5px blur, lighter tint and inset rims, inspired by https://github.com/seunghan91/ios27-design-system/blob/main/packages/tokens/src/materials.json. Existing purple identity retained; reduced-transparency and unsupported-filter fallbacks stay opaque.
+- Metadata sources inspected in SeaKit's pinned payload (7a348e76513757447f07107e45d6ee49af5e7c11): MyDubList MAL-ID index for English dub/partial dub; Jikan for explicitly labeled MAL scores. New browser-native implementation; no Seanime runtime copied. Scores requested only for visible cards, deduplicated and serialized with 1.1s gaps, cached 24h with stale fallback. Missing metadata is omitted, never inferred as undubbed or shown as a zero rating. Direct MAL HTML scraping is deliberately avoided.

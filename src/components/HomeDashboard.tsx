@@ -4,7 +4,10 @@ import {
   Check,
   ChevronRight,
   Home,
-  Mic,
+  Library,
+  Bookmark,
+  Pause,
+  MinusCircle,
   Play,
   Plus,
   Search,
@@ -19,6 +22,7 @@ import type { ListAnime, ListStatus, useAccounts } from "../hooks/useAccounts";
 import { ListFeedback } from "./ListControls";
 import { HeroBackdrop } from "./HeroBackdrop";
 import "./dashboard.css";
+import { AnimeBadges } from "./AnimeBadges";
 
 export interface DashboardAnime extends ListAnime {
   title: { english?: string; romaji?: string };
@@ -79,7 +83,7 @@ export function FloatingNavigation({
       {[
         { key: "all", label: "Home", Icon: Home },
         { key: "dub-releases", label: "Dub calendar", Icon: Calendar },
-        { key: "dub-tracker", label: "Dub tracker", Icon: Mic },
+        { key: "my-list", label: "My List", Icon: Library },
       ].map(({ key, label, Icon }) => (
         <button
           key={key}
@@ -127,6 +131,16 @@ export function QuickList({
 }) {
   const [open, setOpen] = useState(false),
     [notice, setNotice] = useState("");
+  const currentStatus = accounts.getListStatus?.(anime);
+  const StatusIcon = currentStatus
+    ? {
+        planning: Bookmark,
+        watching: Play,
+        completed: Check,
+        paused: Pause,
+        dropped: MinusCircle,
+      }[currentStatus]
+    : Plus;
   const container = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!open) return;
@@ -173,16 +187,25 @@ export function QuickList({
           (planning ? "Add to Planning: " : "Change list status: ") +
           getDisplayTitle(anime)
         }
-        aria-expanded={planning ? undefined : open}
+        title={
+          currentStatus
+            ? statuses.find(([key]) => key === currentStatus)?.[1]
+            : "Add to list"
+        }
+        aria-expanded={planning && !currentStatus ? undefined : open}
         onClick={() =>
-          planning ? void update("planning") : setOpen((value) => !value)
+          planning && !currentStatus
+            ? void update("planning")
+            : setOpen((value) => !value)
         }
         disabled={accounts.busy || accounts.checking}
       >
-        {notice === "Saved" ? <Check size={19} /> : <Plus size={19} />}
+        <StatusIcon size={19} />
         {planning && (
           <span>
-            {notice === "Saved" ? "Added to Planning" : "Add to Planning"}
+            {currentStatus
+              ? statuses.find(([key]) => key === currentStatus)?.[1]
+              : "Add to Planning"}
           </span>
         )}
       </button>
@@ -257,6 +280,7 @@ export function PosterRow({
             <button className="poster-title" onClick={() => onSelect(anime)}>
               {getDisplayTitle(anime)}
             </button>
+            <AnimeBadges idMal={anime.idMal} />
           </article>
         ))}
       </div>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { ChevronLeft, ExternalLink, Mic, Search, Star, X } from "lucide-react";
+import { ChevronLeft, Search, Star, X } from "lucide-react";
 import {
   HomeDashboard,
   FloatingNavigation,
@@ -13,6 +13,8 @@ import { useAccounts } from "./hooks/useAccounts";
 import { AccountSettings } from "./components/AccountSettings";
 import { ListControls } from "./components/ListControls";
 import { VideoPlayer } from "./components/VideoPlayer";
+import { MyList } from "./components/MyList";
+import { AnimeBadges } from "./components/AnimeBadges";
 const THEME_COLOR = "8B5CF6";
 
 export default function App() {
@@ -490,43 +492,13 @@ export default function App() {
             <DubScheduleView onSelectMedia={onSelectMedia} />
           )}
 
-          {/* DUB TRACKER VIEW */}
-          {view === "dub-tracker" && (
-            <div className="apex-tracker h-full flex flex-col p-10 animate-fade-in relative z-10">
-              <div className="flex items-center justify-between mb-8">
-                <div className="flex items-center gap-5">
-                  <div className="w-14 h-14 bg-purple-600 rounded-[20px] flex items-center justify-center shadow-lg shadow-purple-500/20">
-                    <Mic size={28} className="text-white" />
-                  </div>
-                  <div>
-                    <h1 className="text-3xl font-black italic uppercase tracking-tighter text-white">
-                      Dub Tracker
-                    </h1>
-                    <p className="text-purple-400 font-bold tracking-[0.3em] uppercase text-[10px]">
-                      Powered by animedubstatus.com
-                    </p>
-                  </div>
-                </div>
-                <a
-                  href="https://animedubstatus.com"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="flex items-center gap-2 text-zinc-400 hover:text-white text-xs font-black uppercase tracking-widest transition-colors bg-white/5 px-6 py-3 rounded-full hover:bg-white/10 border border-white/5"
-                >
-                  Open in new tab <ExternalLink size={14} />
-                </a>
-              </div>
-
-              <div className="flex-1 rounded-[48px] overflow-hidden border border-white/10 shadow-2xl bg-[#080808] relative">
-                <iframe
-                  src="https://animedubstatus.com/"
-                  className="w-full h-full border-none"
-                  title="Anime Dub Status Tracker"
-                />
-              </div>
-            </div>
+          {view === "my-list" && (
+            <MyList
+              accounts={accounts}
+              onSelect={onSelectMedia}
+              onConnect={() => setShowAccounts(true)}
+            />
           )}
-
           {/* DETAILS VIEW */}
           {view === "details" && selectedAnime && (
             <div className="apex-details animate-fade-in flex h-full">
@@ -574,6 +546,7 @@ export default function App() {
                     </div>
                   </div>
 
+                  <AnimeBadges idMal={selectedAnime.idMal} />
                   <ListControls
                     key={selectedAnime.id}
                     anime={selectedAnime}
