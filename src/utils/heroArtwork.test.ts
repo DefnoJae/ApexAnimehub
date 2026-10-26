@@ -3,9 +3,15 @@ import {
   artworkBackdrops,
   fetchHeroBackdrops,
   isHeroBackdrop,
+  isHeroBanner,
   fetchHeroArtwork,
   isTitleTreatment,
 } from "./heroArtwork";
+test("panoramic banner fallback accepts usable banners but rejects portrait covers and tiny art", () => {
+  expect(isHeroBanner(1920, 600)).toBe(true);
+  expect(isHeroBanner(600, 900)).toBe(false);
+  expect(isHeroBanner(480, 150)).toBe(false);
+});
 test("square and portrait covers cannot replace a hero title", () => {
   expect(isTitleTreatment(1024, 1024)).toBe(false);
   expect(isTitleTreatment(600, 900)).toBe(false);
@@ -92,17 +98,15 @@ test("backdrops select landscape art rather than poster or thin banner categorie
 });
 
 test("logos and backdrops share one metadata fetch", async () => {
-  global.fetch = jest
-    .fn()
-    .mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        mappings: { anilist_id: 45, imdb_id: "tt45" },
-        images: [
-          { coverType: "Fanart", url: "https://artworks.thetvdb.com/hd.jpg" },
-        ],
-      }),
-    });
+  global.fetch = jest.fn().mockResolvedValue({
+    ok: true,
+    json: async () => ({
+      mappings: { anilist_id: 45, imdb_id: "tt45" },
+      images: [
+        { coverType: "Fanart", url: "https://artworks.thetvdb.com/hd.jpg" },
+      ],
+    }),
+  });
   const [logos, backdrops] = await Promise.all([
     fetchHeroArtwork(45),
     fetchHeroBackdrops(45),

@@ -1,5 +1,9 @@
 import React, { useEffect, useState } from "react";
-import { fetchHeroBackdrops, isHeroBackdrop } from "../utils/heroArtwork";
+import {
+  fetchHeroBackdrops,
+  isHeroBackdrop,
+  isHeroBanner,
+} from "../utils/heroArtwork";
 import type { DashboardAnime } from "./HomeDashboard";
 
 export function HeroBackdrop({ anime }: { anime: DashboardAnime }) {
@@ -27,13 +31,6 @@ export function HeroBackdrop({ anime }: { anime: DashboardAnime }) {
   const source = artwork?.id === anime.id ? candidates[index] : undefined;
   return (
     <div className="hero-artwork" aria-hidden="true">
-      {anime.coverImage?.extraLarge && (
-        <img
-          className="hero-mobile-art"
-          src={anime.coverImage.extraLarge}
-          alt=""
-        />
-      )}
       {accepted !== source && (
         <div className="hero-poster-fallback">
           <img src={anime.coverImage?.extraLarge} alt="" />
@@ -48,7 +45,11 @@ export function HeroBackdrop({ anime }: { anime: DashboardAnime }) {
           style={{ opacity: accepted === source ? 1 : 0 }}
           onLoad={(event) => {
             const image = event.currentTarget;
-            if (isHeroBackdrop(image.naturalWidth, image.naturalHeight))
+            if (
+              isHeroBackdrop(image.naturalWidth, image.naturalHeight) ||
+              (source === anime.bannerImage &&
+                isHeroBanner(image.naturalWidth, image.naturalHeight))
+            )
               setAccepted(source);
             else setIndex((value) => value + 1);
           }}

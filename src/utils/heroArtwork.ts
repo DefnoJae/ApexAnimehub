@@ -106,6 +106,16 @@ export function isHeroBackdrop(width: number, height: number): boolean {
     width / height <= 2.4
   );
 }
+// AniList banners are intentionally panoramic, unlike full-height fanart.
+// Keep them as a separate last resort instead of rejecting every thin banner.
+export function isHeroBanner(width: number, height: number): boolean {
+  return (
+    width >= 960 &&
+    height >= 300 &&
+    width / height >= 1.5 &&
+    width / height <= 6
+  );
+}
 async function fetchHeroMedia(anilistId: number): Promise<CachedArtwork> {
   const empty = { logos: [], backdrops: [], updatedAt: 0 };
   if (!Number.isSafeInteger(anilistId) || anilistId <= 0) return empty;
