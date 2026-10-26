@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Pencil, X } from "lucide-react";
 import type {
   AccountProvider,
@@ -102,7 +103,12 @@ function EntryDialog({
   const dirty = useRef({ progress: false, scores: new Set<AccountProvider>() });
   const panel = useRef<HTMLFormElement>(null);
   useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
     panel.current?.querySelector<HTMLElement>("input")?.focus();
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
   }, []);
   useEffect(() => {
     const controller = new AbortController(),
@@ -244,7 +250,7 @@ function EntryDialog({
       setSaving(false);
     }
   };
-  return (
+  return createPortal(
     <div
       className="entry-editor-overlay"
       onClick={(event) => {
@@ -365,6 +371,7 @@ function EntryDialog({
           {saving ? "Saving…" : "Save to connected lists"}
         </button>
       </form>
-    </div>
+    </div>,
+    document.body,
   );
 }

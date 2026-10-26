@@ -59,20 +59,20 @@ test("loads saved personal scores, edits progress downward, preserves untouched 
   expect(node.textContent).toContain("Your AniList: 8.5/10");
   await act(async () =>
     (
-      node.querySelector(
+      document.querySelector(
         '[aria-label="Edit watched episodes and personal scores"]',
       ) as HTMLButtonElement
     ).click(),
   );
   expect(
     (
-      node.querySelector(
+      document.querySelector(
         '[aria-label="MyAnimeList personal score"]',
       ) as HTMLInputElement
     ).value,
   ).toBe("7");
   const set = (label: string, value: string) => {
-    const input = node.querySelector(
+    const input = document.querySelector(
       '[aria-label="' + label + '"]',
     ) as HTMLInputElement;
     Object.getOwnPropertyDescriptor(
@@ -86,7 +86,7 @@ test("loads saved personal scores, edits progress downward, preserves untouched 
     set("AniList personal score", "9.1");
   });
   await act(async () =>
-    node
+    document
       .querySelector("form")!
       .dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })),
   );
@@ -94,14 +94,16 @@ test("loads saved personal scores, edits progress downward, preserves untouched 
     manualProgress: true,
     scores: { anilist: 9.1 },
   });
-  expect(node.textContent).toContain("MyAnimeList: Reconnect required");
-  expect(node.querySelector("[role=dialog]")).not.toBeNull();
+  expect(document.body.textContent).toContain(
+    "MyAnimeList: Reconnect required",
+  );
+  expect(document.querySelector("[role=dialog]")).not.toBeNull();
   act(() =>
-    node
+    document
       .querySelector("form")!
       .dispatchEvent(
         new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
       ),
   );
-  expect(node.querySelector("[role=dialog]")).toBeNull();
+  expect(document.querySelector("[role=dialog]")).toBeNull();
 });
