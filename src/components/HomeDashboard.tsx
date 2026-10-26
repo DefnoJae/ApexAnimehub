@@ -598,32 +598,41 @@ export function HomeDashboard({
                   : undefined
               }
             >
-              {(!titleLogo || validatedLogo !== titleLogo || logoFailed) &&
-                getDisplayTitle(anime)}
-              {titleLogo && !logoFailed && (
-                <img
-                  className="hero-logo"
-                  key={titleLogo}
-                  src={titleLogo}
-                  alt={getDisplayTitle(anime)}
-                  style={{
-                    display: validatedLogo === titleLogo ? "block" : "none",
-                  }}
-                  onLoad={(event) => {
-                    const image = event.currentTarget;
-                    if (
-                      isTitleTreatment(image.naturalWidth, image.naturalHeight)
-                    )
-                      setValidatedLogo(titleLogo);
-                    else if (anime.logoImage) setLogoFailed(true);
-                    else setLogoIndex((index) => index + 1);
-                  }}
-                  onError={() => {
-                    if (anime.logoImage) setLogoFailed(true);
-                    else setLogoIndex((index) => index + 1);
-                  }}
-                />
-              )}
+              <button
+                className="hero-title-link"
+                aria-label={"View anime details: " + getDisplayTitle(anime)}
+                onClick={() => onSelect(anime)}
+              >
+                {(!titleLogo || validatedLogo !== titleLogo || logoFailed) &&
+                  getDisplayTitle(anime)}
+                {titleLogo && !logoFailed && (
+                  <img
+                    className="hero-logo"
+                    key={titleLogo}
+                    src={titleLogo}
+                    alt={getDisplayTitle(anime)}
+                    style={{
+                      display: validatedLogo === titleLogo ? "block" : "none",
+                    }}
+                    onLoad={(event) => {
+                      const image = event.currentTarget;
+                      if (
+                        isTitleTreatment(
+                          image.naturalWidth,
+                          image.naturalHeight,
+                        )
+                      )
+                        setValidatedLogo(titleLogo);
+                      else if (anime.logoImage) setLogoFailed(true);
+                      else setLogoIndex((index) => index + 1);
+                    }}
+                    onError={() => {
+                      if (anime.logoImage) setLogoFailed(true);
+                      else setLogoIndex((index) => index + 1);
+                    }}
+                  />
+                )}
+              </button>
             </h1>
             <div
               className="hero-actions"
@@ -691,67 +700,78 @@ export function HomeDashboard({
                   episodeMetadata[`${item.anime.id}:${item.episode}`];
                 return (
                   <article className="continue-card" key={item.anime.id}>
-                    <button
-                      className="continue-open"
-                      onClick={() => onResume(item)}
-                      aria-label={
-                        "Resume " +
-                        getDisplayTitle(item.anime) +
-                        " episode " +
-                        item.episode
-                      }
-                    >
-                      <div className="continue-art">
-                        <img
-                          loading="lazy"
-                          src={
-                            metadata?.image ||
-                            item.anime.bannerImage ||
-                            item.anime.coverImage?.extraLarge
-                          }
-                          alt=""
-                          onError={(event) => {
-                            const fallback =
+                    <div className="continue-open">
+                      <button
+                        className="continue-resume"
+                        onClick={() => onResume(item)}
+                        aria-label={
+                          "Resume " +
+                          getDisplayTitle(item.anime) +
+                          " episode " +
+                          item.episode
+                        }
+                      >
+                        <div className="continue-art">
+                          <img
+                            loading="lazy"
+                            src={
+                              metadata?.image ||
                               item.anime.bannerImage ||
-                              item.anime.coverImage?.extraLarge;
-                            if (
-                              fallback &&
-                              event.currentTarget.getAttribute("src") !==
-                                fallback
-                            )
-                              event.currentTarget.src = fallback;
-                          }}
-                        />
-                        <span className="resume-circle">
-                          <Play size={22} fill="currentColor" />
-                        </span>
-                      </div>
-                      {percent !== null ? (
-                        <div
-                          className="watch-progress"
-                          role="progressbar"
-                          aria-label={
-                            "Episode progress: " + getDisplayTitle(item.anime)
-                          }
-                          aria-valuemin={0}
-                          aria-valuemax={100}
-                          aria-valuenow={percent}
-                        >
-                          <span
-                            style={{
-                              width: percent + "%",
+                              item.anime.coverImage?.extraLarge
+                            }
+                            alt=""
+                            onError={(event) => {
+                              const fallback =
+                                item.anime.bannerImage ||
+                                item.anime.coverImage?.extraLarge;
+                              if (
+                                fallback &&
+                                event.currentTarget.getAttribute("src") !==
+                                  fallback
+                              )
+                                event.currentTarget.src = fallback;
                             }}
                           />
+                          <span className="resume-circle">
+                            <Play size={22} fill="currentColor" />
+                          </span>
                         </div>
-                      ) : (
-                        <div
-                          className="watch-progress unknown"
-                          title="Playback progress is not available yet"
-                        />
-                      )}
+                        {percent !== null ? (
+                          <div
+                            className="watch-progress"
+                            role="progressbar"
+                            aria-label={
+                              "Episode progress: " + getDisplayTitle(item.anime)
+                            }
+                            aria-valuemin={0}
+                            aria-valuemax={100}
+                            aria-valuenow={percent}
+                          >
+                            <span
+                              style={{
+                                width: percent + "%",
+                              }}
+                            />
+                          </div>
+                        ) : (
+                          <div
+                            className="watch-progress unknown"
+                            title="Playback progress is not available yet"
+                          />
+                        )}
+                      </button>
                       <div className="continue-info">
                         <h3 title={getDisplayTitle(item.anime)}>
-                          {getDisplayTitle(item.anime)}
+                          <button
+                            className="continue-title-link"
+                            onClick={() => onSelect(item.anime)}
+                            aria-label={
+                              "View anime details: " +
+                              getDisplayTitle(item.anime)
+                            }
+                          >
+                            {getDisplayTitle(item.anime)}
+                          </button>
                         </h3>
                         <span className="episode-badge">EP {item.episode}</span>
                       </div>
@@ -763,7 +783,7 @@ export function HomeDashboard({
                           {metadata.title}
                         </p>
                       )}
-                    </button>
+                    </div>
                     <button
                       className="remove-history"
                       aria-label={

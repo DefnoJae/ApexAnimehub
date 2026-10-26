@@ -2065,3 +2065,34 @@ input:focus-visible {
 .home-content .continue-section > .empty-state {
   margin-inline: var(--home-gutter);
 }
+
+.hero-title-link,
+.continue-title-link,
+.continue-resume {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.continue-title-link {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.continue-title-link:hover {
+  color: #d3b2ff;
+}
+.hero-title-link:focus-visible,
+.continue-title-link:focus-visible,
+.continue-resume:focus-visible {
+  outline: 2px solid #b58aff;
+  outline-offset: 3px;
+  border-radius: 5px;
+}

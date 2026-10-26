@@ -233,7 +233,8 @@ test("quick status actions preserve progress unless explicitly completing an ani
   expect(node.textContent).toContain("Saved");
 });
 test("continue watching shows actual playback progress and routes resume to the saved episode", async () => {
-  const resume = jest.fn(),
+  const select = jest.fn(),
+    resume = jest.fn(),
     remove = jest.fn(),
     entry = {
       anime,
@@ -250,7 +251,7 @@ test("continue watching shows actual playback progress and routes resume to the 
         rows={[]}
         history={[entry]}
         accounts={fakeAccounts()}
-        onSelect={jest.fn()}
+        onSelect={select}
         onWatch={jest.fn()}
         onResume={resume}
         onRemove={remove}
@@ -269,6 +270,18 @@ test("continue watching shows actual playback progress and routes resume to the 
     ).click(),
   );
   expect(resume).toHaveBeenCalledWith(entry);
+  const titleButtons = node.querySelectorAll(
+    '[aria-label="View anime details: Example anime"]',
+  );
+  expect(titleButtons).toHaveLength(2);
+  expect(node.querySelector("button button")).toBeNull();
+  act(() => {
+    (titleButtons[0] as HTMLButtonElement).click();
+    (titleButtons[1] as HTMLButtonElement).click();
+  });
+  expect(select).toHaveBeenCalledTimes(2);
+  expect(select).toHaveBeenLastCalledWith(anime);
+  expect(resume).toHaveBeenCalledTimes(1);
   expect(node.querySelector(".continue-info .episode-badge")?.textContent).toBe(
     "EP 3",
   );
