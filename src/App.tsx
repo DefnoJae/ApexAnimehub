@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { ChevronLeft, Search, Star, X } from "lucide-react";
+import { Search, X } from "lucide-react";
 import {
   HomeDashboard,
   FloatingNavigation,
@@ -11,12 +11,13 @@ import { DubScheduleView } from "./components/DubScheduleView";
 
 import { useAccounts } from "./hooks/useAccounts";
 import { AccountSettings } from "./components/AccountSettings";
-import { ListControls } from "./components/ListControls";
+import { AnimeDetails, nextDetailEpisode } from "./components/AnimeDetails";
+import { sameAnime } from "./hooks/useLibrary";
 import { VideoPlayer } from "./components/VideoPlayer";
 import { MyList } from "./components/MyList";
-import { EpisodePicker } from "./components/EpisodePicker";
+
 import { DiscoveryPage } from "./components/DiscoveryPage";
-import { AnimeBadges } from "./components/AnimeBadges";
+
 const THEME_COLOR = "8B5CF6";
 
 export default function App() {
@@ -38,7 +39,7 @@ export default function App() {
 
   const [selectedAnime, setSelectedAnime] = useState<any>(null);
   const [activeEpisode, setActiveEpisode] = useState(1);
-  const [availableStreams, setAvailableStreams] = useState<any[]>([]);
+
   const [playingStream, setPlayingStream] = useState<any>(null);
 
   const [watchHistory, setWatchHistory] = useState<WatchEntry[]>([]);
@@ -243,7 +244,7 @@ export default function App() {
         isEmbed: true,
       },
     ];
-    setAvailableStreams(streams);
+
     return streams;
   };
 
@@ -273,8 +274,26 @@ export default function App() {
       return;
     }
     if (!startStream) setPlayingStream(null);
+    if (!startStream && startEpisode === 1) {
+      const progress = Math.max(
+        0,
+        ...accounts.libraryEntries
+          .filter((entry) => sameAnime(entry.anime, anime))
+          .map((entry) => entry.progress),
+      );
+      const history = watchHistory.find((entry) =>
+        sameAnime(entry.anime, anime),
+      );
+      startEpisode = nextDetailEpisode(
+        anime.episodes || Math.max(progress + 1, history?.episode || 1),
+        progress,
+        history,
+        !!anime.episodes,
+      );
+    }
     setSelectedAnime(anime);
     setView("details");
+    window.scrollTo({ top: 0 });
     setActiveEpisode(startEpisode);
     resolveStreams(anime, startEpisode);
 
@@ -292,7 +311,7 @@ export default function App() {
       const query = `query ($id: Int) {
         Media(id: $id, type: ANIME) {
           id idMal title { english romaji } bannerImage coverImage { extraLarge } description episodes averageScore
-          nextAiringEpisode { episode }
+          seasonYear format status genres studios(isMain:true){nodes{name}} nextAiringEpisode { episode }
           relations {
             edges {
               relationType
@@ -505,140 +524,38 @@ export default function App() {
           {view === "discover" && (
             <DiscoveryPage accounts={accounts} onSelect={onSelectMedia} />
           )}
-          {/* DETAILS VIEW */}
           {view === "details" && selectedAnime && (
-            <div className="apex-details animate-fade-in flex h-full">
-              <div className="apex-details-main flex-1 overflow-y-auto no-scrollbar relative pb-40">
-                <div className="relative h-[650px] w-full">
-                  <img
-                    src={
-                      selectedAnime.bannerImage ||
-                      selectedAnime.coverImage?.extraLarge
-                    }
-                    className="w-full h-full object-cover"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-[#121212] via-transparent" />
-                  <button
-                    onClick={() => setView("all")}
-                    className="details-back absolute top-10 left-10 p-5 bg-black/50 rounded-full hover:bg-purple-600 transition-all z-20"
-                  >
-                    <ChevronLeft size={28} />
-                  </button>
-                </div>
-                <div className="details-info px-20 -mt-80 relative z-10 flex flex-col gap-16">
-                  <div className="flex gap-14">
-                    <div className="details-poster w-80 aspect-[2/3] rounded-[64px] overflow-hidden shadow-2xl border border-white/10 bg-zinc-900 shrink-0">
-                      <img
-                        src={selectedAnime.coverImage?.extraLarge}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                    <div className="flex-1 pt-32">
-                      <div className="flex items-center gap-5 mb-10">
-                        <div className="px-7 py-3 bg-white/5 rounded-[20px] flex items-center gap-3 text-yellow-500 font-black">
-                          <Star size={20} fill="currentColor" />{" "}
-                          {selectedAnime.averageScore / 10 || "N/A"}
-                        </div>
-                      </div>
-                      <h1 className="details-title text-[80px] font-black italic uppercase tracking-tighter leading-[0.75] mb-12">
-                        {getDisplayTitle(selectedAnime)}
-                      </h1>
-                      <p
-                        className="details-text text-zinc-400 text-[18px] leading-relaxed max-w-4xl opacity-70"
-                        dangerouslySetInnerHTML={{
-                          __html: selectedAnime.description,
-                        }}
-                      />
-                    </div>
-                  </div>
-
-                  <AnimeBadges idMal={selectedAnime.idMal} />
-                  <ListControls
-                    key={selectedAnime.id}
-                    anime={selectedAnime}
-                    accounts={accounts}
-                    onConnect={() => setShowAccounts(true)}
-                  />
-                  <EpisodePicker
-                    anime={selectedAnime}
-                    total={totalEpisodes}
-                    selected={activeEpisode}
-                    entries={accounts.libraryEntries}
-                    importing={accounts.libraryLoading}
-                    onSelect={(episode) => {
-                      setActiveEpisode(episode);
-                      resolveStreams(selectedAnime, episode);
-                    }}
-                  />
-
-                  {selectedAnime.relations?.edges?.some(
-                    (e: any) => e.node.type === "ANIME",
-                  ) && (
-                    <div className="mt-20 animate-fade-in pb-12">
-                      <p className="text-purple-500 font-black text-[11px] uppercase tracking-[0.6em] mb-8">
-                        Related Media & Sequels
-                      </p>
-                      <div className="flex gap-6 overflow-x-auto no-scrollbar pb-6 scroll-smooth">
-                        {selectedAnime.relations.edges
-                          .filter((e: any) => e.node.type === "ANIME")
-                          .map((edge: any) => {
-                            const rel = edge.node;
-                            return (
-                              <div
-                                key={rel.id}
-                                onClick={() => onSelectMedia(rel)}
-                                className="w-[180px] shrink-0 cursor-pointer group"
-                              >
-                                <div className="aspect-[2/3] rounded-[32px] overflow-hidden shadow-2xl border border-white/5 bg-zinc-900 relative">
-                                  <img
-                                    src={rel.coverImage?.extraLarge}
-                                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000"
-                                    alt={getDisplayTitle(rel)}
-                                  />
-                                  <div className="absolute top-4 left-4 bg-purple-600/90 backdrop-blur-sm text-white text-[9px] font-black uppercase px-3 py-1 rounded-full tracking-widest shadow-lg">
-                                    {edge.relationType.replace(/_/g, " ")}
-                                  </div>
-                                </div>
-                                <p className="mt-5 text-[12px] font-black truncate text-zinc-400 group-hover:text-white uppercase italic tracking-tighter transition-colors px-2">
-                                  {getDisplayTitle(rel)}
-                                </p>
-                              </div>
-                            );
-                          })}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-              <div className="apex-details-sources w-[450px] bg-[#080808]/90 backdrop-blur-5xl border-l border-white/10 overflow-y-auto no-scrollbar p-12 flex flex-col shrink-0 h-full sticky top-0">
-                <h3 className="text-[11px] font-black uppercase tracking-[0.6em] text-purple-500 mb-10 sticky top-0 bg-[#080808] py-4 z-10">
-                  Sources
-                </h3>
-                <div className="space-y-5">
-                  {availableStreams.map((s, i) => (
-                    <div
-                      key={i}
-                      className="bg-white/5 border border-white/10 p-7 rounded-[40px] hover:border-purple-500/40 transition-all flex flex-col gap-6"
-                    >
-                      <p className="font-black text-[12px] uppercase">
-                        {s.name}
-                      </p>
-                      <button
-                        onClick={() => {
-                          setPlayingStream(s);
-                          updateHistory(selectedAnime, activeEpisode, s.name);
-                        }}
-                        className="w-full bg-white text-black font-black text-[11px] py-4 rounded-[20px] uppercase hover:bg-purple-600 hover:text-white transition-all"
-                      >
-                        Play Episode {activeEpisode}
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
+            <AnimeDetails
+              key={selectedAnime.id}
+              anime={selectedAnime}
+              accounts={accounts}
+              total={totalEpisodes}
+              selected={activeEpisode}
+              history={watchHistory.find(
+                (entry) => entry.anime.id === selectedAnime.id,
+              )}
+              onBack={() => setView("all")}
+              onSelect={onSelectMedia}
+              onConnect={() => setShowAccounts(true)}
+              onEpisode={(episode) => {
+                setActiveEpisode(episode);
+                resolveStreams(selectedAnime, episode);
+              }}
+              onPlay={(episode, audio) => {
+                setActiveEpisode(episode);
+                const streams = resolveStreams(selectedAnime, episode);
+                const stream = streams.find(
+                  (item) =>
+                    item.name ===
+                    (audio === "dub" ? "MegaPlay (Dub)" : "MegaPlay (Sub)"),
+                );
+                if (stream) {
+                  setPlayingStream(stream);
+                  updateHistory(selectedAnime, episode, stream.name);
+                }
+              }}
+            />
           )}
-
           {view === "all" && (
             <>
               {loading && (

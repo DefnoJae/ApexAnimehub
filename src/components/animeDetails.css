@@ -1,0 +1,560 @@
+.anime-detail-page {
+  padding-bottom: 110px;
+}
+.detail-hero {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  min-height: 440px;
+  margin-top: -8px;
+}
+.detail-hero .hero-artwork {
+  z-index: -2;
+}
+.detail-hero .hero-backdrop {
+  animation: none;
+  object-position: center 38%;
+}
+.detail-hero-shade {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background:
+    linear-gradient(90deg, #0d0c12eb 0%, #0d0c12ae 45%, #0d0c1218 80%),
+    linear-gradient(0deg, #0d0c12 0%, #0d0c1255 30%, transparent 90%);
+}
+.detail-hero-content {
+  padding: 24px clamp(24px, 4vw, 70px) 40px;
+  max-width: 1700px;
+  margin: auto;
+}
+.detail-back {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: none;
+  border: 0;
+  color: #ddd6e9;
+  font-size: 12px;
+  padding: 10px 0;
+  margin-bottom: 18px;
+}
+.detail-identity {
+  display: flex;
+  align-items: flex-start;
+  gap: 28px;
+}
+.detail-cover {
+  width: 170px;
+  aspect-ratio: 2/3;
+  border-radius: 15px;
+  object-fit: cover;
+  background: #211d29;
+  box-shadow: 0 16px 36px #0006;
+  flex-shrink: 0;
+}
+.detail-intro {
+  max-width: 850px;
+  min-width: 0;
+  padding-top: 4px;
+}
+.detail-intro h1 {
+  font-size: clamp(30px, 3.7vw, 62px);
+  font-weight: 950;
+  font-style: italic;
+  text-transform: uppercase;
+  letter-spacing: -0.035em;
+  line-height: 1.03;
+  overflow-wrap: anywhere;
+  margin-bottom: 16px;
+}
+.detail-metadata {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+  align-items: center;
+  color: #c2b9ce;
+  font-size: 12px;
+}
+.detail-metadata > span:not(.detail-genre) + span:not(.detail-genre)::before {
+  content: "·";
+  margin-right: 9px;
+  color: #8f859e;
+}
+.detail-genre {
+  border: 1px solid #ffffff25;
+  border-radius: 99px;
+  padding: 5px 10px;
+  background: #241b343d;
+  color: #dfd4ed;
+}
+.detail-rating-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 12px 0;
+  flex-wrap: wrap;
+}
+.detail-rating-line .anime-badges {
+  margin: 0;
+  min-height: 0;
+}
+.detail-anilist-rating {
+  color: #f3d17a;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px;
+  background: #f3d17a12;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 700;
+}
+.detail-synopsis {
+  max-width: 750px;
+  color: #c8c0d2;
+  font-size: 14px;
+  line-height: 1.65;
+  margin: 12px 0 18px;
+}
+.detail-synopsis p {
+  white-space: pre-line;
+}
+.detail-synopsis .is-collapsed {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.detail-synopsis > button {
+  background: none;
+  border: 0;
+  color: #be92fc;
+  font-size: 12px;
+  margin-top: 5px;
+  text-decoration: underline;
+}
+.detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+.detail-continue {
+  background: #fff;
+  color: #141019;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 14px 24px;
+  border: 0;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 800;
+  min-height: 48px;
+}
+.detail-list-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 12px;
+  color: #cfb3f6;
+  padding: 0 14px;
+  min-height: 48px;
+}
+.detail-list-status select {
+  background: transparent;
+  border: 0;
+  color: inherit;
+  font-size: 13px;
+  padding: 12px 4px;
+  min-width: 130px;
+}
+.detail-list-status select option {
+  background: #211a2d;
+  color: #eee;
+}
+.detail-account-status {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+  color: #aaa1b6;
+  font-size: 10px;
+  margin-top: 13px;
+}
+.detail-account-status span {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.detail-account-status .has-entry {
+  color: #91d8b3;
+}
+.detail-account-status button {
+  background: none;
+  border: 0;
+  color: #ba92ee;
+  font-size: 10px;
+  text-decoration: underline;
+}
+.detail-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 340px);
+  gap: 24px;
+  padding: 0 clamp(24px, 4vw, 70px);
+  margin: 0 auto;
+  max-width: 1700px;
+  position: relative;
+}
+.detail-primary-column,
+.detail-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+}
+.detail-episodes-panel,
+.detail-related,
+.detail-playback,
+.detail-info {
+  border-radius: 16px;
+  padding: 22px;
+  background: linear-gradient(145deg, #211c2e3b, #17141f70);
+}
+.detail-progress-heading {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  font-size: 11px;
+  color: #a79ab8;
+  margin-bottom: 18px;
+}
+.detail-progress-heading progress {
+  width: 140px;
+  height: 5px;
+  accent-color: #ac79f3;
+  border: 0;
+  border-radius: 99px;
+  overflow: hidden;
+}
+.detail-progress-heading progress::-webkit-progress-bar {
+  background: #ffffff17;
+}
+.detail-progress-heading progress::-webkit-progress-value {
+  background: #ac79f3;
+}
+.detail-progress-heading progress::-moz-progress-bar {
+  background: #ac79f3;
+}
+.detail-watched-legend {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #8ed2ae;
+}
+.detail-episodes-panel .episode-picker h3 {
+  text-align: left;
+  font-size: 22px;
+  letter-spacing: -0.025em;
+  text-transform: none;
+  color: white;
+  font-style: italic;
+  margin-bottom: 16px;
+}
+.detail-episodes-panel .episode-progress-summary {
+  text-align: left;
+  margin: 0 0 18px;
+  font-size: 11px;
+}
+.detail-episodes-panel .episode-progress-summary span {
+  display: inline;
+  margin-left: 12px;
+}
+.detail-episodes-panel .episode-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 12px;
+  max-height: 430px;
+  overflow: auto;
+  padding: 2px;
+}
+.detail-episodes-panel .episode-cell {
+  width: 100%;
+  height: 58px;
+  border-radius: 12px;
+}
+.detail-playback header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+.detail-playback h2,
+.detail-info h2,
+.detail-related h2 {
+  font-size: 22px;
+  font-weight: 850;
+  font-style: italic;
+}
+.detail-playback header > span {
+  color: #a398b5;
+  font-size: 10px;
+}
+.detail-audio {
+  display: flex;
+  padding: 4px;
+  border: 1px solid #ffffff20;
+  background: #ffffff06;
+  border-radius: 11px;
+  gap: 4px;
+}
+.detail-audio button {
+  flex: 1;
+  padding: 10px;
+  border-radius: 8px;
+  border: 0;
+  color: #bdb1d0;
+  background: none;
+  font-size: 12px;
+}
+.detail-audio [aria-pressed="true"] {
+  background: #9c60e8;
+  color: white;
+}
+.detail-source {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid #ffffff20;
+  border-radius: 11px;
+  padding: 4px 12px;
+  margin: 12px 0;
+  font-size: 12px;
+  color: #a99bb8;
+}
+.detail-source select {
+  background: none;
+  border: 0;
+  color: #d8c7ef;
+  flex: 1;
+  min-width: 0;
+  padding: 9px 0;
+}
+.detail-source option {
+  background: #211a2d;
+}
+.detail-play {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  background: #a568f1;
+  color: white;
+  font-weight: 750;
+  font-size: 13px;
+  border: 0;
+  border-radius: 10px;
+  padding: 13px;
+}
+.detail-playback > p {
+  color: #8f849f;
+  font-size: 10px;
+  margin-top: 12px;
+}
+.detail-info dl {
+  margin-top: 14px;
+}
+.detail-info dl > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  border-top: 1px solid #ffffff12;
+  padding: 12px 0;
+  color: #a99bb9;
+  font-size: 12px;
+}
+.detail-info dd {
+  text-align: right;
+  color: #dfd5ed;
+  text-transform: capitalize;
+}
+.detail-related-track {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+.detail-related-track button {
+  position: relative;
+  min-width: 0;
+  text-align: left;
+  color: #d8cde6;
+  padding: 0;
+  background: #ffffff05;
+  border: 1px solid #ffffff15;
+  border-radius: 12px;
+  overflow: hidden;
+}
+.detail-related-track img {
+  width: 100%;
+  height: 105px;
+  object-fit: cover;
+}
+.detail-related-track strong {
+  display: block;
+  font-size: 11px;
+  line-height: 1.4;
+  padding: 10px;
+  font-weight: 650;
+}
+.detail-relation-label {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  background: #251734dc;
+  color: #d8b9ff;
+  padding: 4px 6px;
+  border: 1px solid #ba88fc50;
+  border-radius: 7px;
+  font-size: 9px;
+  text-transform: capitalize;
+}
+.anime-detail-page button:focus-visible,
+.anime-detail-page select:focus-visible {
+  outline: 2px solid #bd90ff;
+  outline-offset: 3px;
+}
+@media (max-width: 1000px) {
+  .detail-cover {
+    width: 140px;
+  }
+  .detail-body {
+    grid-template-columns: minmax(0, 1fr) 280px;
+    gap: 18px;
+  }
+  .detail-episodes-panel,
+  .detail-related,
+  .detail-playback,
+  .detail-info {
+    padding: 18px;
+  }
+  .detail-progress-heading {
+    flex-wrap: wrap;
+  }
+  .detail-related-track {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 760px) {
+  .detail-hero {
+    min-height: 0;
+  }
+  .detail-hero-content {
+    padding: 16px 22px 28px;
+  }
+  .detail-identity {
+    gap: 16px;
+    align-items: flex-start;
+  }
+  .detail-cover {
+    width: 100px;
+  }
+  .detail-intro h1 {
+    font-size: clamp(25px, 5.5vw, 38px);
+  }
+  .detail-body {
+    display: flex;
+    flex-direction: column;
+    padding: 0 20px;
+  }
+  .detail-sidebar {
+    display: contents;
+  }
+  .detail-playback {
+    order: -1;
+  }
+  .detail-info {
+    order: 2;
+  }
+  .detail-account-status {
+    font-size: 10px;
+  }
+  .detail-metadata {
+    font-size: 10px;
+  }
+  .detail-genre {
+    padding: 4px 7px;
+  }
+  .detail-synopsis {
+    font-size: 12px;
+  }
+  .detail-actions {
+    gap: 8px;
+  }
+  .detail-continue {
+    padding: 12px 16px;
+    font-size: 12px;
+  }
+  .detail-list-status {
+    min-height: 42px;
+    padding: 0 10px;
+  }
+  .detail-list-status select {
+    min-width: 100px;
+    font-size: 12px;
+  }
+  .detail-progress-heading progress {
+    width: 90px;
+  }
+}
+@media (max-width: 450px) {
+  .detail-identity {
+    display: block;
+  }
+  .detail-cover {
+    float: left;
+    margin: 0 16px 12px 0;
+    width: 90px;
+  }
+  .detail-intro {
+    display: contents;
+  }
+  .detail-intro h1 {
+    font-size: 29px;
+  }
+  .detail-metadata {
+    gap: 6px;
+  }
+  .detail-rating-line {
+    margin-bottom: 14px;
+  }
+  .detail-synopsis {
+    clear: both;
+  }
+  .detail-account-status {
+    line-height: 1.6;
+  }
+  .detail-episodes-panel .episode-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+  }
+  .detail-watched-legend {
+    margin-left: 0;
+  }
+  .detail-related-track {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .detail-episodes-panel,
+  .detail-related,
+  .detail-playback,
+  .detail-info {
+    background: #211d29;
+  }
+}
