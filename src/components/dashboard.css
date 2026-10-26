@@ -332,9 +332,10 @@ input:focus-visible {
   animation-play-state: paused;
 }
 .home-content {
+  --home-gutter: 4.8vw;
   position: relative;
   margin-top: -32px;
-  padding: 0 4.8%;
+  padding: 0;
   z-index: 1;
 }
 .discovery-section {
@@ -859,11 +860,6 @@ input:focus-visible {
   }
 }
 @media (min-width: 1700px) {
-  .home-content {
-    max-width: 1700px;
-    margin-left: auto;
-    margin-right: auto;
-  }
   .hero-copy {
     left: max(5.5%, calc((100vw - 1510px) / 2));
   }
@@ -983,7 +979,7 @@ input:focus-visible {
     padding: 9px 4px;
   }
   .home-content {
-    padding: 0 6%;
+    --home-gutter: 6vw;
     margin-top: -25px;
   }
   .section-heading {
@@ -1808,8 +1804,8 @@ input:focus-visible {
 }
 .home-content .continue-track {
   gap: clamp(20px, 1.6vw, 32px);
-  padding: 12px 6px 24px;
-  margin-inline: -6px;
+  padding: 12px var(--home-gutter) 24px;
+  margin-inline: 0;
 }
 .home-content .continue-card {
   flex: 0 0 clamp(300px, 26vw, 520px);
@@ -2060,4 +2056,21 @@ input:focus-visible {
   .home-content .continue-card:focus-within .continue-art img {
     transform: none;
   }
+}
+
+/* Let horizontal rows scroll to the viewport edge instead of clipping at
+   the content gutter; retain the shared inset for headings and first cards. */
+.home-content .section-heading {
+  margin-inline: var(--home-gutter);
+}
+.home-content .poster-track,
+.home-content .episode-track {
+  padding-inline: var(--home-gutter);
+  scroll-padding-inline: var(--home-gutter);
+}
+.home-content .continue-track {
+  scroll-padding-inline: var(--home-gutter);
+}
+.home-content .continue-section > .empty-state {
+  margin-inline: var(--home-gutter);
 }
