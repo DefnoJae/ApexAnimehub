@@ -234,6 +234,7 @@ test("quick status actions preserve progress unless explicitly completing an ani
 });
 test("continue watching shows actual playback progress and routes resume to the saved episode", async () => {
   const resume = jest.fn(),
+    remove = jest.fn(),
     entry = {
       anime,
       episode: 3,
@@ -252,7 +253,7 @@ test("continue watching shows actual playback progress and routes resume to the 
         onSelect={jest.fn()}
         onWatch={jest.fn()}
         onResume={resume}
-        onRemove={jest.fn()}
+        onRemove={remove}
         onCalendar={jest.fn()}
       />,
     );
@@ -268,6 +269,19 @@ test("continue watching shows actual playback progress and routes resume to the 
     ).click(),
   );
   expect(resume).toHaveBeenCalledWith(entry);
+  expect(node.querySelector(".continue-info .episode-badge")?.textContent).toBe(
+    "EP 3",
+  );
+  expect(node.querySelector(".continue-art .episode-badge")).toBeNull();
+  act(() =>
+    (
+      node.querySelector(
+        '[aria-label="Remove Example anime from Continue Watching"]',
+      ) as HTMLButtonElement
+    ).click(),
+  );
+  expect(remove).toHaveBeenCalledWith(anime.id);
+  expect(resume).toHaveBeenCalledTimes(1);
   await act(async () => {
     Array.from(node.querySelectorAll("button"))
       .find((button) => button.textContent === "Dub")!

@@ -5,6 +5,7 @@ import {
   Check,
   ChevronRight,
   Home,
+  History,
   Library,
   Bookmark,
   Pause,
@@ -41,6 +42,19 @@ export interface WatchEntry {
   timestamp: number;
   position?: number;
   duration?: number;
+}
+export function playbackPercent(entry: WatchEntry): number | null {
+  if (
+    !Number.isFinite(entry.position) ||
+    !Number.isFinite(entry.duration) ||
+    !entry.duration ||
+    entry.duration <= 0 ||
+    entry.position === undefined
+  )
+    return null;
+  return Math.round(
+    Math.max(0, Math.min(100, (entry.position / entry.duration) * 100)),
+  );
 }
 type Accounts = ReturnType<typeof useAccounts>;
 const statuses: Array<[ListStatus, string]> = [
@@ -250,12 +264,9 @@ export function PosterRow({
 }) {
   if (!animes.length) return null;
   return (
-    <section className="discovery-section" aria-label={title}>
+    <section className="discovery-section home-poster-row" aria-label={title}>
       <div className="section-heading">
         <h2>{title}</h2>
-        <span>
-          Explore the collection <ChevronRight size={15} />
-        </span>
       </div>
       <div className="poster-track">
         {animes.map((anime) => (
@@ -282,10 +293,16 @@ export function PosterRow({
               </button>
               <QuickList anime={anime} accounts={accounts} />
             </div>
-            <button className="poster-title" onClick={() => onSelect(anime)}>
+            <button
+              className="poster-title"
+              title={getDisplayTitle(anime)}
+              onClick={() => onSelect(anime)}
+            >
               {getDisplayTitle(anime)}
             </button>
-            <AnimeBadges idMal={anime.idMal} />
+            <div className="home-poster-metadata">
+              <AnimeBadges idMal={anime.idMal} />
+            </div>
           </article>
         ))}
       </div>
@@ -627,91 +644,86 @@ export function HomeDashboard({
           aria-label="Continue Watching"
         >
           <div className="section-heading">
-            <h2>Continue Watching</h2>
-            <span>
-              Your next chapter <ChevronRight size={15} />
-            </span>
+            <h2>
+              <span className="continue-heading-icon">
+                <History size={17} />
+              </span>
+              Continue Watching
+            </h2>
           </div>
           {history.length ? (
             <div className="continue-track">
-              {history.map((item) => (
-                <article className="continue-card glass" key={item.anime.id}>
-                  <button
-                    className="continue-open"
-                    onClick={() => onResume(item)}
-                    aria-label={
-                      "Resume " +
-                      getDisplayTitle(item.anime) +
-                      " episode " +
-                      item.episode
-                    }
-                  >
-                    <div className="continue-art">
-                      <img
-                        loading="lazy"
-                        src={
-                          item.anime.bannerImage ||
-                          item.anime.coverImage?.extraLarge
-                        }
-                        alt=""
-                      />
-                      <span className="resume-circle">
-                        <Play size={22} fill="currentColor" />
-                      </span>
-                      <span className="episode-badge">EP {item.episode}</span>
-                    </div>
-                    <div className="continue-info">
-                      <h3>{getDisplayTitle(item.anime)}</h3>
-                      <span>
-                        {item.duration && item.position !== undefined
-                          ? Math.round((item.position / item.duration) * 100) +
-                            "% watched"
-                          : "Ready to resume"}
-                      </span>
-                    </div>
-                    {item.duration && item.position !== undefined ? (
-                      <div
-                        className="watch-progress"
-                        role="progressbar"
-                        aria-label={
-                          "Episode progress: " + getDisplayTitle(item.anime)
-                        }
-                        aria-valuemin={0}
-                        aria-valuemax={100}
-                        aria-valuenow={Math.round(
-                          (item.position / item.duration) * 100,
-                        )}
-                      >
-                        <span
-                          style={{
-                            width:
-                              Math.min(
-                                100,
-                                (item.position / item.duration) * 100,
-                              ) + "%",
-                          }}
+              {history.map((item) => {
+                const percent = playbackPercent(item);
+                return (
+                  <article className="continue-card" key={item.anime.id}>
+                    <button
+                      className="continue-open"
+                      onClick={() => onResume(item)}
+                      aria-label={
+                        "Resume " +
+                        getDisplayTitle(item.anime) +
+                        " episode " +
+                        item.episode
+                      }
+                    >
+                      <div className="continue-art">
+                        <img
+                          loading="lazy"
+                          src={
+                            item.anime.bannerImage ||
+                            item.anime.coverImage?.extraLarge
+                          }
+                          alt=""
                         />
+                        <span className="resume-circle">
+                          <Play size={22} fill="currentColor" />
+                        </span>
                       </div>
-                    ) : (
-                      <div
-                        className="watch-progress unknown"
-                        title="Playback progress is not available yet"
-                      />
-                    )}
-                  </button>
-                  <button
-                    className="remove-history glass"
-                    aria-label={
-                      "Remove " +
-                      getDisplayTitle(item.anime) +
-                      " from Continue Watching"
-                    }
-                    onClick={() => onRemove(item.anime.id)}
-                  >
-                    <X size={15} />
-                  </button>
-                </article>
-              ))}
+                      {percent !== null ? (
+                        <div
+                          className="watch-progress"
+                          role="progressbar"
+                          aria-label={
+                            "Episode progress: " + getDisplayTitle(item.anime)
+                          }
+                          aria-valuemin={0}
+                          aria-valuemax={100}
+                          aria-valuenow={percent}
+                        >
+                          <span
+                            style={{
+                              width: percent + "%",
+                            }}
+                          />
+                        </div>
+                      ) : (
+                        <div
+                          className="watch-progress unknown"
+                          title="Playback progress is not available yet"
+                        />
+                      )}
+                      <div className="continue-info">
+                        <h3 title={getDisplayTitle(item.anime)}>
+                          {getDisplayTitle(item.anime)}
+                        </h3>
+                        <span className="episode-badge">EP {item.episode}</span>
+                      </div>
+                    </button>
+                    <button
+                      className="remove-history"
+                      aria-label={
+                        "Remove " +
+                        getDisplayTitle(item.anime) +
+                        " from Continue Watching"
+                      }
+                      onClick={() => onRemove(item.anime.id)}
+                    >
+                      <X size={15} />
+                    </button>
+                  </article>
+                );
+              })}
             </div>
           ) : (
             <div className="continue-empty glass">
