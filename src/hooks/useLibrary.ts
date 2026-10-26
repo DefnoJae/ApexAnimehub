@@ -8,6 +8,7 @@ export interface LibraryEntry {
   anime: LibraryAnime;
   status: ListStatus;
   progress: number;
+  score?: number;
   updatedAt: number;
 }
 interface Snapshot {
@@ -175,6 +176,7 @@ export function useLibrary(connected: Record<AccountProvider, boolean>) {
     anime: ListAnime,
     status: ListStatus,
     progress?: number,
+    edit?: { manualProgress?: boolean; score?: number },
   ) => {
     setLists((previous) => {
       const list = previous[provider];
@@ -183,7 +185,13 @@ export function useLibrary(connected: Record<AccountProvider, boolean>) {
       const entry = {
         anime: { ...existing?.anime, ...anime },
         status,
-        progress: Math.max(existing?.progress || 0, progress || 0),
+        progress:
+          progress === undefined
+            ? existing?.progress || 0
+            : edit?.manualProgress
+              ? progress
+              : Math.max(existing?.progress || 0, progress),
+        score: edit?.score !== undefined ? edit.score : existing?.score,
         updatedAt: Date.now(),
       };
       const next = {

@@ -507,7 +507,10 @@ export default function App() {
       )}
       <main className="apex-main">
         <div
-          className={"apex-scroll " + (view !== "all" ? "apex-other-view" : "")}
+          className={
+            "apex-scroll " +
+            (view !== "all" && view !== "details" ? "apex-other-view" : "")
+          }
         >
           {/* DUB RELEASES VIEW */}
           {view === "dub-releases" && (

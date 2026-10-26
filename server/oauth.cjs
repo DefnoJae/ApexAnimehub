@@ -1,7 +1,12 @@
 // Same-origin OAuth service. Both providers' credentials stay on the server.
 const http = require("node:http");
 const { randomBytes } = require("node:crypto");
-const { updateList, readList, validateUpdate } = require("./list.cjs");
+const {
+  updateList,
+  readList,
+  readEntry,
+  validateUpdate,
+} = require("./list.cjs");
 const origin =
   process.env.APP_ORIGIN ||
   (process.env.VERCEL_BRANCH_URL || process.env.VERCEL_URL
@@ -270,6 +275,14 @@ function createServer() {
         if (!account)
           return send(401, {
             error: "Please reconnect your " + provider + " account.",
+          });
+        if (url.searchParams.has("animeId"))
+          return send(200, {
+            entry: await readEntry(
+              provider,
+              account,
+              Number(url.searchParams.get("animeId")),
+            ),
           });
         return send(
           200,

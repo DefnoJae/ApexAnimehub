@@ -7,6 +7,7 @@ import { getDisplayTitle } from "../utils/schedule";
 import { HeroBackdrop } from "./HeroBackdrop";
 import { AnimeBadges } from "./AnimeBadges";
 import { EpisodePicker } from "./EpisodePicker";
+import { ListEntryEditor } from "./ListEntryEditor";
 import "./animeDetails.css";
 export interface DetailAnime extends DashboardAnime {
   seasonYear?: number;
@@ -159,6 +160,11 @@ export function AnimeDetails({
                   </span>
                 ) : null}
                 <AnimeBadges idMal={anime.idMal} />
+                <ListEntryEditor
+                  anime={anime}
+                  accounts={accounts}
+                  onConnect={onConnect}
+                />
               </div>
               <div className="detail-synopsis">
                 <p

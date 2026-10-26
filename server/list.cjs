@@ -46,15 +46,36 @@ function validateUpdate(input) {
       input.progress > 100000)
   )
     throw new Error("Invalid episode progress");
+  if (
+    input.score !== undefined &&
+    (!Number.isFinite(input.score) ||
+      input.score < 0 ||
+      input.score > 10 ||
+      Math.abs(input.score * 10 - Math.round(input.score * 10)) > 1e-8)
+  )
+    throw new Error(
+      "Score must be between 0 and 10, with at most one decimal place",
+    );
+  for (const field of ["automatic", "manualProgress"])
+    if (input[field] !== undefined && typeof input[field] !== "boolean")
+      throw new Error("Invalid update mode");
+  if (input.manualProgress && input.automatic)
+    throw new Error("Manual progress cannot be automatic");
   return input;
 }
 async function updateList(provider, account, input) {
   validateUpdate(input);
+  if (
+    provider === "mal" &&
+    input.score !== undefined &&
+    !Number.isInteger(input.score)
+  )
+    throw new Error("MyAnimeList scores must be whole numbers from 0 to 10");
   let progress = input.progress;
   // Progress reports only move forward. Explicit status-only changes preserve progress.
   if (provider === "anilist") {
     let existing;
-    if (progress !== undefined || input.automatic) {
+    if ((progress !== undefined && !input.manualProgress) || input.automatic) {
       const data = await graphql(
         account.accessToken,
         "query($id:Int){Media(id:$id,type:ANIME){mediaListEntry{progress status}}}",
@@ -62,7 +83,7 @@ async function updateList(provider, account, input) {
       );
       if (!data.Media) throw new Error("Anime not found");
       existing = data.Media.mediaListEntry;
-      if (progress !== undefined)
+      if (progress !== undefined && !input.manualProgress)
         progress = Math.max(progress, existing?.progress || 0);
     }
     const status =
@@ -71,15 +92,22 @@ async function updateList(provider, account, input) {
         : statusMap[input.status].anilist;
     const data = await graphql(
       account.accessToken,
-      "mutation($id:Int,$status:MediaListStatus,$progress:Int){SaveMediaListEntry(mediaId:$id,status:$status,progress:$progress){id status progress}}",
-      { id: input.id, status, ...(progress !== undefined ? { progress } : {}) },
+      "mutation($id:Int,$status:MediaListStatus,$progress:Int,$score:Int){SaveMediaListEntry(mediaId:$id,status:$status,progress:$progress,scoreRaw:$score){id status progress score(format:POINT_100)}}",
+      {
+        id: input.id,
+        status,
+        ...(progress !== undefined ? { progress } : {}),
+        ...(input.score !== undefined
+          ? { score: Math.round(input.score * 10) }
+          : {}),
+      },
     );
     if (!data.SaveMediaListEntry)
       throw new Error("AniList did not confirm the update");
     return data.SaveMediaListEntry;
   }
   let existing;
-  if (progress !== undefined || input.automatic) {
+  if ((progress !== undefined && !input.manualProgress) || input.automatic) {
     const data = await upstream(
       "https://api.myanimelist.net/v2/anime/" +
         input.id +
@@ -87,7 +115,7 @@ async function updateList(provider, account, input) {
       { headers: { Authorization: "Bearer " + account.accessToken } },
     );
     existing = data.my_list_status;
-    if (progress !== undefined)
+    if (progress !== undefined && !input.manualProgress)
       progress = Math.max(progress, existing?.num_episodes_watched || 0);
   }
   const status =
@@ -97,6 +125,7 @@ async function updateList(provider, account, input) {
   const fields = new URLSearchParams({ status });
   if (progress !== undefined)
     fields.set("num_watched_episodes", String(progress));
+  if (input.score !== undefined) fields.set("score", String(input.score));
   return upstream(
     "https://api.myanimelist.net/v2/anime/" + input.id + "/my_list_status",
     {
@@ -122,7 +151,7 @@ async function readList(provider, account, page = 1) {
     account.identity = Viewer;
     const data = await graphql(
       account.accessToken,
-      "query($user:Int,$page:Int){Page(page:$page,perPage:50){pageInfo{hasNextPage} mediaList(userId:$user,type:ANIME){status progress updatedAt media{id idMal episodes title{english romaji} coverImage{extraLarge} bannerImage}}}}",
+      "query($user:Int,$page:Int){Page(page:$page,perPage:50){pageInfo{hasNextPage} mediaList(userId:$user,type:ANIME){status progress score(format:POINT_100) updatedAt media{id idMal episodes title{english romaji} coverImage{extraLarge} bannerImage}}}}",
       { user: Viewer.id, page },
     );
     return {
@@ -133,6 +162,7 @@ async function readList(provider, account, page = 1) {
         anime: entry.media,
         status: reverse(entry.status),
         progress: entry.progress,
+        score: (entry.score || 0) / 10,
         updatedAt: entry.updatedAt * 1000,
       })),
     };
@@ -166,8 +196,37 @@ async function readList(provider, account, page = 1) {
       },
       status: reverse(entry.status),
       progress: entry.num_episodes_watched,
+      score: entry.score || 0,
       updatedAt: Date.parse(entry.updated_at) || 0,
     })),
   };
 }
-module.exports = { updateList, readList, validateUpdate, statusMap };
+async function readEntry(provider, account, id) {
+  validateUpdate({ id, status: "watching" });
+  let entry;
+  if (provider === "anilist") {
+    const data = await graphql(
+      account.accessToken,
+      "query($id:Int){Media(id:$id,type:ANIME){mediaListEntry{status progress score(format:POINT_100)}}}",
+      { id },
+    );
+    entry = data.Media?.mediaListEntry;
+  } else {
+    const data = await upstream(
+      "https://api.myanimelist.net/v2/anime/" + id + "?fields=my_list_status",
+      { headers: { Authorization: "Bearer " + account.accessToken } },
+    );
+    entry = data.my_list_status;
+  }
+  if (!entry) return null;
+  return {
+    status:
+      Object.keys(statusMap).find(
+        (key) => statusMap[key][provider] === entry.status,
+      ) || "watching",
+    progress:
+      provider === "anilist" ? entry.progress : entry.num_episodes_watched,
+    score: provider === "anilist" ? (entry.score || 0) / 10 : entry.score || 0,
+  };
+}
+module.exports = { updateList, readList, readEntry, validateUpdate, statusMap };

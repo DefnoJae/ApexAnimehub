@@ -1,7 +1,12 @@
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const { createServer, sessions } = require("./oauth.cjs");
-const { updateList, readList, validateUpdate } = require("./list.cjs");
+const {
+  updateList,
+  readList,
+  readEntry,
+  validateUpdate,
+} = require("./list.cjs");
 const browserFetch = global.fetch;
 const json = (data) => ({ ok: true, status: 200, json: async () => data });
 const origin = "http://localhost:3000";
@@ -255,6 +260,99 @@ test("list mappings preserve progress on status changes and reject invalid input
       assert.equal(input.variables.status, expected);
       assert.equal("progress" in input.variables, false);
     }
+  } finally {
+    global.fetch = browserFetch;
+  }
+});
+
+test("personal scores normalize AniList scale and preserve automatic progress while permitting explicit corrections", async () => {
+  const calls = [];
+  global.fetch = async (url, options) => {
+    calls.push({ url, options });
+    if (url.includes("graphql")) {
+      const input = JSON.parse(options.body);
+      return json({
+        data: input.query.startsWith("mutation")
+          ? {
+              SaveMediaListEntry: {
+                status: input.variables.status,
+                progress: input.variables.progress,
+                score: input.variables.score,
+              },
+            }
+          : {
+              Media: {
+                mediaListEntry: { status: "CURRENT", progress: 8, score: 85 },
+              },
+            },
+      });
+    }
+    if (options.method === "PATCH")
+      return json({ status: "watching", num_episodes_watched: 2, score: 7 });
+    return json({
+      my_list_status: { status: "watching", num_episodes_watched: 8, score: 7 },
+    });
+  };
+  try {
+    assert.equal(
+      (await readEntry("anilist", { accessToken: "test" }, 1)).score,
+      8.5,
+    );
+    assert.equal(
+      (await readEntry("mal", { accessToken: "test" }, 11)).score,
+      7,
+    );
+    await updateList(
+      "anilist",
+      { accessToken: "test" },
+      {
+        id: 1,
+        status: "watching",
+        progress: 2,
+        manualProgress: true,
+        score: 8.5,
+      },
+    );
+    let input = JSON.parse(calls.at(-1).options.body);
+    assert.equal(input.variables.score, 85);
+    assert.equal(input.variables.progress, 2);
+    assert.match(input.query, /scoreRaw:/);
+    await updateList(
+      "anilist",
+      { accessToken: "test" },
+      { id: 1, status: "watching", progress: 2, automatic: true },
+    );
+    input = JSON.parse(calls.at(-1).options.body);
+    assert.equal(input.variables.progress, 8);
+    assert.equal("score" in input.variables, false);
+    await updateList(
+      "mal",
+      { accessToken: "test" },
+      {
+        id: 11,
+        status: "watching",
+        progress: 2,
+        manualProgress: true,
+        score: 0,
+      },
+    );
+    const fields = new URLSearchParams(calls.at(-1).options.body);
+    assert.equal(fields.get("score"), "0");
+    assert.equal(fields.get("num_watched_episodes"), "2");
+    await assert.rejects(
+      updateList("mal", {}, { id: 11, status: "watching", score: 8.5 }),
+      /whole numbers/,
+    );
+    for (const score of [-1, 11, "8", 8.55, NaN])
+      assert.throws(() => validateUpdate({ id: 1, status: "watching", score }));
+    assert.throws(() =>
+      validateUpdate({
+        id: 1,
+        status: "watching",
+        automatic: true,
+        manualProgress: true,
+      }),
+    );
   } finally {
     global.fetch = browserFetch;
   }

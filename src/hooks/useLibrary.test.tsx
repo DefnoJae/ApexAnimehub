@@ -52,6 +52,15 @@ test("imports every page, retains successful provider when another fails, and re
     JSON.parse(localStorage.getItem("apex_library_v1_anilist_alice")!)
       .entries[0].progress,
   ).toBe(4);
+  act(() =>
+    library.record("anilist", anime, "watching", 1, {
+      manualProgress: true,
+      score: 8.5,
+    }),
+  );
+  expect(library.libraryEntries[0]).toMatchObject({ progress: 1, score: 8.5 });
+  act(() => library.record("anilist", anime, "watching", 2));
+  expect(library.libraryEntries[0]).toMatchObject({ progress: 2, score: 8.5 });
   await act(async () => {
     root.render(<Harness anilist={false} mal={false} />);
   });
@@ -75,11 +84,33 @@ test("an account change cannot expose a previous account cache", async () => {
   expect(library.libraryEntries).toHaveLength(0);
   expect(library.lists.anilist?.identity).toBe("bob");
 });
-test('resumes a verified account checkpoint instead of restarting a large import', async () => {
-  localStorage.setItem('apex_library_v1_anilist_alice', JSON.stringify({ identity: 'alice', name: 'alice', entries: [{ anime, status: 'planning', progress: 0, updatedAt: 1 }], complete: false, nextPage: 30, updatedAt: Date.now() }));
-  global.fetch = jest.fn(async (url) => ({ ok: true, json: async () => ({ ...page('alice', 'planning'), entries: [], hasNextPage: String(url).endsWith('page=1') }) })) as jest.Mock;
-  await act(async () => { root.render(<Harness mal={false} />); });
-  expect(global.fetch).toHaveBeenCalledWith('/api/list/anilist?page=30', expect.anything());
+test("resumes a verified account checkpoint instead of restarting a large import", async () => {
+  localStorage.setItem(
+    "apex_library_v1_anilist_alice",
+    JSON.stringify({
+      identity: "alice",
+      name: "alice",
+      entries: [{ anime, status: "planning", progress: 0, updatedAt: 1 }],
+      complete: false,
+      nextPage: 30,
+      updatedAt: Date.now(),
+    }),
+  );
+  global.fetch = jest.fn(async (url) => ({
+    ok: true,
+    json: async () => ({
+      ...page("alice", "planning"),
+      entries: [],
+      hasNextPage: String(url).endsWith("page=1"),
+    }),
+  })) as jest.Mock;
+  await act(async () => {
+    root.render(<Harness mal={false} />);
+  });
+  expect(global.fetch).toHaveBeenCalledWith(
+    "/api/list/anilist?page=30",
+    expect.anything(),
+  );
   expect(library.libraryEntries).toHaveLength(1);
   expect(library.lists.anilist?.complete).toBe(true);
 });

@@ -1,6 +1,7 @@
 import { fetchAnilist } from "../utils/anilist";
 import { useLibrary } from "./useLibrary";
 import { useNotifications } from "./useNotifications";
+import { sameAnime } from "./useLibrary";
 import { useCallback, useEffect, useRef, useState } from "react";
 export type AccountProvider = "anilist" | "mal";
 export type ListStatus =
@@ -19,6 +20,11 @@ export interface AccountResult {
   provider: AccountProvider;
   success: boolean;
   error?: string;
+  entry?: { status: ListStatus; progress?: number; score?: number };
+}
+export interface EntryEdit {
+  manualProgress?: boolean;
+  scores?: Partial<Record<AccountProvider, number>>;
 }
 const providers: AccountProvider[] = ["anilist", "mal"];
 export async function sendListUpdate(
@@ -27,6 +33,7 @@ export async function sendListUpdate(
   status: ListStatus,
   progress?: number,
   automatic = false,
+  edit?: { manualProgress?: boolean; score?: number },
 ): Promise<AccountResult> {
   try {
     if (provider === "anilist" && !anime.id)
@@ -45,6 +52,8 @@ export async function sendListUpdate(
         status,
         ...(progress !== undefined ? { progress } : {}),
         automatic,
+        ...(edit?.manualProgress ? { manualProgress: true } : {}),
+        ...(edit?.score !== undefined ? { score: edit.score } : {}),
       }),
     });
     const data = await response.json();
@@ -52,7 +61,40 @@ export async function sendListUpdate(
       throw new Error(
         data.error || "List update failed (" + response.status + ")",
       );
-    return { provider, success: true };
+    const raw = data.entry;
+    const normalized = raw
+      ? {
+          status:
+            (
+              {
+                CURRENT: "watching",
+                REPEATING: "watching",
+                PLANNING: "planning",
+                COMPLETED: "completed",
+                PAUSED: "paused",
+                DROPPED: "dropped",
+                watching: "watching",
+                plan_to_watch: "planning",
+                completed: "completed",
+                on_hold: "paused",
+                dropped: "dropped",
+              } as Record<string, ListStatus>
+            )[raw.status] || status,
+          progress:
+            provider === "anilist" ? raw.progress : raw.num_episodes_watched,
+          score:
+            typeof raw.score === "number"
+              ? provider === "anilist"
+                ? raw.score / 10
+                : raw.score
+              : undefined,
+        }
+      : undefined;
+    return {
+      provider,
+      success: true,
+      ...(normalized ? { entry: normalized } : {}),
+    };
   } catch (error) {
     return {
       provider,
@@ -203,9 +245,14 @@ export function useAccounts() {
     status: ListStatus,
     progress?: number,
     automatic = false,
+    edit?: EntryEdit,
   ) => {
     if (automatic && !autoSync) return Promise.resolve([]);
-    const enabled = providers.filter((provider) => connected[provider]);
+    const enabled = providers.filter(
+      (provider) =>
+        connected[provider] &&
+        (!edit || edit.manualProgress || edit.scores?.[provider] !== undefined),
+    );
     if (!enabled.length) {
       if (!automatic)
         notificationFeed.notify({
@@ -254,16 +301,42 @@ export function useAccounts() {
           progress >= mapped.episodes
             ? "completed"
             : status;
+        const targetStatuses = new Map<AccountProvider, ListStatus>();
         const settled = await Promise.allSettled(
-          enabled.map((provider) =>
-            sendListUpdate(
+          enabled.map((provider) => {
+            let target = effectiveStatus;
+            if (edit) {
+              target =
+                library.libraryEntries.find(
+                  (entry) =>
+                    entry.provider === provider &&
+                    sameAnime(entry.anime, mapped),
+                )?.status || status;
+              if (progress !== undefined && edit.manualProgress) {
+                if (mapped.episodes && progress >= mapped.episodes)
+                  target = "completed";
+                else if (
+                  target === "completed" ||
+                  (target === "planning" && progress > 0)
+                )
+                  target = "watching";
+              }
+            }
+            targetStatuses.set(provider, target);
+            return sendListUpdate(
               provider,
               mapped,
-              effectiveStatus,
+              target,
               progress,
               automatic,
-            ),
-          ),
+              edit
+                ? {
+                    manualProgress: edit.manualProgress,
+                    score: edit.scores?.[provider],
+                  }
+                : undefined,
+            );
+          }),
         );
         const next = settled.map(
           (result, i): AccountResult =>
@@ -278,7 +351,18 @@ export function useAccounts() {
         next
           .filter((result) => result.success)
           .forEach((result) =>
-            library.record(result.provider, mapped, effectiveStatus, progress),
+            library.record(
+              result.provider,
+              mapped,
+              result.entry?.status ||
+                targetStatuses.get(result.provider) ||
+                effectiveStatus,
+              result.entry?.progress ?? progress,
+              {
+                manualProgress: edit?.manualProgress,
+                score: result.entry?.score ?? edit?.scores?.[result.provider],
+              },
+            ),
           );
         if (next.some((result) => result.success))
           void library.refreshLibrary();

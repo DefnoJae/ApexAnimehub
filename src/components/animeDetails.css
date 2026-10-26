@@ -558,3 +558,139 @@
     background: #211d29;
   }
 }
+/* Artwork begins at the viewport edge, behind the floating navigation. */
+.detail-hero {
+  margin-top: 0;
+}
+.detail-hero-content {
+  padding-top: 110px;
+}
+.detail-entry-edit {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: #eee7fa;
+  padding: 5px 9px;
+  border-radius: 9px;
+  font-size: 13px;
+  font-weight: 750;
+}
+.detail-entry-edit svg {
+  color: #d1b2fb;
+}
+.detail-personal-score {
+  display: inline-flex;
+  font-size: 10px;
+  padding: 4px 7px;
+  border-radius: 7px;
+  color: #c8b1eb;
+  background: #a778ff16;
+}
+.entry-editor-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 650;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #0009;
+  padding: 20px;
+}
+.entry-editor {
+  width: 100%;
+  max-width: 420px;
+  max-height: 90svh;
+  overflow: auto;
+  border-radius: 22px;
+  padding: 24px;
+  background: linear-gradient(135deg, #211b2cf5, #15121cf5);
+  color: #eee7f8;
+}
+.entry-editor header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+.entry-editor h2 {
+  font-size: 21px;
+  font-weight: 800;
+}
+.entry-editor header button {
+  border: 0;
+  background: none;
+  color: #c6b9d5;
+  padding: 6px;
+}
+.entry-editor > label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 18px;
+  font-size: 13px;
+}
+.entry-editor label span,
+.entry-editor label small {
+  color: #a99bb9;
+  font-size: 11px;
+}
+.entry-editor input {
+  border: 1px solid #ffffff25;
+  color: #eee7f8;
+  background: #100d18;
+  border-radius: 10px;
+  padding: 12px;
+  width: 100%;
+  font-size: 15px;
+}
+.entry-editor p {
+  font-size: 11px;
+  color: #a99ab9;
+  line-height: 1.6;
+  margin: 10px 0;
+}
+.entry-editor [role="alert"] {
+  color: #f1be95;
+}
+.entry-save-notice {
+  white-space: pre-line;
+}
+.entry-editor > button {
+  border: 0;
+  background: none;
+  color: #c095f7;
+  padding: 10px 0;
+}
+.entry-editor .entry-save {
+  display: block;
+  width: 100%;
+  padding: 13px;
+  background: #a36bee;
+  color: white;
+  border-radius: 10px;
+  font-weight: 750;
+  font-size: 13px;
+  margin-top: 18px;
+}
+.entry-editor button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+@media (max-width: 640px) {
+  .detail-hero-content {
+    padding-top: 20px;
+  }
+  .entry-editor-overlay {
+    padding: 16px;
+  }
+}
+@media (min-width: 641px) and (max-width: 760px) {
+  .detail-hero-content {
+    padding-top: 110px;
+  }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .entry-editor {
+    background: #211d29;
+  }
+}

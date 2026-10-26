@@ -99,7 +99,9 @@ export function MyList({
         </p>
       ))}
       {Object.entries(accounts.lists)
-        .filter(([p, list]) => !!list && accounts.connected[p as "mal" | "anilist"])
+        .filter(
+          ([p, list]) => !!list && accounts.connected[p as "mal" | "anilist"],
+        )
         .map(([p, list]) => (
           <p className="library-updated" key={p}>
             {p === "mal" ? "MyAnimeList" : "AniList"} · {list?.name} ·{" "}
@@ -151,6 +153,12 @@ export function MyList({
               <small className="library-status" key={e.provider}>
                 {e.provider === "mal" ? "MAL" : "AniList"} · {labels[e.status]}{" "}
                 · {e.progress}/{e.anime.episodes || "?"} episodes
+                {e.score !== undefined && (
+                  <span>
+                    {" "}
+                    · Your score: {e.score > 0 ? e.score + "/10" : "Unrated"}
+                  </span>
+                )}
               </small>
             ))}
           </article>
@@ -159,4 +167,3 @@ export function MyList({
     </section>
   );
 }
-
