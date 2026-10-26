@@ -1,6 +1,19 @@
 import { getDubIndex } from "./animeMetadata";
 import { fetchAnilist } from "./anilist";
 import type { DashboardAnime } from "../components/HomeDashboard";
+import { sameAnime } from "../hooks/useLibrary";
+import type { LibraryEntry } from "../hooks/useLibrary";
+export function matchesListStatus(
+  anime: DashboardAnime,
+  entries: LibraryEntry[],
+  status?: string,
+): boolean {
+  if (!status) return true;
+  const matches = entries.filter((entry) => sameAnime(entry.anime, anime));
+  return status === "not-listed"
+    ? matches.length === 0
+    : matches.some((entry) => entry.status === status);
+}
 export interface DiscoveryFilters {
   search: string;
   genres: string[];
@@ -12,6 +25,7 @@ export interface DiscoveryFilters {
   status: string;
   format: string;
   sort: string;
+  listStatus?: string;
 }
 export const defaultFilters: DiscoveryFilters = {
   search: "",
@@ -24,6 +38,7 @@ export const defaultFilters: DiscoveryFilters = {
   status: "",
   format: "",
   sort: "popularity",
+  listStatus: "",
 };
 export interface DiscoveryAnime extends DashboardAnime {
   malScore: number | null;

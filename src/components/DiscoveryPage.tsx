@@ -6,10 +6,21 @@ import {
   DiscoveryAnime,
   fetchDiscovery,
   fetchGenres,
+  matchesListStatus,
 } from "../utils/discovery";
 import type { useAccounts } from "../hooks/useAccounts";
 import { QuickList } from "./HomeDashboard";
 import { AnimeBadges } from "./AnimeBadges";
+
+const listStatuses = [
+  ["", "Any list status"],
+  ["planning", "Planning"],
+  ["watching", "Watching"],
+  ["completed", "Completed"],
+  ["paused", "Paused"],
+  ["dropped", "Dropped"],
+  ["not-listed", "Not in My List"],
+] as const;
 function savedFilters(): DiscoveryFilters {
   try {
     const saved = JSON.parse(localStorage.getItem("apex_discovery_v1") || "{}");
@@ -139,6 +150,9 @@ export function DiscoveryPage({
     } catch {}
   };
   const chips = [
+    applied.listStatus
+      ? listStatuses.find(([value]) => value === applied.listStatus)?.[1]
+      : "",
     applied.genres
       .map(
         (id) =>
@@ -158,6 +172,9 @@ export function DiscoveryPage({
     applied.status,
     applied.format,
   ].filter(Boolean);
+  const visibleItems = items.filter((anime) =>
+    matchesListStatus(anime, accounts.libraryEntries, applied.listStatus),
+  );
   return (
     <section className="discovery-page">
       <header className="discovery-heading">
@@ -373,6 +390,19 @@ export function DiscoveryPage({
             </select>
           </label>
           <label>
+            My list status
+            <select
+              value={draft.listStatus || ""}
+              onChange={(e) => change("listStatus", e.target.value)}
+            >
+              {listStatuses.map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
             Format
             <select
               value={draft.format}
@@ -393,7 +423,9 @@ export function DiscoveryPage({
         <div className="discovery-results">
           <div className="section-heading">
             <h2>Popular matches</h2>
-            <span>{items.length} loaded</span>
+            <span>
+              {visibleItems.length} matches · {items.length} loaded
+            </span>
           </div>
           <div className="filter-chips">
             {chips.map((chip) => (
@@ -410,6 +442,16 @@ export function DiscoveryPage({
             {(applied.audio === "dub" || applied.season) &&
               " Matches are filtered across batches of up to four source pages; load more to keep searching."}
           </p>
+          {applied.listStatus && (
+            <p className="discovery-note">
+              List status uses your imported connected lists and filters the
+              loaded catalog results. Load more to search further.
+              {accounts.libraryLoading &&
+                " Your lists are still importing; matches may change."}
+              {Object.keys(accounts.libraryErrors || {}).length > 0 &&
+                " Some lists could not be imported; results may be incomplete."}
+            </p>
+          )}
           {error && (
             <p role="alert">
               {error}{" "}
@@ -419,7 +461,7 @@ export function DiscoveryPage({
             </p>
           )}
           <div className="discovery-grid">
-            {items.map((anime) => (
+            {visibleItems.map((anime) => (
               <article
                 className="poster-card"
                 key={anime.idMal ? "mal-" + anime.idMal : "ani-" + anime.id}
@@ -460,7 +502,7 @@ export function DiscoveryPage({
             ))}
           </div>
           {loading && <p role="status">Finding your next anime…</p>}
-          {!loading && !error && !items.length && (
+          {!loading && !error && !visibleItems.length && (
             <p>
               No matches in this batch. Try broader filters
               {nextPage ? " or load more results." : "."}

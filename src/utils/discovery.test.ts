@@ -119,3 +119,25 @@ test("an unreachable MAL catalog falls back to real AniList ratings and preserve
     controller.signal,
   );
 });
+
+test("list filters match either provider by shared IDs and exclude all listed statuses", () => {
+  const { matchesListStatus } = require("./discovery");
+  const anime = { id: 1, idMal: 20, title: { english: "Example" } };
+  const entries = [
+    { anime: { id: 1 }, status: "planning", progress: 0, updatedAt: 0 },
+    {
+      anime: { id: 0, idMal: 20 },
+      status: "paused",
+      progress: 2,
+      updatedAt: 0,
+    },
+  ];
+  expect(matchesListStatus(anime, entries, "planning")).toBe(true);
+  expect(matchesListStatus(anime, entries, "paused")).toBe(true);
+  expect(matchesListStatus(anime, entries, "completed")).toBe(false);
+  expect(matchesListStatus(anime, entries, "not-listed")).toBe(false);
+  expect(matchesListStatus({ id: 2, title: {} }, entries, "not-listed")).toBe(
+    true,
+  );
+  expect(matchesListStatus(anime, entries, "")).toBe(true);
+});
