@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import {
   Calendar,
+  Compass,
   Check,
   ChevronRight,
   Home,
@@ -19,7 +20,7 @@ import { fetchHeroArtwork, isTitleTreatment } from "../utils/heroArtwork";
 import { fetchDubRange } from "../utils/dubSchedule";
 import { getDisplayTitle } from "../utils/schedule";
 import type { ListAnime, ListStatus, useAccounts } from "../hooks/useAccounts";
-import { ListFeedback } from "./ListControls";
+import { NotificationBell } from "./NotificationBell";
 import { HeroBackdrop } from "./HeroBackdrop";
 import "./dashboard.css";
 import { AnimeBadges } from "./AnimeBadges";
@@ -56,12 +57,14 @@ export function FloatingNavigation({
   onSearch,
   onSettings,
   hidden,
+  notificationFeed,
 }: {
   view: string;
   onView: (view: string) => void;
   onSearch: () => void;
   onSettings: () => void;
   hidden: boolean;
+  notificationFeed?: Accounts["notificationFeed"];
 }) {
   return (
     <nav
@@ -84,6 +87,7 @@ export function FloatingNavigation({
         { key: "all", label: "Home", Icon: Home },
         { key: "dub-releases", label: "Dub calendar", Icon: Calendar },
         { key: "my-list", label: "My List", Icon: Library },
+        { key: "discover", label: "Discover anime", Icon: Compass },
       ].map(({ key, label, Icon }) => (
         <button
           key={key}
@@ -107,6 +111,7 @@ export function FloatingNavigation({
         <Search size={20} />
         <span className="nav-tooltip">Search</span>
       </button>
+      {notificationFeed && <NotificationBell feed={notificationFeed} />}
       <button
         className="nav-icon"
         title="Account settings"
@@ -173,7 +178,7 @@ export function QuickList({
     setNotice(
       result.length && result.every((item) => item.success)
         ? "Saved"
-        : "Check list update below",
+        : "Open notifications for details",
     );
   };
   return (
@@ -617,9 +622,6 @@ export function HomeDashboard({
         </section>
       )}
       <div className="home-content">
-        <div className="list-update-feedback">
-          <ListFeedback accounts={accounts} />
-        </div>
         <section
           className="discovery-section continue-section"
           aria-label="Continue Watching"

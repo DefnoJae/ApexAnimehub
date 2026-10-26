@@ -1,7 +1,13 @@
 import React, { useEffect, useRef, useState } from "react";
 import { AudioLines, Star } from "lucide-react";
 import { getDubIndex, getMalScore } from "../utils/animeMetadata";
-export function AnimeBadges({ idMal }: { idMal?: number | null }) {
+export function AnimeBadges({
+  idMal,
+  providedScore,
+}: {
+  idMal?: number | null;
+  providedScore?: number | null;
+}) {
   const element = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(false);
   const [dub, setDub] = useState("");
@@ -24,7 +30,7 @@ export function AnimeBadges({ idMal }: { idMal?: number | null }) {
   useEffect(() => {
     let active = true;
     setDub("");
-    setScore(null);
+    setScore(providedScore ?? null);
     if (visible && idMal) {
       void getDubIndex()
         .then((index) => {
@@ -38,14 +44,15 @@ export function AnimeBadges({ idMal }: { idMal?: number | null }) {
             );
         })
         .catch(() => {});
-      void getMalScore(idMal).then((value) => {
-        if (active) setScore(value);
-      });
+      if (providedScore === undefined)
+        void getMalScore(idMal).then((value) => {
+          if (active) setScore(value);
+        });
     }
     return () => {
       active = false;
     };
-  }, [idMal, visible]);
+  }, [idMal, visible, providedScore]);
   return (
     <div ref={element} className="anime-badges">
       {dub && (

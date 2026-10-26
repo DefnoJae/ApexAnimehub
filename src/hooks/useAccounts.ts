@@ -1,5 +1,6 @@
 import { fetchAnilist } from "../utils/anilist";
 import { useLibrary } from "./useLibrary";
+import { useNotifications } from "./useNotifications";
 import { useCallback, useEffect, useRef, useState } from "react";
 export type AccountProvider = "anilist" | "mal";
 export type ListStatus =
@@ -69,6 +70,60 @@ export function useAccounts() {
     Record<AccountProvider, boolean>
   >({ anilist: false, mal: false });
   const library = useLibrary(connected);
+  const notificationFeed = useNotifications(
+    providers
+      .filter((p) => connected[p])
+      .map((p) => p + ":" + (library.lists[p]?.identity || "pending"))
+      .join("|") || "guest",
+  );
+  const announcedImports = useRef(new Set<string>());
+  const announcedErrors = useRef(new Set<string>());
+  useEffect(() => {
+    Object.entries(library.libraryErrors).forEach(([provider, error]) => {
+      const key =
+        provider +
+        ":" +
+        library.lists[provider as AccountProvider]?.identity +
+        ":" +
+        error;
+      if (error && !announcedErrors.current.has(key)) {
+        announcedErrors.current.add(key);
+        notificationFeed.notify({
+          kind: "error",
+          title: "Library import paused",
+          detail:
+            (provider === "mal" ? "MyAnimeList" : "AniList") +
+            ": " +
+            error +
+            (error.includes("429")
+              ? " The import will retry automatically."
+              : " Open My List to retry."),
+        });
+      }
+    });
+  }, [library.libraryErrors, library.lists, notificationFeed.notify]);
+  useEffect(() => {
+    providers.forEach((provider) => {
+      const list = library.lists[provider];
+      const key = provider + ":" + list?.identity;
+      if (
+        connected[provider] &&
+        list?.complete &&
+        !announcedImports.current.has(key)
+      ) {
+        announcedImports.current.add(key);
+        notificationFeed.notify({
+          kind: "info",
+          title: "Library imported",
+          detail:
+            (provider === "mal" ? "MyAnimeList" : "AniList") +
+            ": " +
+            list.entries.length +
+            " anime ready in My List.",
+        });
+      }
+    });
+  }, [library.lists, connected, notificationFeed.notify]);
   const [checking, setChecking] = useState(true);
   const [accountError, setAccountError] = useState("");
   const [loginNotice] = useState(() => {
@@ -152,6 +207,13 @@ export function useAccounts() {
     if (automatic && !autoSync) return Promise.resolve([]);
     const enabled = providers.filter((provider) => connected[provider]);
     if (!enabled.length) {
+      if (!automatic)
+        notificationFeed.notify({
+          kind: "info",
+          title: "Connect an account",
+          detail:
+            "Connect AniList or MyAnimeList in Settings before updating your lists.",
+        });
       if (!automatic) {
         setResults([]);
         setMessage("Connect AniList or MyAnimeList in Settings first.");
@@ -221,6 +283,26 @@ export function useAccounts() {
         if (next.some((result) => result.success))
           void library.refreshLibrary();
         setResults(next);
+        notificationFeed.notify({
+          kind: next.every((result) => result.success) ? "success" : "error",
+          title: next.every((result) => result.success)
+            ? "Lists updated"
+            : "List update needs attention",
+          detail:
+            (anime.title?.english || anime.title?.romaji || "Anime") +
+            " · " +
+            effectiveStatus +
+            (progress !== undefined ? " · episode " + progress : "") +
+            "\n" +
+            next
+              .map(
+                (result) =>
+                  (result.provider === "mal" ? "MyAnimeList" : "AniList") +
+                  ": " +
+                  (result.success ? "Updated" : result.error),
+              )
+              .join("\n"),
+        });
         setMessage(
           (anime.title?.english || anime.title?.romaji || "Anime") +
             ": " +
@@ -236,6 +318,7 @@ export function useAccounts() {
     return task;
   };
   return {
+    notificationFeed,
     ...library,
     connected,
     configured,

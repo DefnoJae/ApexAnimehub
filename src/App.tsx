@@ -14,6 +14,8 @@ import { AccountSettings } from "./components/AccountSettings";
 import { ListControls } from "./components/ListControls";
 import { VideoPlayer } from "./components/VideoPlayer";
 import { MyList } from "./components/MyList";
+import { EpisodePicker } from "./components/EpisodePicker";
+import { DiscoveryPage } from "./components/DiscoveryPage";
 import { AnimeBadges } from "./components/AnimeBadges";
 const THEME_COLOR = "8B5CF6";
 
@@ -361,6 +363,7 @@ export default function App() {
   return (
     <div className="apex-shell">
       <FloatingNavigation
+        notificationFeed={accounts.notificationFeed}
         view={view}
         hidden={navHidden}
         onView={(next) => {
@@ -499,6 +502,9 @@ export default function App() {
               onConnect={() => setShowAccounts(true)}
             />
           )}
+          {view === "discover" && (
+            <DiscoveryPage accounts={accounts} onSelect={onSelectMedia} />
+          )}
           {/* DETAILS VIEW */}
           {view === "details" && selectedAnime && (
             <div className="apex-details animate-fade-in flex h-full">
@@ -553,29 +559,17 @@ export default function App() {
                     accounts={accounts}
                     onConnect={() => setShowAccounts(true)}
                   />
-                  <div className="animate-in slide-in-from-bottom-10 duration-700">
-                    <p className="text-purple-500 font-black text-[11px] uppercase tracking-[0.6em] mb-8 text-center">
-                      Episodes ({totalEpisodes})
-                    </p>
-                    <div className="flex flex-wrap gap-4">
-                      {Array.from({ length: totalEpisodes }).map((_, i) => (
-                        <button
-                          key={i}
-                          onClick={() => {
-                            setActiveEpisode(i + 1);
-                            resolveStreams(selectedAnime, i + 1);
-                          }}
-                          className={`w-[60px] h-16 shrink-0 rounded-[20px] font-black text-xs border transition-all ${
-                            activeEpisode === i + 1
-                              ? "bg-purple-600 border-purple-400 scale-110"
-                              : "bg-white/5 border-white/10 opacity-40 hover:opacity-100 hover:bg-white/20"
-                          }`}
-                        >
-                          {i + 1}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
+                  <EpisodePicker
+                    anime={selectedAnime}
+                    total={totalEpisodes}
+                    selected={activeEpisode}
+                    entries={accounts.libraryEntries}
+                    importing={accounts.libraryLoading}
+                    onSelect={(episode) => {
+                      setActiveEpisode(episode);
+                      resolveStreams(selectedAnime, episode);
+                    }}
+                  />
 
                   {selectedAnime.relations?.edges?.some(
                     (e: any) => e.node.type === "ANIME",
