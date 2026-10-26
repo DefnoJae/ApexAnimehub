@@ -25,6 +25,10 @@ import { NotificationBell } from "./NotificationBell";
 import { HeroBackdrop } from "./HeroBackdrop";
 import "./dashboard.css";
 import { AnimeBadges } from "./AnimeBadges";
+import {
+  fetchEpisodeMetadata,
+  EpisodeMetadata,
+} from "../utils/episodeMetadata";
 
 export interface DashboardAnime extends ListAnime {
   title: { english?: string; romaji?: string };
@@ -476,6 +480,34 @@ export function HomeDashboard({
   onRemove: (id: number) => void;
   onCalendar: () => void;
 }) {
+  const [episodeMetadata, setEpisodeMetadata] = useState<
+    Record<string, EpisodeMetadata>
+  >({});
+  const episodeKeys = history
+    .map((item) => `${item.anime.id}:${item.episode}`)
+    .join(",");
+  useEffect(() => {
+    let active = true;
+    const keys = episodeKeys ? episodeKeys.split(",") : [];
+    Promise.allSettled(
+      keys.map(async (key) => {
+        const [id, episode] = key.split(":").map(Number);
+        const episodes = await fetchEpisodeMetadata(id);
+        return [key, episodes[String(episode)]] as const;
+      }),
+    ).then((results) => {
+      if (!active) return;
+      const metadata: Record<string, EpisodeMetadata> = {};
+      results.forEach((result) => {
+        if (result.status === "fulfilled" && result.value[1])
+          metadata[result.value[0]] = result.value[1];
+      });
+      setEpisodeMetadata(metadata);
+    });
+    return () => {
+      active = false;
+    };
+  }, [episodeKeys]);
   const [slide, setSlide] = useState(0),
     [paused, setPaused] = useState(false),
     [focusPaused, setFocusPaused] = useState(false),
@@ -655,6 +687,8 @@ export function HomeDashboard({
             <div className="continue-track">
               {history.map((item) => {
                 const percent = playbackPercent(item);
+                const metadata =
+                  episodeMetadata[`${item.anime.id}:${item.episode}`];
                 return (
                   <article className="continue-card" key={item.anime.id}>
                     <button
@@ -671,10 +705,22 @@ export function HomeDashboard({
                         <img
                           loading="lazy"
                           src={
+                            metadata?.image ||
                             item.anime.bannerImage ||
                             item.anime.coverImage?.extraLarge
                           }
                           alt=""
+                          onError={(event) => {
+                            const fallback =
+                              item.anime.bannerImage ||
+                              item.anime.coverImage?.extraLarge;
+                            if (
+                              fallback &&
+                              event.currentTarget.getAttribute("src") !==
+                                fallback
+                            )
+                              event.currentTarget.src = fallback;
+                          }}
                         />
                         <span className="resume-circle">
                           <Play size={22} fill="currentColor" />
@@ -709,6 +755,14 @@ export function HomeDashboard({
                         </h3>
                         <span className="episode-badge">EP {item.episode}</span>
                       </div>
+                      {metadata?.title && (
+                        <p
+                          className="continue-episode-title"
+                          title={metadata.title}
+                        >
+                          {metadata.title}
+                        </p>
+                      )}
                     </button>
                     <button
                       className="remove-history"

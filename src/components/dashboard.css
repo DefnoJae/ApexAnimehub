@@ -1885,6 +1885,15 @@ input:focus-visible {
   min-width: 0;
   max-width: none;
 }
+.home-content .continue-episode-title {
+  margin: 5px 3px 0;
+  font-size: 11px;
+  line-height: 1.4;
+  color: #aaa4b3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .home-content .continue-info .episode-badge {
   position: static;
   display: inline-flex;
