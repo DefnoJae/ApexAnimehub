@@ -70,12 +70,17 @@ export function AnimeDetails({
   selected: number;
   history?: WatchEntry;
   onEpisode: (episode: number) => void;
-  onPlay: (episode: number, audio: "sub" | "dub") => void;
+  onPlay: (
+    episode: number,
+    audio: "sub" | "dub",
+    source?: "apex" | "megaplay",
+  ) => void;
   onBack: () => void;
   onSelect: (anime: DashboardAnime) => void;
   onConnect: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const [source, setSource] = useState<"apex" | "megaplay">("megaplay");
   const [audio, setAudio] = useState<"sub" | "dub">(() => {
     try {
       return localStorage.getItem("apex_episode_language") === "dub"
@@ -186,7 +191,13 @@ export function AnimeDetails({
               <div className="detail-actions">
                 <button
                   className="detail-continue"
-                  onClick={() => onPlay(continueEpisode, audio)}
+                  onClick={() =>
+                    onPlay(
+                      continueEpisode,
+                      audio,
+                      audio === "dub" ? "megaplay" : source,
+                    )
+                  }
                 >
                   <Play size={18} fill="currentColor" />
                   {finished
@@ -321,18 +332,37 @@ export function AnimeDetails({
             </div>
             <label className="detail-source">
               Source
-              <select aria-label="Playback source" defaultValue="megaplay">
+              <select
+                aria-label="Playback source"
+                value={audio === "dub" ? "megaplay" : source}
+                onChange={(e) =>
+                  setSource(e.target.value as "apex" | "megaplay")
+                }
+              >
+                {audio === "sub" && (
+                  <option value="apex">
+                    Apex Player · AnimeParadise (Sub)
+                  </option>
+                )}
                 <option value="megaplay">MegaPlay</option>
               </select>
             </label>
             <button
               className="detail-play"
-              onClick={() => onPlay(selected, audio)}
+              onClick={() =>
+                onPlay(selected, audio, audio === "dub" ? "megaplay" : source)
+              }
             >
               <Play size={17} fill="currentColor" />
               Play Episode {selected}
             </button>
             <p>Stream availability is checked by the player.</p>
+            {source === "apex" && audio === "sub" && (
+              <p>
+                Sub only. Includes subtitles and next/previous episode controls.
+                Use MegaPlay if unavailable.
+              </p>
+            )}
           </section>
           <section className="detail-info glass" aria-label="Anime info">
             <h2>Anime info</h2>

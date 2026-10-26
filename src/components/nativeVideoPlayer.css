@@ -1,0 +1,6 @@
+.apex-native-player:fullscreen .native-player-header {
+  display: none;
+}
+.apex-native-player:-webkit-full-screen .native-player-header {
+  display: none;
+}

@@ -100,6 +100,7 @@ function createServer() {
   return http.createServer(async (req, res) => {
     res.setHeader("Cache-Control", "no-store");
     const url = new URL(req.url, origin);
+    if (url.pathname === "/api/playback") return require('./playback.cjs').handler(req, res);
     const id = /(?:^|; )apex_session=([a-f0-9]{64})(?:;|$)/.exec(
       req.headers.cookie || "",
     )?.[1];

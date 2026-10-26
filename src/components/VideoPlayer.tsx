@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import type { useAccounts } from "../hooks/useAccounts";
-interface PlayerProps {
+export interface PlayerProps {
   title: string;
   episode: number;
   stream: { url: string; name: string };
@@ -29,7 +29,33 @@ export function trustedPlaybackMessage(
     return null;
   }
 }
-export function VideoPlayer({
+const NativeVideoPlayer = React.lazy(() => import("./NativeVideoPlayer"));
+export function VideoPlayer(props: PlayerProps) {
+  const [fallback, setFallback] = useState(false);
+  useEffect(() => setFallback(false), [props.stream.url]);
+  const native = props.stream.url.startsWith("/api/playback?");
+  if (native && !fallback)
+    return (
+      <React.Suspense fallback={<p role="status">Loading player…</p>}>
+        <NativeVideoPlayer {...props} onFallback={() => setFallback(true)} />
+      </React.Suspense>
+    );
+  const params = new URL(props.stream.url, window.location.origin).searchParams;
+  return (
+    <EmbedVideoPlayer
+      {...props}
+      stream={
+        native
+          ? {
+              name: "MegaPlay (Sub)",
+              url: `https://megaplay.buzz/stream/ani/${params.get("id")}/${props.episode}/sub?color=b58aff`,
+            }
+          : props.stream
+      }
+    />
+  );
+}
+function EmbedVideoPlayer({
   title,
   episode,
   stream,

@@ -302,7 +302,10 @@ export default function App() {
       const isDub = startStream.includes("Dub");
       setPlayingStream({
         name: startStream,
-        url: `https://megaplay.buzz/stream/ani/${anime.id}/${startEpisode}/${isDub ? "dub" : "sub"}?color=${THEME_COLOR}`,
+        url:
+          startStream === "Apex Player (Sub)"
+            ? `/api/playback?id=${anime.id}&episode=${startEpisode}`
+            : `https://megaplay.buzz/stream/ani/${anime.id}/${startEpisode}/${isDub ? "dub" : "sub"}?color=${THEME_COLOR}`,
         isEmbed: true,
       });
     }
@@ -344,10 +347,18 @@ export default function App() {
     resolveStreams(selectedAnime, newEp);
 
     const isDub = playingStream?.name?.includes("Dub");
-    const streamName = isDub ? "MegaPlay (Dub)" : "MegaPlay (Sub)";
+    const streamName =
+      playingStream?.name === "Apex Player (Sub)"
+        ? "Apex Player (Sub)"
+        : isDub
+          ? "MegaPlay (Dub)"
+          : "MegaPlay (Sub)";
     setPlayingStream({
       name: streamName,
-      url: `https://megaplay.buzz/stream/ani/${selectedAnime.id}/${newEp}/${isDub ? "dub" : "sub"}?color=${THEME_COLOR}`,
+      url:
+        streamName === "Apex Player (Sub)"
+          ? `/api/playback?id=${selectedAnime.id}&episode=${newEp}`
+          : `https://megaplay.buzz/stream/ani/${selectedAnime.id}/${newEp}/${isDub ? "dub" : "sub"}?color=${THEME_COLOR}`,
       isEmbed: true,
     });
     updateHistory(selectedAnime, newEp, streamName);
@@ -544,8 +555,18 @@ export default function App() {
                 setActiveEpisode(episode);
                 resolveStreams(selectedAnime, episode);
               }}
-              onPlay={(episode, audio) => {
+              onPlay={(episode, audio, source) => {
                 setActiveEpisode(episode);
+                if (source === "apex" && audio === "sub") {
+                  const stream = {
+                    name: "Apex Player (Sub)",
+                    url: `/api/playback?id=${selectedAnime.id}&episode=${episode}`,
+                    isEmbed: false,
+                  };
+                  setPlayingStream(stream);
+                  updateHistory(selectedAnime, episode, stream.name);
+                  return;
+                }
                 const streams = resolveStreams(selectedAnime, episode);
                 const stream = streams.find(
                   (item) =>

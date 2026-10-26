@@ -76,7 +76,7 @@ test("compact detail controls preserve imported watched state and selected audio
       .find((b) => b.textContent === "Play Episode 5")!
       .click(),
   );
-  expect(play).toHaveBeenCalledWith(5, "dub");
+  expect(play).toHaveBeenCalledWith(5, "dub", "megaplay");
   expect(localStorage.getItem("apex_episode_language")).toBe("dub");
   act(() =>
     (
