@@ -11,7 +11,7 @@ function coverId(url) {
   }
 }
 async function resolve(id, episode) {
-  const { HttpClient, AnimeParadiseProvider } = require("anime-sdk");
+  const { HttpClient, AnimeParadiseProvider } = await import("anime-sdk");
   const provider = new AnimeParadiseProvider(
     new HttpClient({ timeoutMs: 8000 }),
   );
