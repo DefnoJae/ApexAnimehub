@@ -107,6 +107,8 @@ input:focus-visible {
   height: 38px;
   object-fit: contain;
 }
+.home-row-notice { color:#aaa1b9; font-size:13px; padding:12px 0; }
+.home-row-action { margin:0 0 22px; color:#c5a2f1; font-size:13px; text-decoration:underline; }
 .nav-divider {
   height: 20px;
   width: 1px;

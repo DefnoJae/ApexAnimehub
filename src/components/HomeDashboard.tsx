@@ -25,6 +25,7 @@ import { NotificationBell } from "./NotificationBell";
 import { HeroBackdrop } from "./HeroBackdrop";
 import "./dashboard.css";
 import { sectionPaths } from "../hooks/usePageRoute";
+import { useMissingLibrary } from "../hooks/useMissingLibrary";
 import { AnimeBadges } from "./AnimeBadges";
 import {
   fetchEpisodeMetadata,
@@ -274,13 +275,15 @@ export function PosterRow({
   animes,
   accounts,
   onSelect,
+  notice,
 }: {
   title: string;
   animes: DashboardAnime[];
   accounts: Accounts;
   onSelect: (anime: DashboardAnime) => void;
+  notice?: string;
 }) {
-  if (!animes.length) return null;
+  if (!animes.length && !notice) return null;
   return (
     <section className="discovery-section home-poster-row" aria-label={title}>
       <div className="section-heading">
@@ -324,7 +327,45 @@ export function PosterRow({
           </article>
         ))}
       </div>
+      {notice && (
+        <p className="home-row-notice" role="status">
+          {notice}
+        </p>
+      )}
     </section>
+  );
+}
+
+function MissingLibraryRow({
+  accounts,
+  onSelect,
+  onConnect,
+}: {
+  accounts: Accounts;
+  onSelect: (anime: DashboardAnime) => void;
+  onConnect?: () => void;
+}) {
+  const missing = useMissingLibrary(accounts);
+  return (
+    <div>
+      <PosterRow
+        title="Missing from Library"
+        animes={missing.animes}
+        notice={missing.notice}
+        accounts={accounts}
+        onSelect={onSelect}
+      />
+      {!missing.connected && onConnect && (
+        <button className="home-row-action" onClick={onConnect}>
+          Connect accounts
+        </button>
+      )}
+      {missing.connected && missing.error && (
+        <button className="home-row-action" onClick={missing.retry}>
+          Try again
+        </button>
+      )}
+    </div>
   );
 }
 
@@ -483,9 +524,10 @@ export function HomeDashboard({
   onResume,
   onRemove,
   onCalendar,
+  onConnect,
 }: {
   slides: DashboardAnime[];
-  rows: Array<{ title: string; animes: DashboardAnime[] }>;
+  rows: Array<{ title: string; animes: DashboardAnime[]; notice?: string }>;
   history: WatchEntry[];
   accounts: Accounts;
   onSelect: (anime: DashboardAnime) => void;
@@ -493,6 +535,7 @@ export function HomeDashboard({
   onResume: (entry: WatchEntry) => void;
   onRemove: (id: number) => void;
   onCalendar: () => void;
+  onConnect?: () => void;
 }) {
   const [episodeMetadata, setEpisodeMetadata] = useState<
     Record<string, EpisodeMetadata>
@@ -852,6 +895,11 @@ export function HomeDashboard({
               onSelect={onSelect}
             />
           ))}
+          <MissingLibraryRow
+            accounts={accounts}
+            onSelect={onSelect}
+            onConnect={onConnect}
+          />
         </div>
         <footer className="apex-footer">
           <a href="#" aria-label="Back to top">

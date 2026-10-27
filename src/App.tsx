@@ -27,6 +27,7 @@ import {
   AudioLanguage,
 } from "./hooks/usePageRoute";
 import { detailQuery } from "./utils/detailQuery";
+import { fetchHomeCatalog, HomeRow } from "./utils/homeRows";
 
 const THEME_COLOR = "8B5CF6";
 
@@ -46,7 +47,7 @@ export default function App() {
 
   const [heroSlides, setHeroSlides] = useState<any[]>([]);
 
-  const [rows, setRows] = useState<any[]>([]);
+  const [rows, setRows] = useState<HomeRow[]>([]);
 
   const [selectedAnime, setSelectedAnime] = useState<any>(null);
   const activeEpisode = route.episode || 1;
@@ -176,18 +177,9 @@ export default function App() {
   // --- DATA FETCHING ---
   const loadContent = useCallback(async () => {
     setLoading(true);
-    const query = `query {
-      trending: Page(page: 1, perPage: 10) { media(type: ANIME, sort: TRENDING_DESC) { id idMal title { english romaji } bannerImage coverImage { extraLarge } description episodes averageScore nextAiringEpisode { episode } } }
-      action: Page(page: 1, perPage: 20) { media(type: ANIME, genre: "Action", sort: POPULARITY_DESC) { id idMal title { english romaji } bannerImage coverImage { extraLarge } description episodes averageScore nextAiringEpisode { episode } } }
-      romance: Page(page: 1, perPage: 20) { media(type: ANIME, genre: "Romance", sort: POPULARITY_DESC) { id idMal title { english romaji } bannerImage coverImage { extraLarge } description episodes averageScore nextAiringEpisode { episode } } }
-    }`;
     setContentError(null);
     try {
-      const data = await fetchAnilist<{
-        trending: { media: any[] };
-        action: { media: any[] };
-        romance: { media: any[] };
-      }>(query);
+      const data = await fetchHomeCatalog();
       // AniList has no transparent title-logo field. Allow an optional local art
       // catalog keyed by AniList ID, with readable text when an asset is missing.
       let logos: Record<string, string> = {};
@@ -196,17 +188,13 @@ export default function App() {
         if (response.ok) logos = await response.json();
       } catch {}
       setHeroSlides(
-        data.trending.media.map((anime) => ({
+        data.trending.slice(0, 10).map((anime) => ({
           ...anime,
           logoImage:
             typeof logos?.[anime.id] === "string" ? logos[anime.id] : undefined,
         })),
       );
-      setRows([
-        { title: "Trending Now", animes: data.trending.media },
-        { title: "Action Picks", animes: data.action.media },
-        { title: "Romance Hits", animes: data.romance.media },
-      ]);
+      setRows(data.rows);
     } catch (error) {
       setContentError(
         error instanceof Error ? error.message : "Could not load anime",
@@ -725,6 +713,7 @@ export default function App() {
                 onResume={resumePlayback}
                 onRemove={removeFromHistory}
                 onCalendar={() => navigate("/calendar")}
+                onConnect={() => setShowAccounts(true)}
               />
             </>
           )}

@@ -57,11 +57,15 @@ beforeEach(() => {
                 episodes: 12,
               },
             }
-          : {
-              trending: { media: [] },
-              action: { media: [] },
-              romance: { media: [] },
-            },
+          : query.includes("RecentlyAired")
+            ? {
+                Page: { pageInfo: { hasNextPage: false }, airingSchedules: [] },
+              }
+            : {
+                trending: { media: [] },
+                current: { media: [] },
+                previous: { media: [] },
+              },
       ),
   );
 });
