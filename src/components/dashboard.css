@@ -2117,6 +2117,7 @@ input:focus-visible {
 
 /* Keep each slide's verified artwork mounted, avoiding poster flashes on cuts. */
 .hero-slide-artwork {
+  visibility: hidden;
   z-index: -3;
   position: absolute;
   inset: 0;
@@ -2125,5 +2126,8 @@ input:focus-visible {
   transition: opacity 0.25s ease;
 }
 .hero-slide-artwork.is-active {
+  visibility: visible;
   opacity: 1;
 }
+
+.hero-slide-artwork:not(.is-active) .hero-backdrop { animation-play-state: paused; }
