@@ -11,6 +11,16 @@ type Accounts = ReturnType<typeof useAccounts>;
 const providers: AccountProvider[] = ["anilist", "mal"];
 const label = (provider: AccountProvider) =>
   provider === "mal" ? "MyAnimeList" : "AniList";
+// Existing fractional or conflicting ratings require an explicit new choice.
+export const commonWholeRating = (values: number[]) => {
+  const unique = Array.from(new Set(values));
+  return unique.length === 1 &&
+    Number.isInteger(unique[0]) &&
+    unique[0] > 0 &&
+    unique[0] <= 10
+    ? String(unique[0])
+    : "";
+};
 export function ListEntryEditor({
   anime,
   accounts,
@@ -46,14 +56,13 @@ export function ListEntryEditor({
         </span>
         <Pencil size={15} />
       </button>
-      {entries
-        .filter((entry) => entry.score !== undefined && entry.score > 0)
-        .map((entry) => (
-          <span key={entry.provider} className="detail-personal-score">
-            Your {entry.provider === "mal" ? "MAL" : "AniList"}: {entry.score}
-            /10
-          </span>
-        ))}
+      {entries.some((entry) => (entry.score || 0) > 0) && (
+        <span className="detail-personal-score">
+          {commonWholeRating(entries.map((entry) => entry.score || 0))
+            ? `Your rating: ${commonWholeRating(entries.map((entry) => entry.score || 0))}/10`
+            : "Choose a whole-number rating"}
+        </span>
+      )}
       {open && (
         <EntryDialog
           anime={anime}
@@ -83,15 +92,13 @@ function EntryDialog({
   const [progress, setProgress] = useState(
     String(Math.max(0, ...entries.map((entry) => entry.progress))),
   );
-  const [scores, setScores] = useState<
-    Partial<Record<AccountProvider, string>>
-  >(() =>
-    Object.fromEntries(
-      entries.map((entry) => [
-        entry.provider,
-        entry.score ? String(entry.score) : "",
-      ]),
-    ),
+  const [score, setScore] = useState(() =>
+    commonWholeRating(entries.map((entry) => entry.score || 0)),
+  );
+  const [needsChoice, setNeedsChoice] = useState(
+    () =>
+      entries.some((entry) => (entry.score || 0) > 0) &&
+      !commonWholeRating(entries.map((entry) => entry.score || 0)),
   );
   const [errors, setErrors] = useState<
     Partial<Record<AccountProvider, string>>
@@ -100,7 +107,7 @@ function EntryDialog({
     [saving, setSaving] = useState(false),
     [notice, setNotice] = useState(""),
     [retry, setRetry] = useState(0);
-  const dirty = useRef({ progress: false, scores: new Set<AccountProvider>() });
+  const dirty = useRef({ progress: false, score: false });
   const panel = useRef<HTMLFormElement>(null);
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
@@ -141,22 +148,22 @@ function EntryDialog({
       .then((results) => {
         if (disposed) return;
         const counts: number[] = [];
+        const savedScores: number[] = [];
         results.forEach((result, i) => {
           const provider = enabled[i];
           if (result.status === "fulfilled") {
             const entry = result.value.entry;
             counts.push(entry?.progress || 0);
+            savedScores.push(entry?.score || 0);
             if (entry)
               accounts.record(provider, anime, entry.status, entry.progress, {
                 score: entry.score,
                 manualProgress: true,
               });
-            if (!dirty.current.scores.has(provider))
-              setScores((previous) => ({
-                ...previous,
-                [provider]: entry?.score ? String(entry.score) : "",
-              }));
           } else {
+            savedScores.push(
+              entries.find((entry) => entry.provider === provider)?.score || 0,
+            );
             counts.push(
               entries.find((entry) => entry.provider === provider)?.progress ||
                 0,
@@ -170,6 +177,13 @@ function EntryDialog({
             }));
           }
         });
+        if (!dirty.current.score) {
+          setScore(commonWholeRating(savedScores));
+          setNeedsChoice(
+            savedScores.some((value) => value > 0) &&
+              !commonWholeRating(savedScores),
+          );
+        }
         if (!dirty.current.progress)
           setProgress(String(Math.max(0, ...counts)));
       })
@@ -198,27 +212,15 @@ function EntryDialog({
       return;
     }
     const changes: Partial<Record<AccountProvider, number>> = {};
-    for (const provider of enabled) {
-      if (!dirty.current.scores.has(provider) || !scores[provider]?.trim())
-        continue;
-      const score = Number(scores[provider]);
-      if (
-        !Number.isFinite(score) ||
-        score < 0 ||
-        score > 10 ||
-        (provider === "mal"
-          ? !Number.isInteger(score)
-          : Math.abs(score * 10 - Math.round(score * 10)) > 1e-8)
-      ) {
-        setNotice(
-          label(provider) +
-            ": use " +
-            (provider === "mal" ? "whole numbers" : "up to one decimal place") +
-            " from 0 to 10.",
-        );
+    if (dirty.current.score && score.trim()) {
+      const value = Number(score);
+      if (!Number.isInteger(value) || value < 0 || value > 10) {
+        setNotice("Use a whole-number rating from 0 to 10.");
         return;
       }
-      changes[provider] = score;
+      enabled.forEach((provider) => {
+        changes[provider] = value;
+      });
     }
     if (!dirty.current.progress && !Object.keys(changes).length) {
       setNotice("No changes to save.");
@@ -314,33 +316,33 @@ function EntryDialog({
             }}
           />
         </label>
-        {enabled.map((provider) => (
-          <label key={provider}>
-            {label(provider)} score /10{" "}
-            <small>
-              {provider === "mal" ? "Whole numbers" : "One decimal allowed"}
-            </small>
-            <input
-              aria-label={label(provider) + " personal score"}
-              type="number"
-              min="0"
-              max="10"
-              step={provider === "mal" ? "1" : "0.1"}
-              placeholder="Unrated"
-              value={scores[provider] || ""}
-              onChange={(event) => {
-                dirty.current.scores.add(provider);
-                setScores((previous) => ({
-                  ...previous,
-                  [provider]: event.target.value,
-                }));
-              }}
-            />
-          </label>
-        ))}
+        <label>
+          Your rating /10{" "}
+          <small>Whole numbers � saves to all connected lists</small>
+          <input
+            aria-label="Your rating"
+            type="number"
+            min="0"
+            max="10"
+            step="1"
+            placeholder={needsChoice ? "Choose a rating" : "Unrated"}
+            value={score}
+            onChange={(event) => {
+              dirty.current.score = true;
+              setScore(event.target.value);
+            }}
+          />
+        </label>
+        {needsChoice && (
+          <p>
+            Your saved ratings differ or use decimals. Choose one whole-number
+            rating to update all connected lists.
+          </p>
+        )}
         <p>
-          Blank scores stay unchanged. Enter 0 to clear a score. Manual episode
-          edits can increase or decrease your count.
+          Leave the rating blank to keep existing scores. Enter 0 to clear it on
+          all connected lists. Manual episode edits can increase or decrease
+          your count.
         </p>
         {loading && <p role="status">Refreshing your saved scores…</p>}
         {Object.entries(errors).map(([provider, error]) => (

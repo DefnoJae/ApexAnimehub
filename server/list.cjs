@@ -48,13 +48,12 @@ function validateUpdate(input) {
     throw new Error("Invalid episode progress");
   if (
     input.score !== undefined &&
-    (!Number.isFinite(input.score) ||
+    (!Number.isInteger(input.score) ||
       input.score < 0 ||
-      input.score > 10 ||
-      Math.abs(input.score * 10 - Math.round(input.score * 10)) > 1e-8)
+      input.score > 10)
   )
     throw new Error(
-      "Score must be between 0 and 10, with at most one decimal place",
+      "Score must be a whole number from 0 to 10",
     );
   for (const field of ["automatic", "manualProgress"])
     if (input[field] !== undefined && typeof input[field] !== "boolean")

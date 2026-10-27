@@ -310,11 +310,11 @@ test("personal scores normalize AniList scale and preserve automatic progress wh
         status: "watching",
         progress: 2,
         manualProgress: true,
-        score: 8.5,
+        score: 8,
       },
     );
     let input = JSON.parse(calls.at(-1).options.body);
-    assert.equal(input.variables.score, 85);
+    assert.equal(input.variables.score, 80);
     assert.equal(input.variables.progress, 2);
     assert.match(input.query, /scoreRaw:/);
     await updateList(
@@ -341,9 +341,13 @@ test("personal scores normalize AniList scale and preserve automatic progress wh
     assert.equal(fields.get("num_watched_episodes"), "2");
     await assert.rejects(
       updateList("mal", {}, { id: 11, status: "watching", score: 8.5 }),
-      /whole numbers/,
+      /whole number/,
     );
-    for (const score of [-1, 11, "8", 8.55, NaN])
+    await assert.rejects(
+      updateList("anilist", {}, { id: 1, status: "watching", score: 8.5 }),
+      /whole number/,
+    );
+    for (const score of [-1, 11, "8", 8.5, 8.55, NaN])
       assert.throws(() => validateUpdate({ id: 1, status: "watching", score }));
     assert.throws(() =>
       validateUpdate({
