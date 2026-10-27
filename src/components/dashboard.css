@@ -366,14 +366,18 @@ input:focus-visible {
   gap: 20px;
   overflow-x: auto;
   padding: 3px 2px 19px;
-  scroll-snap-type: x proximity;
+  /* Keep trackpad momentum free: proximity snapping pulls short swipes back
+     toward the previous card after the user releases the touchpad. */
+  scroll-snap-type: none;
+  scroll-behavior: auto;
+  overscroll-behavior-x: none;
   scrollbar-width: none;
   scrollbar-color: #625076 transparent;
 }
 .poster-card {
   flex: 0 0 calc((100% - 120px) / 7);
   min-width: 144px;
-  scroll-snap-align: start;
+  scroll-snap-align: none;
 }
 .poster-art {
   aspect-ratio: 2/3;
@@ -530,7 +534,7 @@ input:focus-visible {
   max-width: 440px;
   border-radius: 20px;
   position: relative;
-  scroll-snap-align: start;
+  scroll-snap-align: none;
   overflow: hidden;
 }
 .continue-open {
@@ -699,7 +703,7 @@ input:focus-visible {
   color: #e5e0ef;
   padding: 7px;
   cursor: pointer;
-  scroll-snap-align: start;
+  scroll-snap-align: none;
 }
 .episode-card > div {
   aspect-ratio: 16/9;
