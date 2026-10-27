@@ -107,8 +107,17 @@ input:focus-visible {
   height: 38px;
   object-fit: contain;
 }
-.home-row-notice { color:#aaa1b9; font-size:13px; padding:12px 0; }
-.home-row-action { margin:0 0 22px; color:#c5a2f1; font-size:13px; text-decoration:underline; }
+.home-row-notice {
+  color: #aaa1b9;
+  font-size: 13px;
+  padding: 12px 0;
+}
+.home-row-action {
+  margin: 0 0 22px;
+  color: #c5a2f1;
+  font-size: 13px;
+  text-decoration: underline;
+}
 .nav-divider {
   height: 20px;
   width: 1px;
@@ -2104,4 +2113,17 @@ input:focus-visible {
   outline: 2px solid #b58aff;
   outline-offset: 3px;
   border-radius: 5px;
+}
+
+/* Keep each slide's verified artwork mounted, avoiding poster flashes on cuts. */
+.hero-slide-artwork {
+  z-index: -3;
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+}
+.hero-slide-artwork.is-active {
+  opacity: 1;
 }

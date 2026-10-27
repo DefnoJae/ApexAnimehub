@@ -31,7 +31,7 @@ export function HeroBackdrop({ anime }: { anime: DashboardAnime }) {
   const source = artwork?.id === anime.id ? candidates[index] : undefined;
   return (
     <div className="hero-artwork" aria-hidden="true">
-      {accepted !== source && (
+      {artwork?.id === anime.id && !source && (
         <div className="hero-poster-fallback">
           <img src={anime.coverImage?.extraLarge} alt="" />
         </div>

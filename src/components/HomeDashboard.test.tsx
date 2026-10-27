@@ -86,7 +86,7 @@ test("a mislabeled square poster stays hidden and leaves a readable hero title",
   });
   const image = node.querySelector("h1 img") as HTMLImageElement;
   expect(image.style.display).toBe("none");
-  expect(node.querySelector("h1")?.textContent).toBe("Example anime");
+  expect(node.querySelector("h1")?.textContent).toBe(""); // No text flash while the logo is being validated.
   Object.defineProperties(image, {
     naturalWidth: { value: 1024 },
     naturalHeight: { value: 1024 },

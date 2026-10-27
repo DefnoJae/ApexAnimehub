@@ -578,6 +578,17 @@ export function HomeDashboard({
       return "sub";
     }
   });
+  useEffect(() => {
+    // Warm the next slides before navigation rather than fetching after the cut.
+    slides.forEach((item) => {
+      void fetchHeroArtwork(item.id).then((urls) =>
+        urls.slice(0, 1).forEach((url) => {
+          const image = new Image();
+          image.src = url;
+        }),
+      );
+    });
+  }, [slides]);
   const [validatedLogo, setValidatedLogo] = useState<string | null>(null);
   const [artwork, setArtwork] = useState<{
     id: number;
@@ -640,7 +651,18 @@ export function HomeDashboard({
               setFocusPaused(false);
           }}
         >
-          <HeroBackdrop key={anime.id} anime={anime} />
+          {slides.map((item) => (
+            <div
+              key={item.id}
+              className={
+                "hero-slide-artwork" +
+                (item.id === anime.id ? " is-active" : "")
+              }
+              aria-hidden="true"
+            >
+              <HeroBackdrop anime={item} />
+            </div>
+          ))}
           <div className="hero-shade" />
           <div className="hero-copy" key={"copy-" + anime.id}>
             <h1
@@ -654,10 +676,12 @@ export function HomeDashboard({
             >
               <button
                 className="hero-title-link"
+                title={getDisplayTitle(anime)}
                 aria-label={"View anime details: " + getDisplayTitle(anime)}
                 onClick={() => onSelect(anime)}
               >
-                {(!titleLogo || validatedLogo !== titleLogo) &&
+                {artwork?.id === anime.id &&
+                  !titleLogo &&
                   getDisplayTitle(anime)}
                 {titleLogo && (
                   <img

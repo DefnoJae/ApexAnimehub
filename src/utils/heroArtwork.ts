@@ -59,7 +59,7 @@ export function isHeroBanner(width: number, height: number): boolean {
 async function fetchHeroMedia(anilistId: number): Promise<CachedArtwork> {
   const empty = { logos: [], backdrops: [], updatedAt: 0 };
   if (!Number.isSafeInteger(anilistId) || anilistId <= 0) return empty;
-  const key = "apex_tmdb_artwork_v1_" + anilistId;
+  const key = "apex_tmdb_artwork_v2_" + anilistId;
   let cached: CachedArtwork | null = null;
   try {
     const value = JSON.parse(localStorage.getItem(key) || "null");
@@ -83,12 +83,15 @@ async function fetchHeroMedia(anilistId: number): Promise<CachedArtwork> {
   if (existing) return existing;
   const request = (async () => {
     const controller = new AbortController(),
-      timer = setTimeout(() => controller.abort(), 18000);
+      timer = setTimeout(() => controller.abort(), 45000);
     try {
-      const response = await fetch("/api/artwork?anilist_id=" + anilistId, {
-        signal: controller.signal,
-        credentials: "omit",
-      });
+      const response = await fetch(
+        "/api/artwork?anilist_id=" + anilistId + "&v=2",
+        {
+          signal: controller.signal,
+          credentials: "omit",
+        },
+      );
       if (!response.ok) throw new Error("Artwork unavailable");
       const data = await response.json();
       if (!data || Number(data.anilistId) !== anilistId)
