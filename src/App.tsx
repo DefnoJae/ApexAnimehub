@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Search, X } from "lucide-react";
 import {
   HomeDashboard,
@@ -18,13 +18,23 @@ import { VideoPlayer } from "./components/VideoPlayer";
 import { MyList } from "./components/MyList";
 
 import { DiscoveryPage } from "./components/DiscoveryPage";
+import {
+  animePage,
+  episodePage,
+  sectionPaths,
+  usePageRoute,
+  PlaybackSource,
+  AudioLanguage,
+} from "./hooks/usePageRoute";
+import { detailQuery } from "./utils/detailQuery";
 
 const THEME_COLOR = "8B5CF6";
 
 export default function App() {
   const accounts = useAccounts();
   const [showAccounts, setShowAccounts] = useState(false);
-  const [view, setView] = useState("all");
+  const { route, navigate, back } = usePageRoute();
+  const view = route.view;
   const [loading, setLoading] = useState(true);
   const [contentError, setContentError] = useState<string | null>(null);
   const [searchError, setSearchError] = useState<string | null>(null);
@@ -39,9 +49,42 @@ export default function App() {
   const [rows, setRows] = useState<any[]>([]);
 
   const [selectedAnime, setSelectedAnime] = useState<any>(null);
-  const [activeEpisode, setActiveEpisode] = useState(1);
-
-  const [playingStream, setPlayingStream] = useState<any>(null);
+  const activeEpisode = route.episode || 1;
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState("");
+  const [detailAttempt, setDetailAttempt] = useState(0);
+  const previousPage = useRef<string>();
+  const detailCache = useRef(new Map<number, any>());
+  const seeds = useRef(new Map<number, any>());
+  const invalidEpisode = !!(
+    route.play &&
+    selectedAnime?.id === route.animeId &&
+    selectedAnime.episodes &&
+    activeEpisode > selectedAnime.episodes
+  );
+  const streamName =
+    route.source === "anipm"
+      ? `Ani.pm (${route.audio === "dub" ? "Dub" : "Sub"})`
+      : route.source === "apex"
+        ? "Apex Player (Sub)"
+        : `MegaPlay (${route.audio === "dub" ? "Dub" : "Sub"})`;
+  const playingStream =
+    route.play &&
+    !detailLoading &&
+    !detailError &&
+    !invalidEpisode &&
+    selectedAnime?.id === route.animeId
+      ? {
+          name: streamName,
+          url:
+            route.source === "anipm"
+              ? aniPmUrl(route.animeId!, activeEpisode, route.audio)
+              : route.source === "apex"
+                ? `/api/playback?id=${route.animeId}&episode=${activeEpisode}`
+                : `https://megaplay.buzz/stream/ani/${route.animeId}/${activeEpisode}/${route.audio}?color=${THEME_COLOR}`,
+          isEmbed: route.source !== "apex",
+        }
+      : null;
 
   const [watchHistory, setWatchHistory] = useState<WatchEntry[]>([]);
   const markWatched = (automatic: boolean, episode = activeEpisode) => {
@@ -60,9 +103,75 @@ export default function App() {
     const params = new URLSearchParams(window.location.search);
     if (params.has("oauth")) {
       setShowAccounts(true);
-      window.history.replaceState({}, "", window.location.pathname);
+      window.history.replaceState(
+        window.history.state,
+        "",
+        window.location.pathname,
+      );
     }
   }, []);
+
+  useEffect(() => {
+    const key = `${route.view}:${route.animeId}:${route.episode}:${route.play}`;
+    if (previousPage.current !== undefined && previousPage.current !== key)
+      setShowAccounts(false);
+    previousPage.current = key;
+    setIsSearchExpanded(false);
+    setNavHidden(false);
+  }, [route.view, route.animeId, route.episode, route.play]);
+
+  useEffect(() => {
+    if (route.view !== "details" || !route.animeId) return;
+    const id = route.animeId;
+    const abort = new AbortController();
+    setDetailError("");
+    const saved = detailCache.current.get(id);
+    if (saved) {
+      setSelectedAnime(saved);
+      setDetailLoading(false);
+      return;
+    }
+    setSelectedAnime(seeds.current.get(id) || null);
+    setDetailLoading(true);
+    void fetchAnilist<{ Media: any }>(detailQuery, { id }, abort.signal)
+      .then((data) => {
+        if (abort.signal.aborted) return;
+        if (!data.Media?.id) throw new Error("This anime could not be found.");
+        if (detailCache.current.size >= 30)
+          detailCache.current.delete(
+            detailCache.current.keys().next().value as number,
+          );
+        detailCache.current.set(id, data.Media);
+        setSelectedAnime(data.Media);
+      })
+      .catch((error) => {
+        if (!abort.signal.aborted)
+          setDetailError(
+            error instanceof Error
+              ? error.message
+              : "Could not load this anime.",
+          );
+      })
+      .finally(() => {
+        if (!abort.signal.aborted) setDetailLoading(false);
+      });
+    return () => abort.abort();
+  }, [route.view, route.animeId, detailAttempt]);
+
+  useEffect(() => {
+    const section = {
+      all: "Home",
+      discover: "Discover",
+      "my-list": "My List",
+      "dub-releases": "Dub Calendar",
+      "not-found": "Page not found",
+    };
+    const page =
+      view === "details"
+        ? `${selectedAnime?.id === route.animeId ? getDisplayTitle(selectedAnime) : "Anime"}${route.play ? ` · Episode ${activeEpisode}` : ""}`
+        : section[view];
+    document.title = `${page} | ApexAnimehub`;
+  }, [view, route.animeId, route.play, activeEpisode, selectedAnime]);
 
   // --- DATA FETCHING ---
   const loadContent = useCallback(async () => {
@@ -230,25 +339,6 @@ export default function App() {
     );
   };
 
-  // --- STREAM RESOLVER ---
-  const resolveStreams = (anime: any, ep: number) => {
-    const base = `https://megaplay.buzz/stream/ani/${anime.id}/${ep}`;
-    const streams = [
-      {
-        name: "MegaPlay (Sub)",
-        url: `${base}/sub?color=${THEME_COLOR}`,
-        isEmbed: true,
-      },
-      {
-        name: "MegaPlay (Dub)",
-        url: `${base}/dub?color=${THEME_COLOR}`,
-        isEmbed: true,
-      },
-    ];
-
-    return streams;
-  };
-
   const onSelectMedia = async (
     anime: any,
     startEpisode: number = 1,
@@ -274,7 +364,6 @@ export default function App() {
       );
       return;
     }
-    if (!startStream) setPlayingStream(null);
     if (!startStream && startEpisode === 1) {
       const progress = Math.max(
         0,
@@ -292,80 +381,45 @@ export default function App() {
         !!anime.episodes,
       );
     }
-    setSelectedAnime(anime);
-    setView("details");
-    window.scrollTo({ top: 0 });
-    setActiveEpisode(startEpisode);
-    resolveStreams(anime, startEpisode);
-
+    seeds.current.set(anime.id, anime);
+    if (seeds.current.size > 30)
+      seeds.current.delete(seeds.current.keys().next().value as number);
     if (startStream) {
-      updateHistory(anime, startEpisode, startStream);
-      const isDub = startStream.includes("Dub");
-      setPlayingStream({
-        name: startStream,
-        url: startStream.startsWith("Ani.pm")
-          ? aniPmUrl(anime.id, startEpisode, isDub ? "dub" : "sub")
-          : startStream === "Apex Player (Sub)"
-            ? `/api/playback?id=${anime.id}&episode=${startEpisode}`
-            : `https://megaplay.buzz/stream/ani/${anime.id}/${startEpisode}/${isDub ? "dub" : "sub"}?color=${THEME_COLOR}`,
-        isEmbed: true,
-      });
-    }
-
-    try {
-      const query = `query ($id: Int) {
-        Media(id: $id, type: ANIME) {
-          id idMal title { english romaji } bannerImage coverImage { extraLarge } description episodes averageScore
-          seasonYear format status genres studios(isMain:true){nodes{name}} nextAiringEpisode { episode }
-          relations {
-            edges {
-              relationType
-              node { id idMal title { english romaji } coverImage { extraLarge } type bannerImage description episodes averageScore nextAiringEpisode { episode } }
-            }
-          }
-        }
-      }`;
-      const fullData = await fetchAnilist<{ Media: any }>(query, {
-        id: anime.id,
-      });
-      if (!fullData.Media?.id) throw new Error("AniList returned no media");
-      setSelectedAnime((current: { id: number } | null) =>
-        current?.id === anime.id ? fullData.Media : current,
+      const source: PlaybackSource = startStream.startsWith("Ani.pm")
+        ? "anipm"
+        : startStream === "Apex Player (Sub)"
+          ? "apex"
+          : "megaplay";
+      navigate(
+        episodePage(
+          anime.id,
+          startEpisode,
+          startStream.includes("Dub") ? "dub" : "sub",
+          source,
+        ),
       );
-    } catch (e) {
-      console.error("Failed to fetch relations", e);
-    }
+    } else navigate(animePage(anime.id, startEpisode));
   };
 
+  const playEpisode = (
+    episode: number,
+    audio: AudioLanguage,
+    source: PlaybackSource = "anipm",
+  ) => {
+    if (!selectedAnime || selectedAnime.id !== route.animeId) return;
+    navigate(
+      episodePage(
+        selectedAnime.id,
+        episode,
+        audio,
+        source === "apex" && audio === "dub" ? "megaplay" : source,
+      ),
+    );
+  };
   const changeEpisode = (direction: "next" | "prev") => {
-    const newEp = direction === "next" ? activeEpisode + 1 : activeEpisode - 1;
-    if (
-      !selectedAnime ||
-      newEp < 1 ||
-      (direction === "next" && !canNextEpisode)
-    )
-      return;
-    setActiveEpisode(newEp);
-    resolveStreams(selectedAnime, newEp);
-
-    const isDub = playingStream?.name?.includes("Dub");
-    const streamName = playingStream?.name?.startsWith("Ani.pm")
-      ? playingStream.name
-      : playingStream?.name === "Apex Player (Sub)"
-        ? "Apex Player (Sub)"
-        : isDub
-          ? "MegaPlay (Dub)"
-          : "MegaPlay (Sub)";
-    setPlayingStream({
-      name: streamName,
-      url: streamName.startsWith("Ani.pm")
-        ? aniPmUrl(selectedAnime.id, newEp, isDub ? "dub" : "sub")
-        : streamName === "Apex Player (Sub)"
-          ? `/api/playback?id=${selectedAnime.id}&episode=${newEp}`
-          : `https://megaplay.buzz/stream/ani/${selectedAnime.id}/${newEp}/${isDub ? "dub" : "sub"}?color=${THEME_COLOR}`,
-      isEmbed: true,
-    });
-    updateHistory(selectedAnime, newEp, streamName);
+    const episode = activeEpisode + (direction === "next" ? 1 : -1);
+    if (episode < 1 || (direction === "next" && !canNextEpisode)) return;
+    playEpisode(episode, route.audio, route.source);
   };
 
   const totalEpisodes = selectedAnime?.episodes
@@ -398,6 +452,27 @@ export default function App() {
       return next;
     });
   };
+  useEffect(() => {
+    if (
+      !route.play ||
+      detailLoading ||
+      detailError ||
+      invalidEpisode ||
+      selectedAnime?.id !== route.animeId
+    )
+      return;
+    updateHistory(selectedAnime, activeEpisode, streamName);
+  }, [
+    route.play,
+    route.animeId,
+    activeEpisode,
+    streamName,
+    detailLoading,
+    detailError,
+    invalidEpisode,
+    selectedAnime?.id,
+  ]);
+
   return (
     <div className="apex-shell">
       <FloatingNavigation
@@ -405,8 +480,7 @@ export default function App() {
         view={view}
         hidden={navHidden}
         onView={(next) => {
-          setView(next);
-          setPlayingStream(null);
+          navigate(sectionPaths[next] || "/");
           window.scrollTo({ top: 0 });
           setNavHidden(false);
         }}
@@ -429,18 +503,16 @@ export default function App() {
           onNext={() => changeEpisode("next")}
           onWatched={(episode) => void markWatched(true, episode)}
           onEpisodeChange={(episode, lang) => {
-            if (!selectedAnime || !Number.isSafeInteger(episode) || episode < 1)
+            if (episode === activeEpisode && lang === route.audio) return;
+            if (
+              selectedAnime?.id !== route.animeId ||
+              !Number.isSafeInteger(episode) ||
+              episode < 1
+            )
               return;
-            const name = `Ani.pm (${lang === "dub" ? "Dub" : "Sub"})`;
-            setActiveEpisode(episode);
-            setPlayingStream({
-              name,
-              url: aniPmUrl(selectedAnime.id, episode, lang),
-              isEmbed: true,
-            });
-            updateHistory(selectedAnime, episode, name);
+            navigate(episodePage(selectedAnime.id, episode, lang, "anipm"));
           }}
-          onClose={() => setPlayingStream(null)}
+          onClose={() => navigate(animePage(selectedAnime.id, activeEpisode))}
           onProgress={recordProgress}
           accounts={accounts}
         />
@@ -544,6 +616,54 @@ export default function App() {
           }
         >
           {/* DUB RELEASES VIEW */}
+          {view === "not-found" && (
+            <section className="row-loading">
+              <h1>Page not found</h1>
+              <p>This link does not match a page on ApexAnimehub.</p>
+              <a
+                href="/"
+                onClick={(event) => {
+                  event.preventDefault();
+                  navigate("/");
+                }}
+              >
+                Go Home
+              </a>
+            </section>
+          )}
+          {view === "details" &&
+            detailLoading &&
+            selectedAnime?.id !== route.animeId && (
+              <p
+                className="row-loading"
+                style={{ paddingTop: 130 }}
+                role="status"
+              >
+                Loading anime details…
+              </p>
+            )}
+          {view === "details" && detailError && (
+            <section
+              className="row-loading"
+              style={{ paddingTop: 130 }}
+              role="alert"
+            >
+              <h1>Could not open this anime</h1>
+              <p>{detailError}</p>
+              <button onClick={() => setDetailAttempt((value) => value + 1)}>
+                Try again
+              </button>
+              <button onClick={() => back()}>Back</button>
+            </section>
+          )}
+          {invalidEpisode && (
+            <p role="alert" className="row-loading">
+              This episode is outside this anime’s episode count.{" "}
+              <button onClick={() => navigate(animePage(selectedAnime.id))}>
+                Open anime details
+              </button>
+            </p>
+          )}
           {view === "dub-releases" && (
             <DubScheduleView onSelectMedia={onSelectMedia} />
           )}
@@ -558,58 +678,27 @@ export default function App() {
           {view === "discover" && (
             <DiscoveryPage accounts={accounts} onSelect={onSelectMedia} />
           )}
-          {view === "details" && selectedAnime && (
-            <AnimeDetails
-              key={selectedAnime.id}
-              anime={selectedAnime}
-              accounts={accounts}
-              total={totalEpisodes}
-              selected={activeEpisode}
-              history={watchHistory.find(
-                (entry) => entry.anime.id === selectedAnime.id,
-              )}
-              onBack={() => setView("all")}
-              onSelect={onSelectMedia}
-              onConnect={() => setShowAccounts(true)}
-              onEpisode={(episode) => {
-                setActiveEpisode(episode);
-                resolveStreams(selectedAnime, episode);
-              }}
-              onPlay={(episode, audio, source) => {
-                setActiveEpisode(episode);
-                if (source === "anipm") {
-                  const stream = {
-                    name: `Ani.pm (${audio === "dub" ? "Dub" : "Sub"})`,
-                    url: aniPmUrl(selectedAnime.id, episode, audio),
-                    isEmbed: true,
-                  };
-                  setPlayingStream(stream);
-                  updateHistory(selectedAnime, episode, stream.name);
-                  return;
+          {view === "details" &&
+            selectedAnime?.id === route.animeId &&
+            !detailError && (
+              <AnimeDetails
+                key={selectedAnime.id}
+                anime={selectedAnime}
+                accounts={accounts}
+                total={totalEpisodes}
+                selected={activeEpisode}
+                history={watchHistory.find(
+                  (entry) => entry.anime.id === selectedAnime.id,
+                )}
+                onBack={() => back()}
+                onSelect={onSelectMedia}
+                onConnect={() => setShowAccounts(true)}
+                onEpisode={(episode) =>
+                  navigate(animePage(selectedAnime.id, episode))
                 }
-                if (source === "apex" && audio === "sub") {
-                  const stream = {
-                    name: "Apex Player (Sub)",
-                    url: `/api/playback?id=${selectedAnime.id}&episode=${episode}`,
-                    isEmbed: false,
-                  };
-                  setPlayingStream(stream);
-                  updateHistory(selectedAnime, episode, stream.name);
-                  return;
-                }
-                const streams = resolveStreams(selectedAnime, episode);
-                const stream = streams.find(
-                  (item) =>
-                    item.name ===
-                    (audio === "dub" ? "MegaPlay (Dub)" : "MegaPlay (Sub)"),
-                );
-                if (stream) {
-                  setPlayingStream(stream);
-                  updateHistory(selectedAnime, episode, stream.name);
-                }
-              }}
-            />
-          )}
+                onPlay={playEpisode}
+              />
+            )}
           {view === "all" && (
             <>
               {loading && (
@@ -635,7 +724,7 @@ export default function App() {
                 onWatch={(anime) => onSelectMedia(anime, 1, "MegaPlay (Sub)")}
                 onResume={resumePlayback}
                 onRemove={removeFromHistory}
-                onCalendar={() => setView("dub-releases")}
+                onCalendar={() => navigate("/calendar")}
               />
             </>
           )}

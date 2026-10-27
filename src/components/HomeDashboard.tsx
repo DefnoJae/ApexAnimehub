@@ -24,6 +24,7 @@ import type { ListAnime, ListStatus, useAccounts } from "../hooks/useAccounts";
 import { NotificationBell } from "./NotificationBell";
 import { HeroBackdrop } from "./HeroBackdrop";
 import "./dashboard.css";
+import { sectionPaths } from "../hooks/usePageRoute";
 import { AnimeBadges } from "./AnimeBadges";
 import {
   fetchEpisodeMetadata,
@@ -90,10 +91,12 @@ export function FloatingNavigation({
       aria-label="Main navigation"
     >
       <a
-        href="#"
+        href="/"
         className="apex-brand"
         aria-label="ApexAnimehub home"
         onClick={(event) => {
+          if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)
+            return;
           event.preventDefault();
           onView("all");
         }}
@@ -107,17 +110,28 @@ export function FloatingNavigation({
         { key: "my-list", label: "My List", Icon: Library },
         { key: "discover", label: "Discover anime", Icon: Compass },
       ].map(({ key, label, Icon }) => (
-        <button
+        <a
+          href={sectionPaths[key]}
           key={key}
           title={label}
           aria-label={label}
           aria-current={view === key ? "page" : undefined}
           className={"nav-icon " + (view === key ? "active" : "")}
-          onClick={() => onView(key)}
+          onClick={(event) => {
+            if (
+              event.metaKey ||
+              event.ctrlKey ||
+              event.shiftKey ||
+              event.altKey
+            )
+              return;
+            event.preventDefault();
+            onView(key);
+          }}
         >
           <Icon size={20} />
           <span className="nav-tooltip">{label}</span>
-        </button>
+        </a>
       ))}
       <span className="nav-divider" />
       <button
