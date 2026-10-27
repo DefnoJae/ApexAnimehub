@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import { Maximize, X } from "lucide-react";
 import type { PlayerProps } from "./VideoPlayer";
 import type { Player, PlayerState } from "../utils/anipm-sdk";
 import { loadAniPmSdk, validAniPmState } from "../utils/anipm";
@@ -51,6 +52,14 @@ export default function AniPmPlayer(props: PlayerProps) {
           title: `${callbacks.current.title} anime player`,
         });
         instance.current = player;
+        // Deny fullscreen to the provider and all nested frames. The parent dialog
+        // remains eligible for fullscreen through ApexAnimehub's own control.
+        player.iframe.removeAttribute("allowfullscreen");
+        player.iframe.allow = player.iframe.allow
+          .split(";")
+          .filter((permission) => !permission.trim().startsWith("fullscreen"))
+          .concat("fullscreen 'none'")
+          .join(";");
         const stateChanged = (state: PlayerState) => {
           if (active && validAniPmState(state, id))
             callbacks.current.onEpisodeChange?.(state.episode, state.lang);
@@ -149,15 +158,15 @@ export default function AniPmPlayer(props: PlayerProps) {
       aria-label="Anime video player"
       className="apex-native-player fixed inset-0 z-[500] bg-black text-white flex flex-col"
     >
-      <div className="native-player-header shrink-0 flex gap-4 px-4 py-2 text-sm">
-        <span className="flex-1">
+      <div className="native-player-header shrink-0 flex items-center gap-2 px-4 py-2 text-sm">
+        <span className="flex-1 min-w-0 truncate">
           {props.title} · Episode {props.episode} · {props.stream.name}
         </span>
-        <button onClick={enterFullscreen} aria-label="Fullscreen video">
-          Fullscreen
+        <button className="player-header-icon" onClick={enterFullscreen} aria-label="Fullscreen video" title="Fullscreen (F)">
+          <Maximize size={18} aria-hidden="true" />
         </button>
-        <button onClick={props.onClose} aria-label="Close video player">
-          Close
+        <button className="player-header-icon" onClick={props.onClose} aria-label="Close video player" title="Close player">
+          <X size={20} aria-hidden="true" />
         </button>
       </div>
       {error && (

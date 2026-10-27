@@ -10,6 +10,7 @@ test("Ani.pm uses explicit episode identity for 80% tracking and cleans up its S
   const root = createRoot(node);
   const events: Record<string, (data: any) => void> = {};
   const player = {
+    iframe: document.createElement("iframe"),
     state: { anilistId: 1, episode: 2, lang: "dub" },
     on: (event: string, cb: (data: any) => void) => {
       events[event] = cb;
@@ -17,6 +18,8 @@ test("Ani.pm uses explicit episode identity for 80% tracking and cleans up its S
     destroy: jest.fn(),
     loadEpisode: jest.fn().mockResolvedValue({}),
   };
+  player.iframe.allow = "autoplay; fullscreen; picture-in-picture";
+  player.iframe.setAttribute("allowfullscreen", "");
   const original = window.AniPM;
   window.AniPM = {
     Player: jest.fn().mockImplementation(() => player),
@@ -39,6 +42,9 @@ test("Ani.pm uses explicit episode identity for 80% tracking and cleans up its S
   } as unknown as PlayerProps;
   try {
     await act(async () => root.render(<AniPmPlayer {...props} />));
+    expect(player.iframe.hasAttribute("allowfullscreen")).toBe(false);
+    expect(player.iframe.allow).toContain("fullscreen 'none'");
+    expect(player.iframe.allow).toContain("autoplay");
     const dialog = node.querySelector('[role="dialog"]') as HTMLDivElement;
     const requestFullscreen = jest.fn().mockResolvedValue(undefined);
     dialog.requestFullscreen = requestFullscreen;

@@ -4,3 +4,24 @@
 .apex-native-player:-webkit-full-screen .native-player-header {
   display: none;
 }
+.player-header-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  color: #e4e0ec;
+  transition: background 150ms, color 150ms;
+}
+.player-header-icon:hover {
+  background: rgba(181, 138, 255, 0.18);
+  color: #d4b6ff;
+}
+.player-header-icon:focus-visible {
+  outline: 2px solid #b58aff;
+  outline-offset: 2px;
+}
