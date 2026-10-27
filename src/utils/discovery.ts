@@ -17,6 +17,7 @@ export function matchesListStatus(
 export interface DiscoveryFilters {
   search: string;
   genres: string[];
+  tags?: string[];
   from: string;
   to: string;
   season: string;
@@ -30,6 +31,7 @@ export interface DiscoveryFilters {
 export const defaultFilters: DiscoveryFilters = {
   search: "",
   genres: [],
+  tags: [],
   from: "",
   to: "",
   season: "",
@@ -201,6 +203,7 @@ async function fetchAniDiscovery(
   const dubbed = new Set([...(dub?.dubbed || []), ...(dub?.partial || [])]);
   const sort =
     {
+      trending: "TRENDING_DESC",
       popularity: "POPULARITY_DESC",
       score: "SCORE_DESC",
       start_date: "START_DATE_DESC",
@@ -214,11 +217,12 @@ async function fetchAniDiscovery(
   const data = await fetchAnilist<{
     Page: { pageInfo: { hasNextPage: boolean }; media: AniMedia[] };
   }>(
-    "query($page:Int,$search:String,$genres:[String],$after:FuzzyDateInt,$before:FuzzyDateInt,$season:MediaSeason,$score:Int,$status:MediaStatus,$format:MediaFormat,$sort:[MediaSort]){Page(page:$page,perPage:48){pageInfo{hasNextPage} media(type:ANIME,isAdult:false,search:$search,genre_in:$genres,startDate_greater:$after,startDate_lesser:$before,season:$season,averageScore_greater:$score,status:$status,format:$format,sort:$sort){id idMal title{english romaji} coverImage{extraLarge} bannerImage episodes averageScore startDate{year} format}}}",
+    "query($page:Int,$search:String,$genres:[String],$tags:[String],$after:FuzzyDateInt,$before:FuzzyDateInt,$season:MediaSeason,$score:Int,$status:MediaStatus,$format:MediaFormat,$sort:[MediaSort]){Page(page:$page,perPage:50){pageInfo{hasNextPage} media(type:ANIME,isAdult:false,search:$search,genre_in:$genres,tag_in:$tags,startDate_greater:$after,startDate_lesser:$before,season:$season,averageScore_greater:$score,status:$status,format:$format,sort:$sort){id idMal title{english romaji} coverImage{extraLarge} bannerImage episodes averageScore startDate{year} format}}}",
     {
       page,
       search: filters.search.trim() || undefined,
       genres: selectedGenres.length ? selectedGenres : undefined,
+      tags: filters.tags?.length ? filters.tags : undefined,
       after: filters.from ? Number(filters.from) * 10000 + 100 : undefined,
       before: filters.to ? (Number(filters.to) + 1) * 10000 + 101 : undefined,
       season: filters.season ? filters.season.toUpperCase() : undefined,
@@ -262,6 +266,7 @@ export async function fetchDiscovery(
     throw new Error("Start year must be before or equal to end year.");
   if (
     preferred === "anilist" ||
+    filters.tags?.length ||
     filters.genres.some((id) => id.startsWith("name:"))
   )
     return fetchAniDiscovery(filters, page, signal);
@@ -294,4 +299,17 @@ export async function fetchGenres(
       name,
     }));
   }
+}
+
+export async function fetchDiscoveryOptions(signal: AbortSignal) {
+  const data = await fetchAnilist<{
+    GenreCollection: string[];
+    MediaTagCollection: Array<{ name: string; isAdult: boolean }>;
+  }>("query{GenreCollection MediaTagCollection{name isAdult}}", {}, signal);
+  return {
+    genres: data.GenreCollection,
+    tags: data.MediaTagCollection.filter((tag) => !tag.isAdult)
+      .map((tag) => tag.name)
+      .sort(),
+  };
 }

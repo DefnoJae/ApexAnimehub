@@ -1,0 +1,230 @@
+.discovery-refresh {
+  max-width: 1800px;
+  margin: auto;
+  padding: 28px 4vw 80px;
+}
+.discovery-refresh .discovery-heading {
+  margin-bottom: 22px;
+}
+.discovery-refresh .discovery-heading h1 {
+  font-size: 30px;
+  font-style: normal;
+  letter-spacing: -0.025em;
+}
+.discovery-refresh .discovery-heading p {
+  font-size: 12px;
+  color: #929099;
+}
+.discovery-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 14px 16px;
+  margin-bottom: 18px;
+}
+.discovery-inline-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #ffffff09;
+  border-radius: 24px;
+  padding: 10px 14px;
+  flex: 1 1 250px;
+  max-width: 340px;
+  color: #aaa;
+}
+.discovery-inline-search input {
+  width: 100%;
+  border: 0;
+  background: none;
+  color: white;
+  outline: none;
+  font-size: 13px;
+}
+.discovery-inline-filter {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 10px;
+  color: #999;
+}
+.discovery-inline-filter select {
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid #ffffff55;
+  border-radius: 0;
+  color: #eee;
+  font-size: 12px;
+  max-width: 130px;
+  padding: 4px 12px 4px 0;
+}
+.discovery-inline-filter option {
+  background: #19181d;
+}
+.discovery-choice {
+  position: relative;
+  font-size: 13px;
+  align-self: center;
+}
+.discovery-choice summary {
+  cursor: pointer;
+  color: #eee;
+  text-decoration: underline;
+  text-underline-offset: 5px;
+  padding: 10px 0;
+}
+.discovery-choice-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  width: 250px;
+  z-index: 20;
+  padding: 12px;
+  border: 1px solid #ffffff20;
+  border-radius: 14px;
+  background: #19181ff5;
+  box-shadow: 0 18px 40px #0009;
+}
+.discovery-choice-menu > input {
+  width: 100%;
+  padding: 8px;
+  background: #ffffff0a;
+  border: 1px solid #ffffff20;
+  border-radius: 8px;
+  color: white;
+  margin-bottom: 8px;
+}
+.discovery-choice-menu > div {
+  max-height: 280px;
+  overflow: auto;
+}
+.discovery-choice-menu label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px;
+  font-size: 12px;
+}
+.discovery-choice-menu input[type="checkbox"] {
+  accent-color: #ad79f5;
+}
+.discovery-years {
+  display: flex;
+  gap: 10px;
+}
+.discovery-years label {
+  display: block;
+  width: 50%;
+}
+.discovery-years input {
+  width: 100%;
+  background: #ffffff0a;
+  border: 1px solid #ffffff20;
+  padding: 8px;
+  color: white;
+  margin-top: 6px;
+}
+.discovery-active-filters {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-height: 30px;
+  margin-bottom: 20px;
+}
+.discovery-active-filters button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 9px;
+  border: 0;
+  border-radius: 7px;
+  background: #e9e5ee;
+  color: #16141b;
+  font-size: 11px;
+}
+.discovery-active-filters .discovery-clear {
+  background: none;
+  color: #bbb;
+}
+.discovery-refresh .discovery-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 30px 12px;
+}
+.discovery-refresh .poster-card {
+  width: auto;
+  min-width: 0;
+}
+.discovery-refresh .poster-art {
+  aspect-ratio: 2/3;
+  border-radius: 20px;
+  overflow: hidden;
+  position: relative;
+}
+.discovery-refresh .poster-open {
+  width: 100%;
+  height: 100%;
+}
+.discovery-refresh .poster-open img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.discovery-poster-caption {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 36px 10px 12px;
+  background: linear-gradient(transparent, #000e);
+  pointer-events: none;
+}
+.discovery-poster-caption strong {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 12px;
+}
+.discovery-poster-caption small {
+  display: block;
+  color: #c1bcc7;
+  font-size: 10px;
+  margin-top: 5px;
+}
+.discovery-sentinel {
+  height: 1px;
+}
+.discovery-end {
+  font-size: 12px;
+  color: #999;
+  text-align: center;
+  padding: 30px;
+}
+.discovery-refresh .poster-list-button {
+  z-index: 2;
+}
+@media (max-width: 1100px) {
+  .discovery-refresh .discovery-grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
+@media (max-width: 760px) {
+  .discovery-refresh .discovery-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 20px 10px;
+  }
+  .discovery-refresh {
+    padding-top: 20px;
+  }
+  .discovery-toolbar {
+    gap: 12px;
+  }
+  .discovery-inline-search {
+    max-width: none;
+    flex-basis: 100%;
+  }
+  .discovery-choice-menu {
+    max-width: 240px;
+  }
+}

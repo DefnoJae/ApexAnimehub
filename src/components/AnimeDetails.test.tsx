@@ -7,7 +7,11 @@ import {
   descriptionText,
   nextDetailEpisode,
 } from "./AnimeDetails";
+import { fetchEpisodeMetadata } from "../utils/episodeMetadata";
 import type { useAccounts } from "../hooks/useAccounts";
+jest.mock("../utils/episodeMetadata", () => ({
+  fetchEpisodeMetadata: jest.fn().mockResolvedValue({}),
+}));
 jest.mock("./HeroBackdrop", () => ({ HeroBackdrop: () => null }));
 jest.mock("./AnimeBadges", () => ({ AnimeBadges: () => null }));
 let node: HTMLDivElement, root: Root;
@@ -23,6 +27,7 @@ const anime: DetailAnime = {
   format: "TV",
 };
 beforeEach(() => {
+  (fetchEpisodeMetadata as jest.Mock).mockResolvedValue({});
   node = document.createElement("div");
   document.body.appendChild(node);
   root = createRoot(node);
@@ -112,4 +117,77 @@ test("continue targets the next unwatched episode, honors unfinished local histo
       "<img src=x onerror=bad()>Hello &amp; goodbye<script>bad()</script>",
     ),
   ).toBe("Hello & goodbye");
+});
+
+test("detail navigation contains only episodes, related anime and recommendations", async () => {
+  const select = jest.fn();
+  const details = {
+    ...anime,
+    relations: {
+      edges: [
+        {
+          relationType: "SEQUEL",
+          node: { id: 2, type: "ANIME", title: { english: "Sequel" } },
+        },
+      ],
+    },
+    recommendations: {
+      nodes: [
+        {
+          mediaRecommendation: {
+            id: 3,
+            type: "ANIME",
+            title: { english: "Similar anime" },
+          },
+        },
+      ],
+    },
+  };
+  const accounts = {
+    connected: { anilist: false, mal: false },
+    getListStatus: () => undefined,
+    libraryEntries: [],
+    libraryLoading: false,
+  } as unknown as ReturnType<typeof useAccounts>;
+  await act(async () =>
+    root.render(
+      <AnimeDetails
+        anime={details}
+        accounts={accounts}
+        total={12}
+        selected={1}
+        onEpisode={jest.fn()}
+        onPlay={jest.fn()}
+        onBack={jest.fn()}
+        onSelect={select}
+        onConnect={jest.fn()}
+      />,
+    ),
+  );
+  expect(
+    Array.from(node.querySelectorAll('[role="tab"]')).map((t) => t.textContent),
+  ).toEqual(["Episodes12", "Related1", "More Like This1"]);
+  act(() =>
+    (node.querySelector("#detail-tab-related") as HTMLButtonElement).click(),
+  );
+  expect(node.querySelector('[role="tabpanel"]')?.textContent).toContain(
+    "Sequel",
+  );
+  act(() =>
+    (
+      node.querySelector("#detail-tab-recommendations") as HTMLButtonElement
+    ).click(),
+  );
+  expect(node.querySelector('[role="tabpanel"]')?.textContent).toContain(
+    "Similar anime",
+  );
+  act(() =>
+    (
+      node.querySelector(
+        '[aria-label="View details: Similar anime"]',
+      ) as HTMLButtonElement
+    ).click(),
+  );
+  expect(select).toHaveBeenCalledWith(expect.objectContaining({ id: 3 }));
+  expect(node.querySelector(".detail-info")).toBeNull();
 });

@@ -7,6 +7,9 @@ test("matches local episode numbers and excludes specials and wrong anime", () =
       "2": {
         episode: "2",
         absoluteEpisodeNumber: 27,
+        overview: "Episode summary",
+        airDate: "2026-10-01",
+        runtime: 24,
         title: { en: "That Day" },
         image: "https://artworks.thetvdb.com/episode.jpg",
       },
@@ -17,6 +20,9 @@ test("matches local episode numbers and excludes specials and wrong anime", () =
   };
   expect(parseEpisodes(data, 16498)).toEqual({
     "2": {
+      overview: "Episode summary",
+      airDate: "2026-10-01",
+      runtime: 24,
       title: "That Day",
       image: "https://artworks.thetvdb.com/episode.jpg",
     },
@@ -27,15 +33,13 @@ test("matches local episode numbers and excludes specials and wrong anime", () =
 
 test("deduplicates requests and falls back to cached metadata on failure", async () => {
   const original = global.fetch;
-  const mock = jest
-    .fn()
-    .mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        mappings: { anilist_id: 90001 },
-        episodes: { "1": { title: { en: "Pilot" } } },
-      }),
-    });
+  const mock = jest.fn().mockResolvedValue({
+    ok: true,
+    json: async () => ({
+      mappings: { anilist_id: 90001 },
+      episodes: { "1": { title: { en: "Pilot" } } },
+    }),
+  });
   global.fetch = mock;
   try {
     const [a, b] = await Promise.all([
@@ -45,7 +49,7 @@ test("deduplicates requests and falls back to cached metadata on failure", async
     expect(a).toEqual(b);
     expect(mock).toHaveBeenCalledTimes(1);
     localStorage.setItem(
-      "apex_episode_metadata_v1_90002",
+      "apex_episode_metadata_v2_90002",
       JSON.stringify({ updated: 0, episodes: { "2": { title: "Cached" } } }),
     );
     mock.mockRejectedValueOnce(new Error("offline"));

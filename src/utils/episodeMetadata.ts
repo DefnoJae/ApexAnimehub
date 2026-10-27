@@ -1,6 +1,9 @@
 export interface EpisodeMetadata {
   title?: string;
   image?: string;
+  overview?: string;
+  airDate?: string;
+  runtime?: number;
 }
 type Episodes = Record<string, EpisodeMetadata>;
 const pending = new Map<number, Promise<Episodes>>();
@@ -15,7 +18,14 @@ export function parseEpisodes(data: unknown, id: number): Episodes {
     mappings?: { anilist_id?: number };
     episodes?: Record<
       string,
-      { episode?: string; title?: Record<string, unknown>; image?: unknown }
+      {
+        episode?: string;
+        title?: Record<string, unknown>;
+        image?: unknown;
+        overview?: unknown;
+        airDate?: unknown;
+        runtime?: unknown;
+      }
     >;
   };
   if (Number(payload.mappings?.anilist_id) !== id || !payload.episodes)
@@ -31,6 +41,12 @@ export function parseEpisodes(data: unknown, id: number): Episodes {
       continue;
     const image = text(episode.image);
     result[number] = {
+      overview: text(episode.overview),
+      airDate: text(episode.airDate),
+      runtime:
+        typeof episode.runtime === "number" && episode.runtime > 0
+          ? episode.runtime
+          : undefined,
       title: text(episode.title?.en) || text(episode.title?.["x-jat"]),
       image: image?.startsWith("https://") ? image : undefined,
     };
@@ -39,7 +55,7 @@ export function parseEpisodes(data: unknown, id: number): Episodes {
 }
 
 export async function fetchEpisodeMetadata(id: number): Promise<Episodes> {
-  const key = `apex_episode_metadata_v1_${id}`;
+  const key = `apex_episode_metadata_v2_${id}`;
   let cached = memory.get(id);
   if (!cached) {
     try {

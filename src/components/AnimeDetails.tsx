@@ -14,7 +14,8 @@ import { getDisplayTitle } from "../utils/schedule";
 import { DetailTitle } from "./DetailTitle";
 import { HeroBackdrop } from "./HeroBackdrop";
 import { AnimeBadges } from "./AnimeBadges";
-import { EpisodePicker } from "./EpisodePicker";
+import { DetailEpisodes } from "./DetailEpisodes";
+import { QuickList } from "./HomeDashboard";
 import { ListEntryEditor } from "./ListEntryEditor";
 import "./animeDetails.css";
 import "./watchOrder.css";
@@ -24,6 +25,13 @@ export interface DetailAnime extends DashboardAnime {
   format?: string;
   status?: string;
   genres?: string[];
+  recommendations?: {
+    nodes: Array<{
+      mediaRecommendation?:
+        | (DashboardAnime & { type?: string; isAdult?: boolean })
+        | null;
+    }>;
+  };
   studios?: { nodes: Array<{ name: string }> };
   relations?: {
     edges: Array<{
@@ -89,6 +97,9 @@ export function AnimeDetails({
   onSelect: (anime: DashboardAnime) => void;
   onConnect: () => void;
 }) {
+  const [tab, setTab] = useState<"episodes" | "related" | "recommendations">(
+    "episodes",
+  );
   const [expanded, setExpanded] = useState(false);
   const [orderId, setOrderId] = useState<number | null>(null);
   const [source, setSource] = useState<"apex" | "megaplay" | "anipm">("anipm");
@@ -119,6 +130,13 @@ export function AnimeDetails({
   const synopsis = descriptionText(anime.description);
   const related =
     anime.relations?.edges.filter((edge) => edge.node.type === "ANIME") || [];
+  const recommendations =
+    anime.recommendations?.nodes
+      .map((node) => node.mediaRecommendation)
+      .filter(
+        (node): node is DashboardAnime & { type?: string; isAdult?: boolean } =>
+          !!node && node.type === "ANIME" && !node.isAdult,
+      ) || [];
   const changeAudio = (value: "sub" | "dub") => {
     setAudio(value);
     try {
@@ -139,6 +157,9 @@ export function AnimeDetails({
   };
   return (
     <article className="anime-detail-page">
+      <div className="detail-ambient" aria-hidden="true">
+        <HeroBackdrop anime={anime} />
+      </div>
       <header className="detail-hero">
         <HeroBackdrop anime={anime} />
         <div className="detail-hero-shade" />
@@ -293,59 +314,115 @@ export function AnimeDetails({
           </Suspense>
         </div>
       )}
+      <nav
+        className="detail-section-tabs"
+        aria-label="Anime sections"
+        role="tablist"
+      >
+        {(
+          [
+            ["episodes", "Episodes", total],
+            ["related", "Related", related.length],
+            ["recommendations", "More Like This", recommendations.length],
+          ] as const
+        ).map(([value, label, count]) => (
+          <button
+            key={value}
+            id={"detail-tab-" + value}
+            role="tab"
+            aria-selected={tab === value}
+            aria-controls={"detail-panel-" + value}
+            onClick={() => setTab(value)}
+          >
+            {label}
+            <span>{count}</span>
+          </button>
+        ))}
+      </nav>
       <div className="detail-body">
         <div className="detail-primary-column">
-          <div className="detail-episodes-panel glass">
-            <div className="detail-progress-heading">
-              <span>
-                {progress} of {total} watched
-              </span>
-              <progress
-                aria-label="Watched episode progress"
-                value={progress}
-                max={total}
-              />
-              <span className="detail-watched-legend">
-                <CheckCircle2 size={14} />
-                Watched
-              </span>
-            </div>
-            <EpisodePicker
-              anime={anime}
-              total={total}
-              selected={selected}
-              entries={accounts.libraryEntries}
-              importing={accounts.libraryLoading}
-              onSelect={onEpisode}
-            />
-          </div>
-          {related.length > 0 && (
-            <section
-              className="detail-related glass"
-              aria-label="Related anime"
+          {tab === "episodes" && (
+            <div
+              role="tabpanel"
+              id="detail-panel-episodes"
+              aria-labelledby="detail-tab-episodes"
+              className="detail-episodes-panel glass"
             >
-              <h2>Related anime</h2>
-              <div className="detail-related-track">
-                {related.map((edge) => (
-                  <button
-                    key={edge.node.id + edge.relationType}
-                    onClick={() => onSelect(edge.node)}
-                  >
-                    <img
-                      loading="lazy"
-                      src={
-                        edge.node.bannerImage ||
-                        edge.node.coverImage?.extraLarge
-                      }
-                      alt=""
-                    />
-                    <span className="detail-relation-label">
-                      {edge.relationType.replace(/_/g, " ").toLowerCase()}
-                    </span>
-                    <strong>{getDisplayTitle(edge.node)}</strong>
-                  </button>
+              <div className="detail-progress-heading">
+                <span>
+                  {progress} of {total} watched
+                </span>
+                <progress
+                  aria-label="Watched episode progress"
+                  value={progress}
+                  max={total}
+                />
+                <span className="detail-watched-legend">
+                  <CheckCircle2 size={14} />
+                  Watched
+                </span>
+              </div>
+              <DetailEpisodes
+                anime={anime}
+                total={total}
+                selected={selected}
+                accounts={accounts}
+                onSelect={onEpisode}
+              />
+            </div>
+          )}
+          {tab !== "episodes" && (
+            <section
+              className="detail-catalog-panel"
+              role="tabpanel"
+              id={"detail-panel-" + tab}
+              aria-labelledby={"detail-tab-" + tab}
+            >
+              <div className="detail-poster-grid">
+                {(tab === "related"
+                  ? related.map((edge) => ({
+                      anime: edge.node,
+                      label: edge.relationType.replace(/_/g, " ").toLowerCase(),
+                    }))
+                  : recommendations.map((item) => ({
+                      anime: item,
+                      label: "Recommended",
+                    }))
+                ).map(({ anime: item, label }) => (
+                  <article className="poster-card" key={item.id}>
+                    <div className="poster-art">
+                      <button
+                        className="poster-open"
+                        onClick={() => onSelect(item)}
+                        aria-label={"View details: " + getDisplayTitle(item)}
+                      >
+                        <img
+                          loading="lazy"
+                          src={item.coverImage?.extraLarge}
+                          alt=""
+                        />
+                      </button>
+                      <QuickList anime={item} accounts={accounts} />
+                    </div>
+                    <small>{label}</small>
+                    <button
+                      className="poster-title"
+                      onClick={() => onSelect(item)}
+                    >
+                      {getDisplayTitle(item)}
+                    </button>
+                  </article>
                 ))}
               </div>
+              {!(tab === "related"
+                ? related.length
+                : recommendations.length) && (
+                <p>
+                  {tab === "related"
+                    ? "No related anime available."
+                    : "No recommendations available for this anime yet."}
+                </p>
+              )}
             </section>
           )}
         </div>
@@ -416,29 +493,6 @@ export function AnimeDetails({
                 Use MegaPlay if unavailable.
               </p>
             )}
-          </section>
-          <section className="detail-info glass" aria-label="Anime info">
-            <h2>Anime info</h2>
-            <dl>
-              <div>
-                <dt>Status</dt>
-                <dd>
-                  {anime.status?.replace(/_/g, " ").toLowerCase() || "Unknown"}
-                </dd>
-              </div>
-              <div>
-                <dt>Studio</dt>
-                <dd>
-                  {anime.studios?.nodes
-                    .map((studio) => studio.name)
-                    .join(", ") || "Unknown"}
-                </dd>
-              </div>
-              <div>
-                <dt>Format</dt>
-                <dd>{anime.format?.replace(/_/g, " ") || "Unknown"}</dd>
-              </div>
-            </dl>
           </section>
         </aside>
       </div>
