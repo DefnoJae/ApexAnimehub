@@ -578,7 +578,6 @@ export function HomeDashboard({
       return "sub";
     }
   });
-  const [logoFailed, setLogoFailed] = useState(false);
   const [validatedLogo, setValidatedLogo] = useState<string | null>(null);
   const [artwork, setArtwork] = useState<{
     id: number;
@@ -589,9 +588,8 @@ export function HomeDashboard({
     resume = history.find((item) => item.anime.id === anime?.id);
   useEffect(() => {
     let active = true;
-    setLogoFailed(false);
     setLogoIndex(0);
-    if (anime?.id && !anime.logoImage) {
+    if (anime?.id) {
       void fetchHeroArtwork(anime.id).then((logos) => {
         if (active) setArtwork({ id: anime.id, logos });
       });
@@ -601,8 +599,7 @@ export function HomeDashboard({
     };
   }, [anime?.id, anime?.logoImage]);
   const titleLogo =
-    anime?.logoImage ||
-    (artwork?.id === anime?.id ? artwork?.logos[logoIndex] : undefined);
+    artwork?.id === anime?.id ? artwork?.logos[logoIndex] : undefined;
   useEffect(() => {
     const changed = () => setPageHidden(document.hidden);
     document.addEventListener("visibilitychange", changed);
@@ -648,7 +645,7 @@ export function HomeDashboard({
           <div className="hero-copy" key={"copy-" + anime.id}>
             <h1
               className={
-                !titleLogo || validatedLogo !== titleLogo || logoFailed
+                !titleLogo || validatedLogo !== titleLogo
                   ? getDisplayTitle(anime).length > 60
                     ? "hero-long-title"
                     : undefined
@@ -660,9 +657,9 @@ export function HomeDashboard({
                 aria-label={"View anime details: " + getDisplayTitle(anime)}
                 onClick={() => onSelect(anime)}
               >
-                {(!titleLogo || validatedLogo !== titleLogo || logoFailed) &&
+                {(!titleLogo || validatedLogo !== titleLogo) &&
                   getDisplayTitle(anime)}
-                {titleLogo && !logoFailed && (
+                {titleLogo && (
                   <img
                     className="hero-logo"
                     key={titleLogo}
@@ -680,12 +677,10 @@ export function HomeDashboard({
                         )
                       )
                         setValidatedLogo(titleLogo);
-                      else if (anime.logoImage) setLogoFailed(true);
                       else setLogoIndex((index) => index + 1);
                     }}
                     onError={() => {
-                      if (anime.logoImage) setLogoFailed(true);
-                      else setLogoIndex((index) => index + 1);
+                      setLogoIndex((index) => index + 1);
                     }}
                   />
                 )}
@@ -908,6 +903,10 @@ export function HomeDashboard({
           <p>A world of stories. Your next obsession.</p>
           <small>
             Anime data from AniList · Dub timetable from AsunaTracks
+          </small>
+          <small>
+            This product uses the TMDB API but is not endorsed or certified by
+            TMDB.
           </small>
         </footer>
       </div>

@@ -1,117 +1,65 @@
 import {
   artworkLogos,
   artworkBackdrops,
-  fetchHeroBackdrops,
-  isHeroBackdrop,
-  isHeroBanner,
   fetchHeroArtwork,
+  fetchHeroBackdrops,
   isTitleTreatment,
+  isHeroBackdrop,
 } from "./heroArtwork";
-test("panoramic banner fallback accepts usable banners but rejects portrait covers and tiny art", () => {
-  expect(isHeroBanner(1920, 600)).toBe(true);
-  expect(isHeroBanner(600, 900)).toBe(false);
-  expect(isHeroBanner(480, 150)).toBe(false);
-});
-test("square and portrait covers cannot replace a hero title", () => {
-  expect(isTitleTreatment(1024, 1024)).toBe(false);
-  expect(isTitleTreatment(600, 900)).toBe(false);
-  expect(isTitleTreatment(800, 310)).toBe(true);
-  expect(isTitleTreatment(1, 0)).toBe(false);
-});
 const originalFetch = global.fetch;
-beforeEach(() => {
-  localStorage.clear();
-});
+beforeEach(() => localStorage.clear());
 afterEach(() => {
   global.fetch = originalFetch;
 });
-test("artwork requires the exact anime ID and excludes non-logo or untrusted images", () => {
-  const payload = {
-    mappings: { anilist_id: 42, imdb_id: "tt12345" },
-    images: [
-      { coverType: "Poster", url: "https://artworks.thetvdb.com/poster.png" },
-      { coverType: "Clearlogo", url: "https://untrusted.example/logo.png" },
-      { coverType: "Clearlogo", url: "https://artworks.thetvdb.com/logo.png" },
-    ],
-  };
-  expect(artworkLogos(payload, 99)).toEqual([]);
-  expect(artworkLogos(payload, 42)).toEqual([
-    "https://images.metahub.space/logo/medium/tt12345/img",
-    "https://artworks.thetvdb.com/logo.png",
-  ]);
-});
-test("artwork requests deduplicate and reuse the successful cache", async () => {
-  global.fetch = jest.fn().mockResolvedValue({
-    ok: true,
-    json: async () => ({
-      mappings: { anilist_id: 43, imdb_id: "tt12346" },
-      images: [],
-    }),
-  });
-  const [first, second] = await Promise.all([
-    fetchHeroArtwork(43),
-    fetchHeroArtwork(43),
-  ]);
-  expect(first).toEqual(second);
-  expect(first[0]).toContain("tt12346");
-  await fetchHeroArtwork(43);
-  expect(global.fetch).toHaveBeenCalledTimes(1);
-});
-test("an unavailable source uses stale validated cache without overwriting it", async () => {
-  const saved = {
-    logos: ["https://artworks.thetvdb.com/stale.png"],
-    updatedAt: Date.now() - 8 * 86400000,
-  };
-  localStorage.setItem(
-    "apex_hero_artwork_v2_44",
-    JSON.stringify({ ...saved, backdrops: [] }),
-  );
-  global.fetch = jest.fn().mockRejectedValue(new Error("Offline"));
-  expect(await fetchHeroArtwork(44)).toEqual(saved.logos);
-  expect(JSON.parse(localStorage.getItem("apex_hero_artwork_v2_44")!)).toEqual({
-    ...saved,
-    backdrops: [],
-  });
-});
-
-test("backdrops select landscape art rather than poster or thin banner categories", () => {
+test("only matching TMDB image payloads are accepted", () => {
   const data = {
-    mappings: { anilist_id: 9 },
-    images: [
-      { coverType: "Poster", url: "https://artworks.thetvdb.com/poster.jpg" },
-      { coverType: "Banner", url: "https://artworks.thetvdb.com/banner.jpg" },
-      {
-        coverType: "Fanart",
-        url: "https://artworks.thetvdb.com/background.jpg",
-      },
-      { coverType: "Fanart", url: "https://untrusted.example/image.jpg" },
+    anilistId: 42,
+    logos: [
+      "https://image.tmdb.org/t/p/original/logo.png",
+      "https://untrusted.example/logo.png",
     ],
+    backdrops: ["https://image.tmdb.org/t/p/original/backdrop.jpg"],
   };
-  expect(artworkBackdrops(data, 9)).toEqual([
-    "https://artworks.thetvdb.com/background.jpg",
-  ]);
-  expect(artworkBackdrops(data, 10)).toEqual([]);
-  expect(isHeroBackdrop(1920, 1080)).toBe(true);
-  expect(isHeroBackdrop(460, 690)).toBe(false);
-  expect(isHeroBackdrop(1920, 400)).toBe(false);
+  expect(artworkLogos(data, 42)).toEqual([data.logos[0]]);
+  expect(artworkLogos(data, 43)).toEqual([]);
+  expect(artworkBackdrops(data, 42)).toEqual(data.backdrops);
+  expect(isTitleTreatment(600, 900)).toBe(false);
+  expect(isTitleTreatment(800, 310)).toBe(true);
+  expect(isHeroBackdrop(3840, 2160)).toBe(true);
   expect(isHeroBackdrop(640, 360)).toBe(false);
 });
-
-test("logos and backdrops share one metadata fetch", async () => {
-  global.fetch = jest.fn().mockResolvedValue({
-    ok: true,
-    json: async () => ({
-      mappings: { anilist_id: 45, imdb_id: "tt45" },
-      images: [
-        { coverType: "Fanart", url: "https://artworks.thetvdb.com/hd.jpg" },
-      ],
-    }),
-  });
+test("logo and backdrop requests share server fetch and daily cache", async () => {
+  const data = {
+    anilistId: 43,
+    logos: ["https://image.tmdb.org/t/p/original/logo.png"],
+    backdrops: ["https://image.tmdb.org/t/p/original/bg.jpg"],
+  };
+  global.fetch = jest
+    .fn()
+    .mockResolvedValue({ ok: true, json: async () => data });
   const [logos, backdrops] = await Promise.all([
-    fetchHeroArtwork(45),
-    fetchHeroBackdrops(45),
+    fetchHeroArtwork(43),
+    fetchHeroBackdrops(43),
   ]);
-  expect(logos[0]).toContain("tt45");
-  expect(backdrops).toEqual(["https://artworks.thetvdb.com/hd.jpg"]);
+  expect(logos).toEqual(data.logos);
+  expect(backdrops).toEqual(data.backdrops);
+  await fetchHeroArtwork(43);
   expect(global.fetch).toHaveBeenCalledTimes(1);
+  expect(global.fetch).toHaveBeenCalledWith(
+    "/api/artwork?anilist_id=43",
+    expect.anything(),
+  );
+});
+test("provider outage preserves stale TMDB artwork", async () => {
+  const saved = {
+    logos: ["https://image.tmdb.org/t/p/original/stale.png"],
+    backdrops: [],
+    updatedAt: Date.now() - 2 * 86400000,
+  };
+  localStorage.setItem("apex_tmdb_artwork_v1_44", JSON.stringify(saved));
+  global.fetch = jest.fn().mockRejectedValue(new Error("Offline"));
+  expect(await fetchHeroArtwork(44)).toEqual(saved.logos);
+  expect(JSON.parse(localStorage.getItem("apex_tmdb_artwork_v1_44")!)).toEqual(
+    saved,
+  );
 });

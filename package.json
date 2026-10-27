@@ -28,7 +28,7 @@
     "eject": "react-scripts eject",
     "oauth-server": "node server/oauth.cjs",
     "test:ci": "react-scripts test --watchAll=false --runInBand",
-    "test:server": "node --test server/oauth.test.cjs server/vercel.test.cjs server/playback.test.cjs",
+    "test:server": "node --test server/oauth.test.cjs server/vercel.test.cjs server/playback.test.cjs server/artwork.test.cjs",
     "typecheck": "tsc --noEmit"
   },
   "browserslist": {

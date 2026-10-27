@@ -11,6 +11,7 @@ import type { DashboardAnime, WatchEntry } from "./HomeDashboard";
 import type { ListStatus, useAccounts } from "../hooks/useAccounts";
 import { sameAnime } from "../hooks/useLibrary";
 import { getDisplayTitle } from "../utils/schedule";
+import { DetailTitle } from "./DetailTitle";
 import { HeroBackdrop } from "./HeroBackdrop";
 import { AnimeBadges } from "./AnimeBadges";
 import { EpisodePicker } from "./EpisodePicker";
@@ -152,7 +153,7 @@ export function AnimeDetails({
               alt={getDisplayTitle(anime) + " poster"}
             />
             <div className="detail-intro">
-              <h1>{getDisplayTitle(anime)}</h1>
+              <DetailTitle id={anime.id} title={getDisplayTitle(anime)} />
               <div className="detail-metadata">
                 <span>{anime.seasonYear || "Year TBA"}</span>
                 <span>{anime.format?.replace(/_/g, " ") || "Anime"}</span>

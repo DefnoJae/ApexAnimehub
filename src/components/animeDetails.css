@@ -699,3 +699,14 @@
   outline: 2px solid #bd90ff;
   outline-offset: 3px;
 }
+
+.detail-title-logo {
+  width: auto;
+  height: auto;
+  max-width: min(100%, 520px);
+  max-height: 170px;
+  object-fit: contain;
+  object-position: left center;
+  margin: 4px 0 20px;
+  filter: drop-shadow(0 2px 8px #0008);
+}
