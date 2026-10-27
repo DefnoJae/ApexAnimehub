@@ -101,7 +101,7 @@ export function FloatingNavigation({
           onView("all");
         }}
       >
-        A<span>✦</span>
+        <img src="/apex-logo.png" alt="" width="38" height="38" />
       </a>
       <span className="nav-divider" />
       {[

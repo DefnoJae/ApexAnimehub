@@ -89,6 +89,10 @@ input:focus-visible {
   pointer-events: auto;
 }
 .apex-brand {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
   font-size: 25px;
   font-weight: 950;
   font-style: italic;
@@ -97,12 +101,11 @@ input:focus-visible {
   padding: 0 12px;
   position: relative;
 }
-.apex-brand span {
-  font-size: 12px;
-  color: var(--apex-accent);
-  position: absolute;
-  right: 3px;
-  top: 0;
+.apex-brand img {
+  display: block;
+  width: 38px;
+  height: 38px;
+  object-fit: contain;
 }
 .nav-divider {
   height: 20px;
