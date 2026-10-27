@@ -7,8 +7,9 @@ export interface PlayerProps {
   canNext: boolean;
   onPrevious: () => void;
   onNext: () => void;
-  onWatched: () => void;
-  onProgress?: (position: number, duration: number) => void;
+  onWatched: (episode?: number) => void;
+  onProgress?: (position: number, duration: number, episode?: number) => void;
+  onEpisodeChange?: (episode: number, lang: "sub" | "dub") => void;
   onClose: () => void;
   accounts: ReturnType<typeof useAccounts>;
 }
@@ -30,9 +31,19 @@ export function trustedPlaybackMessage(
   }
 }
 const NativeVideoPlayer = React.lazy(() => import("./NativeVideoPlayer"));
+const AniPmPlayer = React.lazy(() => import("./AniPmPlayer"));
 export function VideoPlayer(props: PlayerProps) {
   const [fallback, setFallback] = useState(false);
   useEffect(() => setFallback(false), [props.stream.url]);
+  if (
+    new URL(props.stream.url, window.location.origin).origin ===
+    "https://ani.pm"
+  )
+    return (
+      <React.Suspense fallback={<p role="status">Loading Ani.pm player…</p>}>
+        <AniPmPlayer {...props} />
+      </React.Suspense>
+    );
   const native = props.stream.url.startsWith("/api/playback?");
   if (native && !fallback)
     return (

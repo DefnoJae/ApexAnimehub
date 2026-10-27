@@ -73,14 +73,14 @@ export function AnimeDetails({
   onPlay: (
     episode: number,
     audio: "sub" | "dub",
-    source?: "apex" | "megaplay",
+    source?: "apex" | "megaplay" | "anipm",
   ) => void;
   onBack: () => void;
   onSelect: (anime: DashboardAnime) => void;
   onConnect: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
-  const [source, setSource] = useState<"apex" | "megaplay">("megaplay");
+  const [source, setSource] = useState<"apex" | "megaplay" | "anipm">("anipm");
   const [audio, setAudio] = useState<"sub" | "dub">(() => {
     try {
       return localStorage.getItem("apex_episode_language") === "dub"
@@ -195,7 +195,9 @@ export function AnimeDetails({
                     onPlay(
                       continueEpisode,
                       audio,
-                      audio === "dub" ? "megaplay" : source,
+                      audio === "dub" && source === "apex"
+                        ? "megaplay"
+                        : source,
                     )
                   }
                 >
@@ -334,11 +336,14 @@ export function AnimeDetails({
               Source
               <select
                 aria-label="Playback source"
-                value={audio === "dub" ? "megaplay" : source}
+                value={
+                  audio === "dub" && source === "apex" ? "megaplay" : source
+                }
                 onChange={(e) =>
-                  setSource(e.target.value as "apex" | "megaplay")
+                  setSource(e.target.value as "apex" | "megaplay" | "anipm")
                 }
               >
+                <option value="anipm">Ani.pm (Sub &amp; Dub)</option>
                 {audio === "sub" && (
                   <option value="apex">
                     Apex Player · AnimeParadise (Sub)
@@ -350,13 +355,23 @@ export function AnimeDetails({
             <button
               className="detail-play"
               onClick={() =>
-                onPlay(selected, audio, audio === "dub" ? "megaplay" : source)
+                onPlay(
+                  selected,
+                  audio,
+                  audio === "dub" && source === "apex" ? "megaplay" : source,
+                )
               }
             >
               <Play size={17} fill="currentColor" />
               Play Episode {selected}
             </button>
             <p>Stream availability is checked by the player.</p>
+            {source === "anipm" && (
+              <p>
+                Ani.pm includes captions and episode controls. The provider may
+                open an ad tab once every five minutes.
+              </p>
+            )}
             {source === "apex" && audio === "sub" && (
               <p>
                 Sub only. Includes subtitles and next/previous episode controls.

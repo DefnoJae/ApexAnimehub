@@ -6,6 +6,7 @@ import {
   WatchEntry,
 } from "./components/HomeDashboard";
 import { fetchAnilist } from "./utils/anilist";
+import { aniPmUrl } from "./utils/anipm";
 import { getDisplayTitle } from "./utils/schedule";
 import { DubScheduleView } from "./components/DubScheduleView";
 
@@ -43,14 +44,14 @@ export default function App() {
   const [playingStream, setPlayingStream] = useState<any>(null);
 
   const [watchHistory, setWatchHistory] = useState<WatchEntry[]>([]);
-  const markWatched = (automatic: boolean) => {
+  const markWatched = (automatic: boolean, episode = activeEpisode) => {
     if (!selectedAnime) return Promise.resolve([]);
     const completed =
-      !!selectedAnime.episodes && activeEpisode >= selectedAnime.episodes;
+      !!selectedAnime.episodes && episode >= selectedAnime.episodes;
     return accounts.sync(
       selectedAnime,
       completed ? "completed" : "watching",
-      activeEpisode,
+      episode,
       automatic,
     );
   };
@@ -302,8 +303,9 @@ export default function App() {
       const isDub = startStream.includes("Dub");
       setPlayingStream({
         name: startStream,
-        url:
-          startStream === "Apex Player (Sub)"
+        url: startStream.startsWith("Ani.pm")
+          ? aniPmUrl(anime.id, startEpisode, isDub ? "dub" : "sub")
+          : startStream === "Apex Player (Sub)"
             ? `/api/playback?id=${anime.id}&episode=${startEpisode}`
             : `https://megaplay.buzz/stream/ani/${anime.id}/${startEpisode}/${isDub ? "dub" : "sub"}?color=${THEME_COLOR}`,
         isEmbed: true,
@@ -347,16 +349,18 @@ export default function App() {
     resolveStreams(selectedAnime, newEp);
 
     const isDub = playingStream?.name?.includes("Dub");
-    const streamName =
-      playingStream?.name === "Apex Player (Sub)"
+    const streamName = playingStream?.name?.startsWith("Ani.pm")
+      ? playingStream.name
+      : playingStream?.name === "Apex Player (Sub)"
         ? "Apex Player (Sub)"
         : isDub
           ? "MegaPlay (Dub)"
           : "MegaPlay (Sub)";
     setPlayingStream({
       name: streamName,
-      url:
-        streamName === "Apex Player (Sub)"
+      url: streamName.startsWith("Ani.pm")
+        ? aniPmUrl(selectedAnime.id, newEp, isDub ? "dub" : "sub")
+        : streamName === "Apex Player (Sub)"
           ? `/api/playback?id=${selectedAnime.id}&episode=${newEp}`
           : `https://megaplay.buzz/stream/ani/${selectedAnime.id}/${newEp}/${isDub ? "dub" : "sub"}?color=${THEME_COLOR}`,
       isEmbed: true,
@@ -376,11 +380,15 @@ export default function App() {
   const canNextEpisode =
     availableEpisodes == null || activeEpisode < availableEpisodes;
 
-  const recordProgress = (position: number, duration: number) => {
+  const recordProgress = (
+    position: number,
+    duration: number,
+    episode = activeEpisode,
+  ) => {
     if (!selectedAnime || !playingStream) return;
     setWatchHistory((previous) => {
       const next = previous.map((item) =>
-        item.anime.id === selectedAnime.id && item.episode === activeEpisode
+        item.anime.id === selectedAnime.id && item.episode === episode
           ? { ...item, position, duration }
           : item,
       );
@@ -419,7 +427,19 @@ export default function App() {
           canNext={canNextEpisode}
           onPrevious={() => changeEpisode("prev")}
           onNext={() => changeEpisode("next")}
-          onWatched={() => void markWatched(true)}
+          onWatched={(episode) => void markWatched(true, episode)}
+          onEpisodeChange={(episode, lang) => {
+            if (!selectedAnime || !Number.isSafeInteger(episode) || episode < 1)
+              return;
+            const name = `Ani.pm (${lang === "dub" ? "Dub" : "Sub"})`;
+            setActiveEpisode(episode);
+            setPlayingStream({
+              name,
+              url: aniPmUrl(selectedAnime.id, episode, lang),
+              isEmbed: true,
+            });
+            updateHistory(selectedAnime, episode, name);
+          }}
           onClose={() => setPlayingStream(null)}
           onProgress={recordProgress}
           accounts={accounts}
@@ -557,6 +577,16 @@ export default function App() {
               }}
               onPlay={(episode, audio, source) => {
                 setActiveEpisode(episode);
+                if (source === "anipm") {
+                  const stream = {
+                    name: `Ani.pm (${audio === "dub" ? "Dub" : "Sub"})`,
+                    url: aniPmUrl(selectedAnime.id, episode, audio),
+                    isEmbed: true,
+                  };
+                  setPlayingStream(stream);
+                  updateHistory(selectedAnime, episode, stream.name);
+                  return;
+                }
                 if (source === "apex" && audio === "sub") {
                   const stream = {
                     name: "Apex Player (Sub)",
