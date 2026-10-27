@@ -39,7 +39,11 @@ export default function AniPmPlayer(props: PlayerProps) {
     void loadAniPmSdk()
       .then(() => {
         if (!active || !host.current) return;
-        const player = new window.AniPM.Player(host.current, {
+        // Configure permissions while detached: changing allow after navigation
+        // does not revoke the policy already inherited by nested documents.
+        const mount = document.createElement("div");
+        mount.style.height = "100%";
+        const player = new window.AniPM.Player(mount, {
           anime: id,
           episode,
           lang,
@@ -60,6 +64,7 @@ export default function AniPmPlayer(props: PlayerProps) {
           .filter((permission) => !permission.trim().startsWith("fullscreen"))
           .concat("fullscreen 'none'")
           .join(";");
+        host.current.replaceChildren(mount);
         const stateChanged = (state: PlayerState) => {
           if (active && validAniPmState(state, id))
             callbacks.current.onEpisodeChange?.(state.episode, state.lang);
