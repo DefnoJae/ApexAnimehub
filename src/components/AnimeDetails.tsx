@@ -1,5 +1,12 @@
-import React, { useState } from "react";
-import { ArrowLeft, Bookmark, CheckCircle2, Play, Star } from "lucide-react";
+import React, { lazy, Suspense, useState } from "react";
+import {
+  ArrowLeft,
+  Bookmark,
+  CheckCircle2,
+  ListOrdered,
+  Play,
+  Star,
+} from "lucide-react";
 import type { DashboardAnime, WatchEntry } from "./HomeDashboard";
 import type { ListStatus, useAccounts } from "../hooks/useAccounts";
 import { sameAnime } from "../hooks/useLibrary";
@@ -9,6 +16,8 @@ import { AnimeBadges } from "./AnimeBadges";
 import { EpisodePicker } from "./EpisodePicker";
 import { ListEntryEditor } from "./ListEntryEditor";
 import "./animeDetails.css";
+import "./watchOrder.css";
+const WatchOrder = lazy(() => import("./WatchOrder"));
 export interface DetailAnime extends DashboardAnime {
   seasonYear?: number;
   format?: string;
@@ -80,6 +89,7 @@ export function AnimeDetails({
   onConnect: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const [orderId, setOrderId] = useState<number | null>(null);
   const [source, setSource] = useState<"apex" | "megaplay" | "anipm">("anipm");
   const [audio, setAudio] = useState<"sub" | "dub">(() => {
     try {
@@ -225,6 +235,20 @@ export function AnimeDetails({
                     ))}
                   </select>
                 </label>
+                <button
+                  className="detail-watch-order-toggle"
+                  aria-label="Watch Order"
+                  title="Watch Order"
+                  aria-expanded={orderId === anime.id}
+                  aria-controls="anime-watch-order"
+                  onClick={() =>
+                    setOrderId((value) =>
+                      value === anime.id ? null : anime.id,
+                    )
+                  }
+                >
+                  <ListOrdered size={21} aria-hidden="true" />
+                </button>
               </div>
               <div className="detail-account-status">
                 {(["anilist", "mal"] as const).map((provider) => {
@@ -255,6 +279,19 @@ export function AnimeDetails({
           </div>
         </div>
       </header>
+      {orderId === anime.id && (
+        <div className="detail-watch-order-wrap">
+          <Suspense fallback={<p role="status">Loading Watch Order…</p>}>
+            <WatchOrder
+              key={anime.id}
+              anime={anime}
+              accounts={accounts}
+              onSelect={onSelect}
+              onClose={() => setOrderId(null)}
+            />
+          </Suspense>
+        </div>
+      )}
       <div className="detail-body">
         <div className="detail-primary-column">
           <div className="detail-episodes-panel glass">

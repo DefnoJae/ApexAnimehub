@@ -1,0 +1,231 @@
+.detail-watch-order-wrap {
+  max-width: 1700px;
+  margin: 0 auto 22px;
+  padding: 0 clamp(24px, 4vw, 70px);
+}
+.detail-watch-order-toggle {
+  width: 44px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #ffffff20;
+  border-radius: 11px;
+  background: #29272b9c;
+  color: #e7e2ed;
+}
+.detail-watch-order-toggle:hover,
+.detail-watch-order-toggle[aria-expanded="true"] {
+  background: #8b5ac52e;
+  border-color: #b58aff88;
+  color: #d8bbff;
+}
+.watch-order {
+  border: 1px solid #ffffff23;
+  border-radius: 18px;
+  overflow: hidden;
+  background: #15121ec2;
+}
+.watch-order-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 20px 22px 12px;
+}
+.watch-order-heading h2 {
+  font-size: 24px;
+  font-weight: 900;
+  font-style: italic;
+  margin: 0;
+}
+.watch-order-heading p,
+.watch-order footer {
+  color: #aaa1b9;
+  font-size: 12px;
+}
+.watch-order-heading p {
+  margin: 3px 0 0;
+}
+.watch-order-tools {
+  display: flex;
+  gap: 7px;
+  flex-shrink: 0;
+}
+.watch-order-tools button,
+.watch-order-state button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-width: 34px;
+  height: 34px;
+  border: 1px solid #ffffff24;
+  border-radius: 9px;
+  background: #ffffff06;
+  color: #e2d8ed;
+  padding: 7px;
+}
+.watch-order button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.watch-order button:focus-visible,
+.detail-watch-order-toggle:focus-visible,
+.watch-order-viewport:focus-visible {
+  outline: 2px solid #c49cff;
+  outline-offset: 3px;
+}
+.watch-order-viewport {
+  overflow: auto;
+  max-height: 500px;
+  cursor: grab;
+  touch-action: pan-x pan-y;
+}
+.watch-order-viewport:active {
+  cursor: grabbing;
+}
+.watch-order-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: top left;
+}
+.watch-order-lines {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.watch-order-lines text {
+  font-size: 10px;
+  fill: #c5a6e7;
+  paint-order: stroke;
+  stroke: #16121e;
+  stroke-width: 4px;
+  stroke-linejoin: round;
+}
+.order-side-edge polyline {
+  stroke-dasharray: 5 4;
+  opacity: 0.7;
+}
+.watch-order-node {
+  position: absolute;
+  display: flex;
+  text-align: left;
+  align-items: stretch;
+  gap: 12px;
+  border: 1px solid #ffffff2b;
+  border-radius: 12px;
+  padding: 10px;
+  background: #19161fef;
+  color: #f1ecf7;
+  cursor: pointer;
+}
+.watch-order-node:hover {
+  border-color: #b58aff;
+  background: #251d32;
+}
+.watch-order-node.is-current {
+  border-color: #b58aff;
+  box-shadow: 0 0 0 1px #b58aff35;
+}
+.watch-order-node img,
+.watch-order-poster-placeholder {
+  width: 58px;
+  min-width: 58px;
+  height: 90px;
+  border-radius: 6px;
+  object-fit: cover;
+  background: #302739;
+}
+.watch-order-node-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  flex: 1;
+}
+.watch-order-node strong {
+  font-size: 12px;
+  font-weight: 750;
+  line-height: 1.25;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.watch-order-node small {
+  font-size: 10px;
+  color: #aaa1b9;
+}
+.watch-order-current {
+  font-size: 8px;
+  color: #dfc7ff;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  background: #8d4fc755;
+  border-radius: 4px;
+  padding: 2px 5px;
+  width: fit-content;
+}
+.watch-order-completed,
+.watch-order-progress,
+.watch-order-unsaved {
+  font-size: 10px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: auto;
+  color: #c9b6e3;
+}
+.watch-order-completed {
+  color: #8dd8b4;
+}
+.watch-order-unsaved {
+  color: #8d8499;
+}
+.watch-order footer {
+  padding: 12px 22px 16px;
+  line-height: 1.6;
+}
+.watch-order footer span {
+  display: block;
+  font-size: 11px;
+  color: #92879f;
+}
+.watch-order-state {
+  padding: 24px;
+  color: #bbb0c8;
+  font-size: 13px;
+}
+.watch-order-warning {
+  padding: 5px 22px;
+  font-size: 12px;
+  color: #e1bd7a;
+}
+.watch-order-warning button {
+  text-decoration: underline;
+  margin-left: 6px;
+}
+@media (max-width: 600px) {
+  .watch-order-heading {
+    align-items: flex-start;
+    padding: 16px 14px 8px;
+  }
+  .watch-order-heading h2 {
+    font-size: 21px;
+  }
+  .watch-order-tools {
+    gap: 4px;
+  }
+  .watch-order-tools span {
+    display: none;
+  }
+  .watch-order footer {
+    padding: 10px 14px;
+  }
+  .watch-order-heading p {
+    max-width: 160px;
+    font-size: 11px;
+  }
+}
