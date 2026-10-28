@@ -37,7 +37,12 @@ test("deduplicates requests and falls back to cached metadata on failure", async
     ok: true,
     json: async () => ({
       mappings: { anilist_id: 90001 },
-      episodes: { "1": { title: { en: "Pilot" } } },
+      episodes: {
+        "1": {
+          title: { en: "Pilot" },
+          image: "https://artworks.thetvdb.com/pilot.jpg",
+        },
+      },
     }),
   });
   global.fetch = mock;
@@ -49,13 +54,51 @@ test("deduplicates requests and falls back to cached metadata on failure", async
     expect(a).toEqual(b);
     expect(mock).toHaveBeenCalledTimes(1);
     localStorage.setItem(
-      "apex_episode_metadata_v2_90002",
+      "apex_episode_metadata_v3_90002",
       JSON.stringify({ updated: 0, episodes: { "2": { title: "Cached" } } }),
     );
     mock.mockRejectedValueOnce(new Error("offline"));
     expect(await fetchEpisodeMetadata(90002)).toEqual({
       "2": { title: "Cached" },
     });
+  } finally {
+    global.fetch = original;
+    localStorage.clear();
+  }
+});
+
+test("uses verified TMDB episode stills when the primary source has no episodes", async () => {
+  const original = global.fetch;
+  global.fetch = jest
+    .fn()
+    .mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ mappings: { anilist_id: 199446 }, episodes: {} }),
+    })
+    .mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        anilistId: 199446,
+        episodes: {
+          "1": {
+            title: "Actual episode",
+            image: "https://image.tmdb.org/t/p/w780/real.jpg",
+            overview: "Real synopsis",
+            airDate: "2026-01-06",
+          },
+        },
+      }),
+    });
+  try {
+    const result = await fetchEpisodeMetadata(199446);
+    expect(result["1"]).toMatchObject({
+      title: "Actual episode",
+      image: "https://image.tmdb.org/t/p/w780/real.jpg",
+    });
+    expect(global.fetch).toHaveBeenLastCalledWith(
+      "/api/episode-metadata?anilist_id=199446",
+      expect.anything(),
+    );
   } finally {
     global.fetch = original;
     localStorage.clear();

@@ -55,7 +55,7 @@ export function parseEpisodes(data: unknown, id: number): Episodes {
 }
 
 export async function fetchEpisodeMetadata(id: number): Promise<Episodes> {
-  const key = `apex_episode_metadata_v2_${id}`;
+  const key = `apex_episode_metadata_v3_${id}`;
   let cached = memory.get(id);
   if (!cached) {
     try {
@@ -69,19 +69,67 @@ export async function fetchEpisodeMetadata(id: number): Promise<Episodes> {
         cached = saved;
     } catch {}
   }
-  if (cached && Date.now() - cached.updated < DAY) return cached.episodes;
+  if (
+    cached &&
+    Date.now() - cached.updated <
+      (Object.values(cached.episodes).some((e) => e.image) ? DAY : 60000)
+  )
+    return cached.episodes;
   const existing = pending.get(id);
   if (existing) return existing;
   const request = (async () => {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 5000);
+    const timer = setTimeout(() => controller.abort(), 25000);
     try {
-      const response = await fetch(
-        `https://api.ani.zip/mappings?anilist_id=${id}`,
-        { signal: controller.signal, credentials: "omit" },
-      );
-      if (!response.ok) throw new Error("Episode metadata unavailable");
-      const episodes = parseEpisodes(await response.json(), id);
+      let episodes: Episodes = {};
+      try {
+        const response = await fetch(
+          `https://api.ani.zip/mappings?anilist_id=${id}`,
+          { signal: controller.signal, credentials: "omit" },
+        );
+        if (response.ok) episodes = parseEpisodes(await response.json(), id);
+      } catch {}
+      if (
+        !Object.keys(episodes).length ||
+        Object.values(episodes).some((episode) => !episode.image)
+      ) {
+        try {
+          const fallback = await fetch(
+            `/api/episode-metadata?anilist_id=${id}`,
+            { signal: controller.signal, credentials: "omit" },
+          );
+          const data = await fallback.json();
+          if (
+            fallback.ok &&
+            data.anilistId === id &&
+            data.episodes &&
+            typeof data.episodes === "object"
+          ) {
+            for (const [number, raw] of Object.entries(data.episodes)) {
+              if (!/^[1-9]\d*$/.test(number) || !raw || typeof raw !== "object")
+                continue;
+              const item = raw as EpisodeMetadata;
+              const previous = episodes[number];
+              episodes[number] = {
+                title: previous?.title || text(item.title),
+                overview: previous?.overview || text(item.overview),
+                airDate: previous?.airDate || text(item.airDate),
+                runtime:
+                  previous?.runtime ||
+                  (typeof item.runtime === "number" ? item.runtime : undefined),
+                image:
+                  previous?.image ||
+                  (typeof item.image === "string" &&
+                  /^https:\/\/image\.tmdb\.org\/t\/p\/w780\/[A-Za-z0-9_.-]+$/.test(
+                    item.image,
+                  )
+                    ? item.image
+                    : undefined),
+              };
+            }
+          }
+        } catch {}
+      }
       if (!Object.keys(episodes).length) throw new Error("No matched episodes");
       const entry = { updated: Date.now(), episodes };
       memory.set(id, entry);
