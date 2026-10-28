@@ -67,6 +67,7 @@ test("compact detail controls preserve imported watched state and selected audio
       />,
     ),
   );
+  expect(node.querySelector(".detail-full-title")?.textContent).toBe("Example");
   expect(node.querySelectorAll(".is-watched")).toHaveLength(4);
   expect(node.textContent).toContain("Continue Episode 5");
   expect(node.textContent).not.toContain("MAL synced");

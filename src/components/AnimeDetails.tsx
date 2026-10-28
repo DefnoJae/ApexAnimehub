@@ -161,6 +161,7 @@ export function AnimeDetails({
         <HeroBackdrop anime={anime} />
       </div>
       <header className="detail-hero">
+        <div className="detail-header-art" aria-hidden="true"><HeroBackdrop anime={anime}/><div className="detail-hero-shade"/></div>
         <div className="detail-hero-content">
           <button className="detail-back" onClick={onBack}>
             <ArrowLeft size={18} /> Back
@@ -172,6 +173,7 @@ export function AnimeDetails({
               alt={getDisplayTitle(anime) + " poster"}
             />
             <div className="detail-intro">
+              <p className="detail-full-title">{getDisplayTitle(anime)}</p>
               <DetailTitle id={anime.id} title={getDisplayTitle(anime)} />
               <div className="detail-metadata">
                 <span>{anime.seasonYear || "Year TBA"}</span>

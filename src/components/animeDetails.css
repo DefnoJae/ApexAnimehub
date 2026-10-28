@@ -967,35 +967,14 @@
   mask-image: linear-gradient(#000 0%, #000 50%, transparent 100%);
 }
 
-/* A single continuous image sits behind both header and content. The blur is
-   masked progressively, so no separately cropped header can create a seam. */
-.detail-ambient {
-  height: 1200px;
-  mask-image: linear-gradient(#000 0%, #000 65%, transparent 100%);
-}
-.detail-ambient .hero-backdrop {
-  filter: none;
-  transform: none;
-  object-position: center 25%;
-}
-.detail-ambient::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  backdrop-filter: blur(36px);
-  -webkit-backdrop-filter: blur(36px);
-  mask-image: linear-gradient(transparent 12%, #000 58%);
-  pointer-events: none;
-}
-.detail-ambient::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background:
-    linear-gradient(90deg, #08070bc9 0%, #08070b75 46%, #08070b25 85%),
-    linear-gradient(0deg, #000 0%, #0009 25%, transparent 75%);
-  pointer-events: none;
-}
+/* Preserve the original header crop; soften only its lower join. */
+.detail-ambient {height:1400px;mask-image:linear-gradient(#000 0%,#000b 30%,transparent 90%)}
+.detail-ambient .hero-backdrop {filter:blur(32px) brightness(.45);transform:none;object-position:center 38%}
+.detail-header-art {position:absolute;inset:0;z-index:-1;mask-image:linear-gradient(#000 0%,#000 calc(100% - 64px),transparent 100%)}
+.detail-header-art::after {content:"";position:absolute;left:0;right:0;bottom:0;height:72px;backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);mask-image:linear-gradient(transparent,#000);pointer-events:none}
+.detail-hero .hero-artwork {mask-image:none}
+.detail-intro {position:relative}
+.detail-full-title {position:absolute;left:0;top:-38px;margin:0;white-space:nowrap;overflow:visible;font-family:"Nunito",sans-serif;font-weight:700;font-style:normal;font-size:19px;line-height:26px;letter-spacing:0;color:#f5f1fa;z-index:1}
 .detail-title-placeholder {
   display: block;
   width: min(440px, 100%);
