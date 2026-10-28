@@ -471,6 +471,7 @@ export default function App() {
   return (
     <div className="apex-shell">
       <FloatingNavigation
+        accounts={accounts}
         notificationFeed={accounts.notificationFeed}
         view={view}
         hidden={navHidden}

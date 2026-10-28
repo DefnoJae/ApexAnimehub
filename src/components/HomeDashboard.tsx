@@ -25,6 +25,7 @@ import {
 } from "../utils/weeklyReleases";
 import { getDisplayTitle } from "../utils/schedule";
 import type { ListAnime, ListStatus, useAccounts } from "../hooks/useAccounts";
+import { FollowingStories } from "./FollowingStories";
 import { NotificationBell } from "./NotificationBell";
 import { HeroBackdrop } from "./HeroBackdrop";
 import "./dashboard.css";
@@ -84,6 +85,7 @@ export function FloatingNavigation({
   onSettings,
   hidden,
   notificationFeed,
+  accounts,
 }: {
   view: string;
   onView: (view: string) => void;
@@ -91,6 +93,7 @@ export function FloatingNavigation({
   onSettings: () => void;
   hidden: boolean;
   notificationFeed?: Accounts["notificationFeed"];
+  accounts?: Accounts;
 }) {
   return (
     <nav
@@ -160,6 +163,14 @@ export function FloatingNavigation({
         <Settings size={20} />
         <span className="nav-tooltip">Settings</span>
       </button>
+      {accounts && (
+        <FollowingStories
+          identity={accounts.lists?.anilist?.identity}
+          connected={accounts.connected.anilist}
+          checking={accounts.checking}
+          onConnect={onSettings}
+        />
+      )}
     </nav>
   );
 }
