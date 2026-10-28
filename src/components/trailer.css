@@ -1,0 +1,154 @@
+.detail-trailer-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 34px;
+  flex-shrink: 0;
+  border-radius: 10px;
+  border: 1px solid #ffffff28;
+  background: #211b343d;
+  color: #d6c5ec;
+  transition:
+    background 0.2s,
+    border-color 0.2s;
+}
+.detail-trailer-button:hover,
+.detail-trailer-button:focus-visible {
+  background: #a878f229;
+  border-color: #c29bf070;
+  outline: 2px solid transparent;
+}
+.trailer-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 650;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: #05060bb3;
+  backdrop-filter: blur(9px);
+  animation: trailer-fade-in 0.25s ease;
+  transition: opacity 0.2s ease;
+}
+.trailer-dialog {
+  width: min(800px, 100%);
+  max-height: calc(100dvh - 40px);
+  overflow: auto;
+  border: 1px solid #ffffff22;
+  border-radius: 20px;
+  background: #16171fe8;
+  box-shadow: 0 20px 90px #0009;
+  padding: 20px;
+  color: #f3eff8;
+  font-family: "Nunito", sans-serif;
+  animation: trailer-panel-in 0.25s ease;
+  transition: transform 0.2s ease;
+}
+.trailer-dialog > header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.trailer-dialog > header > div {
+  min-width: 0;
+  flex: 1;
+}
+.trailer-dialog h2 {
+  font-size: 17px;
+  font-weight: 800;
+  margin: 0 0 3px;
+}
+.trailer-dialog p {
+  font-size: 12px;
+  line-height: 1.4;
+  color: #ada8b9;
+  margin: 0;
+}
+.trailer-dialog > header > button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  background: none;
+  color: #b6afc3;
+  border: 0;
+  border-radius: 9px;
+}
+.trailer-dialog > header > button:hover,
+.trailer-dialog > header > button:focus-visible {
+  background: #ffffff10;
+  color: white;
+  outline: 2px solid #b69adc66;
+}
+.trailer-video {
+  position: relative;
+  aspect-ratio: 16/9;
+  background: #000;
+  border-radius: 12px;
+  overflow: hidden;
+}
+.trailer-video iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  display: block;
+}
+.trailer-overlay.is-closing {
+  opacity: 0;
+  pointer-events: none;
+  animation: none;
+}
+.trailer-overlay.is-closing .trailer-dialog {
+  transform: translateY(8px) scale(0.98);
+  animation: none;
+}
+@keyframes trailer-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes trailer-panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (max-width: 600px) {
+  .trailer-overlay {
+    padding: 12px;
+  }
+  .trailer-dialog {
+    padding: 12px;
+    border-radius: 16px;
+  }
+  .trailer-dialog > header {
+    gap: 9px;
+    margin-bottom: 12px;
+  }
+  .trailer-dialog h2 {
+    font-size: 15px;
+  }
+  .trailer-dialog p {
+    font-size: 11px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .trailer-overlay,
+  .trailer-dialog,
+  .detail-trailer-button {
+    animation: none !important;
+    transition: none !important;
+  }
+}

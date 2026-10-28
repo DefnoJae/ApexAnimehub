@@ -25,10 +25,12 @@ export function ListEntryEditor({
   anime,
   accounts,
   onConnect,
+  afterEdit,
 }: {
   anime: ListAnime;
   accounts: Accounts;
   onConnect: () => void;
+  afterEdit?: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
   const trigger = useRef<HTMLButtonElement>(null);
@@ -56,6 +58,7 @@ export function ListEntryEditor({
         </span>
         <Pencil size={15} />
       </button>
+      {afterEdit}
       {entries.some((entry) => (entry.score || 0) > 0) && (
         <span className="detail-personal-score">
           {commonWholeRating(entries.map((entry) => entry.score || 0))

@@ -12,6 +12,7 @@ import type { ListStatus, useAccounts } from "../hooks/useAccounts";
 import { sameAnime } from "../hooks/useLibrary";
 import { getDisplayTitle } from "../utils/schedule";
 import { FriendsActivityDock } from "./FriendsActivityDock";
+import { TrailerButton } from "./TrailerButton";
 import { DetailTitle } from "./DetailTitle";
 import { HeroBackdrop } from "./HeroBackdrop";
 import { AnimeBadges } from "./AnimeBadges";
@@ -22,6 +23,7 @@ import "./animeDetails.css";
 import "./watchOrder.css";
 const WatchOrder = lazy(() => import("./WatchOrder"));
 export interface DetailAnime extends DashboardAnime {
+  trailer?: { id?: string | null; site?: string | null } | null;
   seasonYear?: number;
   format?: string;
   status?: string;
@@ -211,6 +213,12 @@ export function AnimeDetails({
                   anime={anime}
                   accounts={accounts}
                   onConnect={onConnect}
+                  afterEdit={
+                    <TrailerButton
+                      trailer={anime.trailer}
+                      title={getDisplayTitle(anime)}
+                    />
+                  }
                 />
               </div>
               <div className="detail-synopsis">
