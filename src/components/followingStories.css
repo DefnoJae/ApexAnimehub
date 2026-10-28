@@ -13,7 +13,7 @@
   cursor: pointer;
   transition: filter 0.25s;
 }
-.following-stories-trigger svg {
+.apex-nav .following-stories-trigger svg {
   width: 100%;
   height: 100%;
 }
