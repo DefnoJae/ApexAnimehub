@@ -161,8 +161,6 @@ export function AnimeDetails({
         <HeroBackdrop anime={anime} />
       </div>
       <header className="detail-hero">
-        <HeroBackdrop anime={anime} />
-        <div className="detail-hero-shade" />
         <div className="detail-hero-content">
           <button className="detail-back" onClick={onBack}>
             <ArrowLeft size={18} /> Back

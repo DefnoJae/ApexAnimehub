@@ -148,3 +148,15 @@ test("sequels reuse original artwork and exact title search fills missing mappin
     else process.env.TMDB_API_KEY = originalKey;
   }
 });
+
+test("small English TMDB logos such as 18if are retained", () => {
+  const result = selectImages({
+    logos: [
+      { file_path: "/18if.png", width: 142, height: 151, iso_639_1: "en" },
+    ],
+    backdrops: [],
+  });
+  assert.deepEqual(result.logos, [
+    "https://image.tmdb.org/t/p/original/18if.png",
+  ]);
+});

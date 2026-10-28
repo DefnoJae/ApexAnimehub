@@ -27,8 +27,9 @@ function selectImages(images) {
         (i) =>
           valid(i) &&
           i.iso_639_1 === "en" &&
-          i.width >= 300 &&
-          /\.png$/i.test(i.file_path),
+          i.width >= 32 &&
+          i.height >= 12 &&
+          /\.(png|svg|webp)$/i.test(i.file_path),
       )
       .sort(rank)
       .slice(0, 5)

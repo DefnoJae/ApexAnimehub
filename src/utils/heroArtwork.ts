@@ -9,15 +9,10 @@ interface CachedArtwork {
   updatedAt: number;
 }
 const DAY = 86400000;
-// Some provider records label square cover art as a clearlogo. Only accept
-// wide title treatments; uncertain artwork keeps the readable text fallback.
+// TMDB assets come from its verified logos collection. Square title marks
+// (for example 18if) are valid logos too, not automatically poster artwork.
 export function isTitleTreatment(width: number, height: number): boolean {
-  return (
-    width >= 160 &&
-    height >= 24 &&
-    width / height >= 1.5 &&
-    width / height <= 16
-  );
+  return width >= 32 && height >= 12;
 }
 const pending = new Map<number, Promise<CachedArtwork>>();
 function safeImage(value: unknown): value is string {
@@ -59,7 +54,7 @@ export function isHeroBanner(width: number, height: number): boolean {
 async function fetchHeroMedia(anilistId: number): Promise<CachedArtwork> {
   const empty = { logos: [], backdrops: [], updatedAt: 0 };
   if (!Number.isSafeInteger(anilistId) || anilistId <= 0) return empty;
-  const key = "apex_tmdb_artwork_v2_" + anilistId;
+  const key = "apex_tmdb_artwork_v3_" + anilistId;
   let cached: CachedArtwork | null = null;
   try {
     const value = JSON.parse(localStorage.getItem(key) || "null");
@@ -86,7 +81,7 @@ async function fetchHeroMedia(anilistId: number): Promise<CachedArtwork> {
       timer = setTimeout(() => controller.abort(), 45000);
     try {
       const response = await fetch(
-        "/api/artwork?anilist_id=" + anilistId + "&v=2",
+        "/api/artwork?anilist_id=" + anilistId + "&v=3",
         {
           signal: controller.signal,
           credentials: "omit",

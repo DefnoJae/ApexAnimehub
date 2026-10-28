@@ -21,7 +21,10 @@ export function DetailTitle({ id, title }: { id: number; title: string }) {
   const url = art.id === id ? art.urls[index] : undefined;
   return (
     <h1 className="detail-title" aria-label={title} title={title}>
-      {(!url || loaded !== url) && title}
+      {art.id === id && !url && title}
+      {(art.id !== id || (url && loaded !== url)) && (
+        <span className="detail-title-placeholder" aria-hidden="true" />
+      )}
       {url && (
         <img
           className="detail-title-logo"
