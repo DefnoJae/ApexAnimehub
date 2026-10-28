@@ -54,10 +54,10 @@ export function isHeroBanner(width: number, height: number): boolean {
 async function fetchHeroMedia(anilistId: number): Promise<CachedArtwork> {
   const empty = { logos: [], backdrops: [], updatedAt: 0 };
   if (!Number.isSafeInteger(anilistId) || anilistId <= 0) return empty;
-  const key = "apex_tmdb_artwork_v3_" + anilistId;
+  const key = "apex_tmdb_artwork_v4_" + anilistId;
   let cached: CachedArtwork | null = null;
   try {
-    const value = JSON.parse(localStorage.getItem(key) || "null");
+    const value = JSON.parse(localStorage.getItem(key) || localStorage.getItem("apex_tmdb_artwork_v3_" + anilistId) || localStorage.getItem("apex_tmdb_artwork_v2_" + anilistId) || "null");
     if (
       value &&
       Array.isArray(value.logos) &&
@@ -71,7 +71,7 @@ async function fetchHeroMedia(anilistId: number): Promise<CachedArtwork> {
   if (
     cached &&
     Date.now() - cached.updatedAt <
-      (cached.logos.length || cached.backdrops.length ? DAY : DAY / 24)
+      (cached.logos.length ? DAY : DAY / 96)
   )
     return cached;
   const existing = pending.get(anilistId);
@@ -81,7 +81,7 @@ async function fetchHeroMedia(anilistId: number): Promise<CachedArtwork> {
       timer = setTimeout(() => controller.abort(), 45000);
     try {
       const response = await fetch(
-        "/api/artwork?anilist_id=" + anilistId + "&v=3",
+        "/api/artwork?anilist_id=" + anilistId + "&v=4",
         {
           signal: controller.signal,
           credentials: "omit",

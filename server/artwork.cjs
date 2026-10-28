@@ -26,12 +26,12 @@ function selectImages(images) {
       .filter(
         (i) =>
           valid(i) &&
-          i.iso_639_1 === "en" &&
+          (i.iso_639_1 === "en" || i.iso_639_1 === null) &&
           i.width >= 32 &&
           i.height >= 12 &&
           /\.(png|svg|webp)$/i.test(i.file_path),
       )
-      .sort(rank)
+      .sort((a,b)=>(a.iso_639_1 === "en" ? 0 : 1)-(b.iso_639_1 === "en" ? 0 : 1)||rank(a,b))
       .slice(0, 5)
       .map((i) => "https://image.tmdb.org/t/p/original" + i.file_path),
     backdrops: (images.backdrops || [])
@@ -86,7 +86,7 @@ async function originalSeason(id) {
               e.relationType === "PREQUEL" &&
               e.node?.type === "ANIME" &&
               ["TV", "TV_SHORT", "ONA"].includes(e.node.format) &&
-              !seen.has(e.node.id),
+              !seen.has(e.node.id) && (!media.seasonYear || !e.node.startDate?.year || e.node.startDate.year <= media.seasonYear),
           );
     prequels.sort(
       (a, b) =>
@@ -104,7 +104,9 @@ async function originalSeason(id) {
   // Bound traversal and avoid recursive cache cycles for malformed relation data.
   return { ...media, id };
 }
-async function artwork(id) {
+async function artwork(id, ancestors = new Set()) {
+  if(ancestors.has(id))return {anilistId:id,logos:[],backdrops:[]};
+  const visited=new Set(ancestors);visited.add(id);
   const old = cache.get(id);
   if (old && Date.now() - old.updated < 86400000) return old.data;
   if (pending.has(id)) return pending.get(id);
@@ -120,9 +122,9 @@ async function artwork(id) {
           (key && !token ? "api_key=" + encodeURIComponent(key) : ""),
         token ? { Authorization: "Bearer " + token } : {},
       );
-    const media = await originalSeason(id);
+    const media = await originalSeason(id).catch(()=>({id}));
     // Reuse an original season's cache while preserving the requested identity.
-    if (media.id !== id) return { ...(await artwork(media.id)), anilistId: id };
+    if (media.id !== id) return { ...(await artwork(media.id,visited)), anilistId: id };
     let m = {};
     try {
       const mapped = await json(
@@ -132,7 +134,7 @@ async function artwork(id) {
     } catch {
       /* A missing mapping should not block an exact-title TMDB lookup. */
     }
-    const type = media.format === "MOVIE" ? "movie" : "tv";
+    const type = (media.format === "MOVIE" || String(m.type).toUpperCase() === "MOVIE") ? "movie" : "tv";
     let tmdbId = m.themoviedb_id;
     if (!/^\d+$/.test(String(tmdbId || ""))) {
       const sources = [];
@@ -201,6 +203,10 @@ async function artwork(id) {
           ),
         ),
       );
+    if(!data.logos.length) {
+      const parent=media.relations?.edges?.find(edge=>edge.relationType === "PARENT" && edge.node?.type === "ANIME" && ["TV","TV_SHORT","ONA"].includes(edge.node.format) && !visited.has(edge.node.id));
+      if(parent) {try {data.logos=(await artwork(parent.node.id,visited)).logos;}catch{}}
+    }
     if (cache.size >= 500) cache.delete(cache.keys().next().value);
     cache.set(id, { updated: Date.now(), data });
     return data;

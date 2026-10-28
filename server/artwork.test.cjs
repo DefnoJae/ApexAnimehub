@@ -160,3 +160,5 @@ test("small English TMDB logos such as 18if are retained", () => {
     "https://image.tmdb.org/t/p/original/18if.png",
   ]);
 });
+
+test("unlabelled TMDB logos are valid fallbacks and English remains first",()=>{const result=selectImages({logos:[{file_path:"/unlabelled.png",iso_639_1:null,width:800,height:200,vote_average:10},{file_path:"/english.png",iso_639_1:"en",width:500,height:200,vote_average:1}],backdrops:[]});assert.equal(result.logos[0],"https://image.tmdb.org/t/p/original/english.png");assert.equal(result.logos.length,2);});

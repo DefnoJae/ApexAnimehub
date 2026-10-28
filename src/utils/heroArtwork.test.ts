@@ -48,7 +48,7 @@ test("logo and backdrop requests share server fetch and daily cache", async () =
   await fetchHeroArtwork(43);
   expect(global.fetch).toHaveBeenCalledTimes(1);
   expect(global.fetch).toHaveBeenCalledWith(
-    "/api/artwork?anilist_id=43&v=3",
+    "/api/artwork?anilist_id=43&v=4",
     expect.anything(),
   );
 });
@@ -58,10 +58,10 @@ test("provider outage preserves stale TMDB artwork", async () => {
     backdrops: [],
     updatedAt: Date.now() - 2 * 86400000,
   };
-  localStorage.setItem("apex_tmdb_artwork_v3_44", JSON.stringify(saved));
+  localStorage.setItem("apex_tmdb_artwork_v4_44", JSON.stringify(saved));
   global.fetch = jest.fn().mockRejectedValue(new Error("Offline"));
   expect(await fetchHeroArtwork(44)).toEqual(saved.logos);
-  expect(JSON.parse(localStorage.getItem("apex_tmdb_artwork_v3_44")!)).toEqual(
+  expect(JSON.parse(localStorage.getItem("apex_tmdb_artwork_v4_44")!)).toEqual(
     saved,
   );
 });
