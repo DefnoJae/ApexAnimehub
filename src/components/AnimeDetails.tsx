@@ -243,7 +243,7 @@ export function AnimeDetails({
                   className="detail-continue"
                   onClick={() =>
                     onPlay(
-                      continueEpisode,
+                      selected,
                       audio,
                       audio === "dub" && source === "apex"
                         ? "megaplay"
@@ -252,11 +252,13 @@ export function AnimeDetails({
                   }
                 >
                   <Play size={18} fill="currentColor" />
-                  {finished
-                    ? "Watch again"
-                    : progress || history
-                      ? "Continue Episode " + continueEpisode
-                      : "Watch Episode 1"}
+                  {selected !== continueEpisode
+                    ? "Watch Episode " + selected
+                    : finished
+                      ? "Watch again"
+                      : progress || history
+                        ? "Continue Episode " + continueEpisode
+                        : "Watch Episode 1"}
                 </button>
                 <label className="detail-list-status glass">
                   <Bookmark size={16} />
@@ -423,6 +425,15 @@ export function AnimeDetails({
                       <QuickList anime={item} accounts={accounts} />
                     </div>
                     <small>{label}</small>
+                    <div className="detail-related-badges">
+                      {item.averageScore ? (
+                        <span className="detail-related-rating">
+                          <Star size={12} /> AniList{" "}
+                          {(item.averageScore / 10).toFixed(1)}
+                        </span>
+                      ) : null}
+                      <AnimeBadges idMal={item.idMal} providedScore={null} />
+                    </div>
                     <button
                       className="poster-title"
                       onClick={() => onSelect(item)}

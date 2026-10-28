@@ -229,3 +229,11 @@
     font-size: 11px;
   }
 }
+
+.watch-order-dub {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: #d7bcf5;
+  font-size: 9px;
+}

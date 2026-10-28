@@ -1,9 +1,13 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
 import { act } from "react-dom/test-utils";
+import { getDubIndex } from "../utils/animeMetadata";
 import WatchOrder, { graphLayout } from "./WatchOrder";
 import { fetchWatchOrder, OrderGraph } from "../utils/watchOrder";
 import type { useAccounts } from "../hooks/useAccounts";
+jest.mock("../utils/animeMetadata", () => ({
+  getDubIndex: jest.fn().mockResolvedValue({ dubbed: [11], partial: [] }),
+}));
 jest.mock("../utils/watchOrder", () => ({ fetchWatchOrder: jest.fn() }));
 const graph: OrderGraph = {
   nodes: [
@@ -37,6 +41,7 @@ test("layout has finite positions and preserves edges even with cycles", () => {
   expect(result.edges).toHaveLength(2);
 });
 test("poster navigation uses imported progress and never writes to connected lists", async () => {
+  (getDubIndex as jest.Mock).mockResolvedValue({ dubbed: [11], partial: [] });
   (fetchWatchOrder as jest.Mock).mockResolvedValue(graph);
   const node = document.createElement("div");
   document.body.append(node);
@@ -61,6 +66,7 @@ test("poster navigation uses imported progress and never writes to connected lis
         />,
       ),
     );
+    expect(node.querySelector(".watch-order-dub")?.textContent).toBe("DUB");
     expect(node.querySelectorAll(".watch-order-node img")).toHaveLength(2);
     expect(node.textContent).toContain("Completed 12/12");
     const next = node.querySelector(

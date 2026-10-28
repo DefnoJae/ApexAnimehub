@@ -1,7 +1,12 @@
 import React from "react";
 import { createRoot, Root } from "react-dom/client";
 import { act } from "react-dom/test-utils";
-import { HomeDashboard, QuickList, FloatingNavigation } from "./HomeDashboard";
+import {
+  HomeDashboard,
+  QuickList,
+  FloatingNavigation,
+  LatestEpisodes,
+} from "./HomeDashboard";
 import { useAccounts } from "../hooks/useAccounts";
 import { fetchAnilist } from "../utils/anilist";
 import { fetchDubRange } from "../utils/dubSchedule";
@@ -43,7 +48,7 @@ beforeEach(() => {
   root = createRoot(node);
   localStorage.clear();
   (fetchAnilist as jest.Mock).mockResolvedValue({
-    Page: { airingSchedules: [] },
+    Page: { pageInfo: { hasNextPage: false }, airingSchedules: [] },
   });
   (fetchDubRange as jest.Mock).mockResolvedValue({
     entries: [],
@@ -339,4 +344,38 @@ test("navigation exposes accessible labels, active location and independent sear
   );
   expect(search).toHaveBeenCalledTimes(1);
   expect(settings).toHaveBeenCalledTimes(1);
+});
+
+test("latest releases show local dates and open the exact episode without opening the calendar", async () => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const onSelect = jest.fn(),
+    onCalendar = jest.fn();
+  (fetchAnilist as jest.Mock).mockResolvedValue({
+    Page: {
+      pageInfo: { hasNextPage: false },
+      airingSchedules: [
+        { episode: 7, airingAt: Math.floor(+today / 1000), media: anime },
+      ],
+    },
+  });
+  await act(async () =>
+    root.render(
+      <LatestEpisodes
+        language="sub"
+        setLanguage={jest.fn()}
+        onSelect={onSelect}
+        onCalendar={onCalendar}
+      />,
+    ),
+  );
+  const card = node.querySelector<HTMLButtonElement>(".episode-card")!;
+  expect(card.querySelector("time")?.getAttribute("dateTime")).toBe(
+    today.toISOString(),
+  );
+  act(() => card.click());
+  expect(onSelect).toHaveBeenCalledWith(
+    expect.objectContaining({ id: 42, releaseEpisode: 7 }),
+  );
+  expect(onCalendar).not.toHaveBeenCalled();
 });

@@ -332,6 +332,8 @@ export default function App() {
     startEpisode: number = 1,
     startStream: string | null = null,
   ) => {
+    const releaseEpisode = anime?.releaseEpisode;
+    if (releaseEpisode) startEpisode = releaseEpisode;
     if (!anime?.id && anime?.idMal) {
       try {
         const result = await fetchAnilist<{ Media: any }>(
@@ -352,7 +354,7 @@ export default function App() {
       );
       return;
     }
-    if (!startStream && startEpisode === 1) {
+    if (!startStream && startEpisode === 1 && !releaseEpisode) {
       const progress = Math.max(
         0,
         ...accounts.libraryEntries
@@ -386,7 +388,12 @@ export default function App() {
           source,
         ),
       );
-    } else navigate(animePage(anime.id, startEpisode));
+    } else
+      navigate(
+        releaseEpisode
+          ? `/anime/${anime.id}?episode=${startEpisode}`
+          : animePage(anime.id, startEpisode),
+      );
   };
 
   const playEpisode = (
@@ -501,7 +508,11 @@ export default function App() {
             navigate(episodePage(selectedAnime.id, episode, lang, "anipm"));
           }}
           onClose={() => navigate(animePage(selectedAnime.id, activeEpisode))}
-          resume={watchHistory.find(item=>item.anime.id===selectedAnime.id && item.episode===activeEpisode)}
+          resume={watchHistory.find(
+            (item) =>
+              item.anime.id === selectedAnime.id &&
+              item.episode === activeEpisode,
+          )}
           onProgress={recordProgress}
           accounts={accounts}
         />

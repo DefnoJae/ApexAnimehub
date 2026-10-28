@@ -19,6 +19,10 @@ import {
 import { fetchAnilist } from "../utils/anilist";
 import { fetchHeroArtwork, isTitleTreatment } from "../utils/heroArtwork";
 import { fetchDubRange } from "../utils/dubSchedule";
+import {
+  currentReleaseWeek,
+  orderWeeklyReleases,
+} from "../utils/weeklyReleases";
 import { getDisplayTitle } from "../utils/schedule";
 import type { ListAnime, ListStatus, useAccounts } from "../hooks/useAccounts";
 import { NotificationBell } from "./NotificationBell";
@@ -40,6 +44,8 @@ export interface DashboardAnime extends ListAnime {
   averageScore?: number;
   description?: string;
   episode?: number;
+  releaseAt?: number;
+  releaseEpisode?: number;
 }
 export interface WatchEntry {
   anime: DashboardAnime;
@@ -369,7 +375,7 @@ function MissingLibraryRow({
   );
 }
 
-function LatestEpisodes({
+export function LatestEpisodes({
   language,
   setLanguage,
   onSelect,
@@ -385,34 +391,58 @@ function LatestEpisodes({
     [error, setError] = useState(""),
     [retry, setRetry] = useState(0);
   useEffect(() => {
+    const timer = window.setInterval(
+      () => setRetry((value) => value + 1),
+      60000,
+    );
+    return () => window.clearInterval(timer);
+  }, []);
+  useEffect(() => {
     let active = true;
+    const controller = new AbortController();
     setLoading(true);
     setError("");
     setItems([]);
     const load = async () => {
+      const { start, end } = currentReleaseWeek();
       if (language === "sub") {
-        const data = await fetchAnilist<{
-          Page: {
-            airingSchedules: Array<{ episode: number; media: DashboardAnime }>;
-          };
-        }>(
-          "query($now:Int,$since:Int){Page(page:1,perPage:30){airingSchedules(airingAt_lesser:$now,airingAt_greater:$since,sort:TIME_DESC){episode media{id idMal title{english romaji} bannerImage coverImage{extraLarge} episodes isAdult}}}}",
-          {
-            now: Math.floor(Date.now() / 1000),
-            since: Math.floor(Date.now() / 1000) - 7 * 86400,
-          },
-        );
-        return data.Page.airingSchedules
-          .filter(
-            (item) =>
-              item.media &&
-              !(item.media as DashboardAnime & { isAdult?: boolean }).isAdult,
-          )
-          .map((item) => ({ ...item.media, episode: item.episode }));
+        const releases: DashboardAnime[] = [];
+        let page = 1,
+          more = true;
+        while (more) {
+          const data = await fetchAnilist<{
+            Page: {
+              pageInfo: { hasNextPage: boolean };
+              airingSchedules: Array<{
+                episode: number;
+                airingAt: number;
+                media: DashboardAnime & { isAdult?: boolean };
+              }>;
+            };
+          }>(
+            "query($page:Int,$until:Int,$since:Int){Page(page:$page,perPage:50){pageInfo{hasNextPage} airingSchedules(airingAt_lesser:$until,airingAt_greater:$since,sort:TIME_DESC){episode airingAt media{id idMal title{english romaji} bannerImage coverImage{extraLarge} episodes isAdult}}}}",
+            {
+              page,
+              until: Math.floor(end.getTime() / 1000),
+              since: Math.floor(start.getTime() / 1000) - 1,
+            },
+            controller.signal,
+          );
+          releases.push(
+            ...data.Page.airingSchedules
+              .filter((item) => item.media && !item.media.isAdult)
+              .map((item) => ({
+                ...item.media,
+                episode: item.episode,
+                releaseAt: item.airingAt * 1000,
+              })),
+          );
+          more = active && data.Page.pageInfo.hasNextPage;
+          page++;
+        }
+        return releases;
       }
-      const end = new Date(),
-        start = new Date(end.getTime() - 6 * 86400000);
-      const result = await fetchDubRange(start, end);
+      const result = await fetchDubRange(start, new Date(end.getTime() - 1));
       if (active && result.error)
         setError(
           "Some dub releases could not be refreshed. " +
@@ -424,17 +454,21 @@ function LatestEpisodes({
         .filter(
           (entry) =>
             Date.parse(entry.episodeDate) >= start.getTime() &&
-            Date.parse(entry.episodeDate) <= end.getTime(),
+            Date.parse(entry.episodeDate) < end.getTime(),
         )
         .sort((a, b) => Date.parse(b.episodeDate) - Date.parse(a.episodeDate))
         .map((entry) => ({
           ...(entry.media?.media || { id: 0, title: { english: entry.title } }),
           episode: entry.episodeNumber,
+          releaseAt: Date.parse(entry.episodeDate),
         }));
     };
     void load()
       .then((next) => {
-        if (active) setItems(next);
+        if (active)
+          setItems(
+            orderWeeklyReleases(next).filter((item) => item.id || item.idMal),
+          );
       })
       .catch(() => {
         if (active)
@@ -445,6 +479,7 @@ function LatestEpisodes({
       });
     return () => {
       active = false;
+      controller.abort();
     };
   }, [language, retry]);
   return (
@@ -479,7 +514,7 @@ function LatestEpisodes({
         </div>
       ) : !items.length ? (
         <p className="section-notice">
-          No recent releases available.{" "}
+          No releases available for this week.{" "}
           <button onClick={onCalendar}>Browse the calendar</button>
         </p>
       ) : (
@@ -489,7 +524,7 @@ function LatestEpisodes({
               className="episode-card glass"
               key={anime.id + ":" + anime.episode + ":" + index}
               onClick={() =>
-                anime.id || anime.idMal ? onSelect(anime) : onCalendar()
+                onSelect({ ...anime, releaseEpisode: anime.episode })
               }
             >
               <div>
@@ -503,8 +538,17 @@ function LatestEpisodes({
                 </span>
               </div>
               <h3>{getDisplayTitle(anime)}</h3>
-              {!anime.id && !anime.idMal && (
-                <small>Find this release in the calendar</small>
+              {anime.releaseAt && (
+                <time dateTime={new Date(anime.releaseAt).toISOString()}>
+                  {new Date(anime.releaseAt).toLocaleString(undefined, {
+                    weekday: "short",
+                    month: "short",
+                    day: "numeric",
+                    hour: "numeric",
+                    minute: "2-digit",
+                    timeZoneName: "short",
+                  })}
+                </time>
               )}
             </button>
           ))}

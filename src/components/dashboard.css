@@ -2130,4 +2130,13 @@ input:focus-visible {
   opacity: 1;
 }
 
-.hero-slide-artwork:not(.is-active) .hero-backdrop { animation-play-state: paused; }
+.hero-slide-artwork:not(.is-active) .hero-backdrop {
+  animation-play-state: paused;
+}
+
+.episode-card time {
+  display: block;
+  color: #b8afc6;
+  font-size: 12px;
+  padding: 0 14px 14px;
+}

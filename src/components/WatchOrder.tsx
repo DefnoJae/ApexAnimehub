@@ -1,12 +1,20 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { graphlib, layout } from "@dagrejs/dagre";
-import { CheckCircle2, Maximize, Minus, Plus, X } from "lucide-react";
+import {
+  AudioLines,
+  CheckCircle2,
+  Maximize,
+  Minus,
+  Plus,
+  X,
+} from "lucide-react";
 import { fetchWatchOrder, OrderAnime, OrderGraph } from "../utils/watchOrder";
 import type { DashboardAnime } from "./HomeDashboard";
 import type { useAccounts } from "../hooks/useAccounts";
 import { sameAnime } from "../hooks/useLibrary";
 import { getDisplayTitle } from "../utils/schedule";
 import "./watchOrder.css";
+import { getDubIndex } from "../utils/animeMetadata";
 
 const width = 260,
   height = 112;
@@ -57,6 +65,21 @@ export default function WatchOrder({
   onSelect: (anime: DashboardAnime) => void;
   onClose: () => void;
 }) {
+  const [dubs, setDubs] = useState<{ dubbed: number[]; partial: number[] }>({
+    dubbed: [],
+    partial: [],
+  });
+  useEffect(() => {
+    let active = true;
+    void getDubIndex()
+      .then((value) => {
+        if (active) setDubs(value);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
   const [data, setData] = useState<OrderGraph | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
@@ -309,6 +332,23 @@ export default function WatchOrder({
                             ? `${node.episodes} eps`
                             : "Episodes TBA"}
                         </small>
+                        {node.idMal &&
+                        (dubs.dubbed.includes(node.idMal) ||
+                          dubs.partial.includes(node.idMal)) ? (
+                          <span
+                            className="watch-order-dub"
+                            title={
+                              dubs.partial.includes(node.idMal)
+                                ? "Some episodes have an English dub"
+                                : "English dub available"
+                            }
+                          >
+                            <AudioLines size={11} />
+                            {dubs.partial.includes(node.idMal)
+                              ? "PARTIAL DUB"
+                              : "DUB"}
+                          </span>
+                        ) : null}
                         {current && (
                           <span className="watch-order-current">
                             Current title
