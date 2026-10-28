@@ -164,3 +164,17 @@ test("missing library stops at thirty real matches and preserves partial matches
   expect(partial.animes).toHaveLength(1);
   expect(partial.error).toBe("Rate limited");
 });
+
+test("hero selection shuffles the full trending pool without mutating the row or repeating titles", () => {
+  const { pickHeroSlides } = jest.requireActual("./homeRows");
+  const items = Array.from({ length: 30 }, (_, i) => ({ id: i + 1 }));
+  const result = pickHeroSlides(items, 10, () => 0);
+  expect(result).toHaveLength(10);
+  expect(new Set(result.map((item: { id: number }) => item.id)).size).toBe(10);
+  expect(result.map((item: { id: number }) => item.id)).not.toEqual(
+    items.slice(0, 10).map((item) => item.id),
+  );
+  expect(items.map((item) => item.id)).toEqual(
+    Array.from({ length: 30 }, (_, i) => i + 1),
+  );
+});

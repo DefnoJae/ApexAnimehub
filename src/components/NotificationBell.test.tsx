@@ -52,3 +52,60 @@ test("bell exposes actual sync details, unread actions, keyboard dismissal and s
   act(() => feed.clearNotifications());
   expect(feed.notifications).toHaveLength(0);
 });
+
+test("anime updates show rounded posters while system messages do not; imports are removed and duplicates collapse", async () => {
+  localStorage.setItem(
+    "apex_notifications_v1_alice",
+    JSON.stringify([
+      {
+        id: "legacy",
+        title: "Library imported",
+        detail: "AniList",
+        kind: "info",
+        time: Date.now(),
+        read: false,
+      },
+    ]),
+  );
+  await act(async () => root.render(<Harness />));
+  expect(feed.notifications).toHaveLength(0);
+  act(() =>
+    feed.notify({ title: "AniList imported", detail: "bulk", kind: "info" }),
+  );
+  expect(feed.notifications).toHaveLength(0);
+  const update = {
+    title: "Lists updated",
+    detail: "Example anime\nRating updated: 7 → 9",
+    kind: "success" as const,
+    anime: {
+      id: 42,
+      title: "Example anime",
+      poster: "https://example.com/poster.jpg",
+    },
+  };
+  act(() => {
+    feed.notify(update);
+    feed.notify(update);
+    feed.notify({
+      title: "Account connection failed",
+      detail: "Reconnect",
+      kind: "error",
+    });
+  });
+  expect(feed.notifications).toHaveLength(2);
+  act(() => node.querySelector("button")!.click());
+  const posters = node.querySelectorAll<HTMLImageElement>(
+    ".notification-anime-poster",
+  );
+  expect(posters).toHaveLength(1);
+  expect(posters[0].src).toBe("https://example.com/poster.jpg");
+  expect(node.textContent).toContain("Rating updated: 7 → 9");
+  act(() => feed.markAllRead());
+  expect(feed.unreadCount).toBe(0);
+  act(() =>
+    Array.from(node.querySelectorAll("button"))
+      .find((b) => b.textContent === "Unread")!
+      .click(),
+  );
+  expect(node.querySelectorAll(".notification-item")).toHaveLength(0);
+});

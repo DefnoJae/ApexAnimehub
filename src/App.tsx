@@ -27,7 +27,7 @@ import {
   AudioLanguage,
 } from "./hooks/usePageRoute";
 import { detailQuery } from "./utils/detailQuery";
-import { fetchHomeCatalog, HomeRow } from "./utils/homeRows";
+import { fetchHomeCatalog, HomeRow, pickHeroSlides } from "./utils/homeRows";
 
 const THEME_COLOR = "8B5CF6";
 
@@ -188,7 +188,7 @@ export default function App() {
         if (response.ok) logos = await response.json();
       } catch {}
       setHeroSlides(
-        data.trending.slice(0, 10).map((anime) => ({
+        pickHeroSlides(data.trending).map((anime) => ({
           ...anime,
           logoImage:
             typeof logos?.[anime.id] === "string" ? logos[anime.id] : undefined,

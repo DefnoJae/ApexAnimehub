@@ -2140,3 +2140,61 @@ input:focus-visible {
   font-size: 12px;
   padding: 0 14px 14px;
 }
+
+.notification-anime-poster {
+  width: 48px;
+  height: 72px;
+  object-fit: cover;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+.episode-card {
+  transition:
+    border-color 0.25s ease,
+    box-shadow 0.25s ease;
+}
+.episode-card img {
+  transition: transform 0.6s ease;
+}
+.episode-card:hover,
+.episode-card:focus-visible {
+  border-color: #b58aff88;
+  box-shadow: 0 0 20px #9c66ef30;
+}
+.episode-card:hover img,
+.episode-card:focus-visible img {
+  transform: scale(1.045);
+}
+.cinematic-hero .hero-slide-artwork .hero-backdrop {
+  animation: none;
+  transform: none;
+}
+.cinematic-hero .hero-slide-artwork.is-active .hero-artwork {
+  animation: hero-slide-zoom 8s linear forwards;
+  transform-origin: center;
+}
+.cinematic-hero.motion-paused .hero-slide-artwork.is-active .hero-artwork {
+  animation-play-state: paused;
+}
+@keyframes hero-slide-zoom {
+  from {
+    transform: scale(1);
+  }
+  to {
+    transform: scale(1.045);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cinematic-hero .hero-slide-artwork.is-active .hero-artwork {
+    animation: none;
+  }
+  .episode-card,
+  .episode-card img {
+    transition: none;
+  }
+  .episode-card:hover img,
+  .episode-card:focus-visible img {
+    transform: none;
+  }
+}

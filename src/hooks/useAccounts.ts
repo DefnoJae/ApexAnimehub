@@ -1,4 +1,5 @@
 import { fetchAnilist } from "../utils/anilist";
+import { entryChanges } from "../utils/notificationChanges";
 import { useLibrary } from "./useLibrary";
 import { useNotifications } from "./useNotifications";
 import { sameAnime } from "./useLibrary";
@@ -14,6 +15,7 @@ export interface ListAnime {
   id: number;
   idMal?: number | null;
   episodes?: number | null;
+  coverImage?: { extraLarge?: string };
   title?: { english?: string; romaji?: string };
 }
 export interface AccountResult {
@@ -118,54 +120,8 @@ export function useAccounts() {
       .map((p) => p + ":" + (library.lists[p]?.identity || "pending"))
       .join("|") || "guest",
   );
-  const announcedImports = useRef(new Set<string>());
-  const announcedErrors = useRef(new Set<string>());
-  useEffect(() => {
-    Object.entries(library.libraryErrors).forEach(([provider, error]) => {
-      const key =
-        provider +
-        ":" +
-        library.lists[provider as AccountProvider]?.identity +
-        ":" +
-        error;
-      if (error && !announcedErrors.current.has(key)) {
-        announcedErrors.current.add(key);
-        notificationFeed.notify({
-          kind: "error",
-          title: "Library import paused",
-          detail:
-            (provider === "mal" ? "MyAnimeList" : "AniList") +
-            ": " +
-            error +
-            (error.includes("429")
-              ? " The import will retry automatically."
-              : " Open My List to retry."),
-        });
-      }
-    });
-  }, [library.libraryErrors, library.lists, notificationFeed.notify]);
-  useEffect(() => {
-    providers.forEach((provider) => {
-      const list = library.lists[provider];
-      const key = provider + ":" + list?.identity;
-      if (
-        connected[provider] &&
-        list?.complete &&
-        !announcedImports.current.has(key)
-      ) {
-        announcedImports.current.add(key);
-        notificationFeed.notify({
-          kind: "info",
-          title: "Library imported",
-          detail:
-            (provider === "mal" ? "MyAnimeList" : "AniList") +
-            ": " +
-            list.entries.length +
-            " anime ready in My List.",
-        });
-      }
-    });
-  }, [library.lists, connected, notificationFeed.notify]);
+  const currentLibrary = useRef(library);
+  currentLibrary.current = library;
   const [checking, setChecking] = useState(true);
   const [accountError, setAccountError] = useState("");
   const [loginNotice] = useState(() => {
@@ -275,7 +231,7 @@ export function useAccounts() {
         if (enabled.includes("anilist") && !mapped.id && mapped.idMal) {
           try {
             const data = await fetchAnilist<{ Media: ListAnime }>(
-              "query($idMal:Int){Media(idMal:$idMal,type:ANIME){id idMal episodes title{english romaji}}}",
+              "query($idMal:Int){Media(idMal:$idMal,type:ANIME){id idMal episodes title{english romaji} coverImage{extraLarge}}}",
               { idMal: mapped.idMal },
             );
             if (data.Media) mapped = { ...mapped, ...data.Media };
@@ -286,7 +242,7 @@ export function useAccounts() {
         if (enabled.includes("mal") && !mapped.idMal) {
           try {
             const data = await fetchAnilist<{ Media: ListAnime }>(
-              "query($id:Int){Media(id:$id,type:ANIME){id idMal episodes title{english romaji}}}",
+              "query($id:Int){Media(id:$id,type:ANIME){id idMal episodes title{english romaji} coverImage{extraLarge}}}",
               { id: anime.id },
             );
             if (data.Media) mapped = data.Media;
@@ -301,6 +257,9 @@ export function useAccounts() {
           progress >= mapped.episodes
             ? "completed"
             : status;
+        const previousEntries = currentLibrary.current.libraryEntries.filter(
+          (entry) => sameAnime(entry.anime, mapped),
+        );
         const targetStatuses = new Map<AccountProvider, ListStatus>();
         const settled = await Promise.allSettled(
           enabled.map((provider) => {
@@ -367,26 +326,78 @@ export function useAccounts() {
         if (next.some((result) => result.success))
           void library.refreshLibrary();
         setResults(next);
-        notificationFeed.notify({
-          kind: next.every((result) => result.success) ? "success" : "error",
-          title: next.every((result) => result.success)
-            ? "Lists updated"
-            : "List update needs attention",
-          detail:
-            (anime.title?.english || anime.title?.romaji || "Anime") +
-            " · " +
-            effectiveStatus +
-            (progress !== undefined ? " · episode " + progress : "") +
-            "\n" +
+        const changes = Array.from(
+          new Set(
             next
-              .map(
-                (result) =>
-                  (result.provider === "mal" ? "MyAnimeList" : "AniList") +
-                  ": " +
-                  (result.success ? "Updated" : result.error),
-              )
-              .join("\n"),
-        });
+              .filter((result) => result.success)
+              .flatMap((result) => {
+                const before = previousEntries.find(
+                  (entry) => entry.provider === result.provider,
+                );
+                return entryChanges(before, {
+                  status:
+                    result.entry?.status ||
+                    targetStatuses.get(result.provider) ||
+                    effectiveStatus,
+                  progress:
+                    result.entry?.progress ??
+                    (progress === undefined
+                      ? before?.progress || 0
+                      : edit?.manualProgress
+                        ? progress
+                        : Math.max(before?.progress || 0, progress)),
+                  score:
+                    result.entry?.score ??
+                    edit?.scores?.[result.provider] ??
+                    before?.score,
+                });
+              }),
+          ),
+        );
+        if (changes.length || next.some((result) => !result.success)) {
+          let poster =
+            mapped.coverImage?.extraLarge ||
+            previousEntries.find((entry) => entry.anime.coverImage?.extraLarge)
+              ?.anime.coverImage?.extraLarge;
+          if (!poster && mapped.id) {
+            try {
+              const data = await fetchAnilist<{
+                Media: { coverImage?: { extraLarge?: string } };
+              }>(
+                "query($id:Int){Media(id:$id,type:ANIME){coverImage{extraLarge}}}",
+                { id: mapped.id },
+              );
+              poster = data.Media?.coverImage?.extraLarge;
+            } catch {
+              /* Keep the entry notification when artwork is unavailable. */
+            }
+          }
+          notificationFeed.notify({
+            kind: next.every((result) => result.success) ? "success" : "error",
+            title: next.every((result) => result.success)
+              ? "Lists updated"
+              : "List update needs attention",
+            anime: {
+              id: mapped.id,
+              idMal: mapped.idMal,
+              title: anime.title?.english || anime.title?.romaji || "Anime",
+              poster,
+            },
+            detail:
+              (anime.title?.english || anime.title?.romaji || "Anime") +
+              "\n" +
+              changes.join("\n") +
+              "\n" +
+              next
+                .map(
+                  (result) =>
+                    (result.provider === "mal" ? "MyAnimeList" : "AniList") +
+                    ": " +
+                    (result.success ? "Updated" : result.error),
+                )
+                .join("\n"),
+          });
+        }
         setMessage(
           (anime.title?.english || anime.title?.romaji || "Anime") +
             ": " +

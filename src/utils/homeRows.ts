@@ -230,3 +230,20 @@ export async function fetchMissingLibrary(
   }
   return { animes: Array.from(matches.values()) };
 }
+
+export function pickHeroSlides<T extends { id: number }>(
+  trending: T[],
+  limit = 10,
+  random = Math.random,
+): T[] {
+  const pool = Array.from(
+    new Map(
+      trending.filter((item) => item.id > 0).map((item) => [item.id, item]),
+    ).values(),
+  );
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(random() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  return pool.slice(0, limit);
+}

@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Bell, CheckCircle2, AlertCircle, RefreshCw, X } from "lucide-react";
+import { notificationPoster } from "../hooks/useNotifications";
 import type { useNotifications } from "../hooks/useNotifications";
 export function NotificationBell({
   feed,
@@ -106,6 +107,17 @@ export function NotificationBell({
                     onClick={() => feed.markRead(n.id)}
                     aria-label={n.title + (n.read ? "" : ", unread")}
                   >
+                    {notificationPoster(n) && (
+                      <img
+                        className="notification-anime-poster"
+                        src={notificationPoster(n)}
+                        alt={n.anime?.title + " poster"}
+                        loading="lazy"
+                        onError={(event) => {
+                          event.currentTarget.style.display = "none";
+                        }}
+                      />
+                    )}
                     <Icon size={24} />
                     <span>
                       <strong>{n.title}</strong>
