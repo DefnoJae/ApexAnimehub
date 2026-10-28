@@ -11,6 +11,7 @@ import type { DashboardAnime, WatchEntry } from "./HomeDashboard";
 import type { ListStatus, useAccounts } from "../hooks/useAccounts";
 import { sameAnime } from "../hooks/useLibrary";
 import { getDisplayTitle } from "../utils/schedule";
+import { FriendsActivityDock } from "./FriendsActivityDock";
 import { DetailTitle } from "./DetailTitle";
 import { HeroBackdrop } from "./HeroBackdrop";
 import { AnimeBadges } from "./AnimeBadges";
@@ -157,11 +158,20 @@ export function AnimeDetails({
   };
   return (
     <article className="anime-detail-page">
+      <FriendsActivityDock
+        animeId={anime.id}
+        connected={accounts.connected.anilist}
+        checking={accounts.checking}
+        identity={accounts.lists?.anilist?.identity}
+      />
       <div className="detail-ambient" aria-hidden="true">
         <HeroBackdrop anime={anime} />
       </div>
       <header className="detail-hero">
-        <div className="detail-header-art" aria-hidden="true"><HeroBackdrop anime={anime}/><div className="detail-hero-shade"/></div>
+        <div className="detail-header-art" aria-hidden="true">
+          <HeroBackdrop anime={anime} />
+          <div className="detail-hero-shade" />
+        </div>
         <div className="detail-hero-content">
           <button className="detail-back" onClick={onBack}>
             <ArrowLeft size={18} /> Back

@@ -1,0 +1,198 @@
+.friends-dock {
+  position: fixed;
+  right: -1px;
+  top: 56vh;
+  z-index: 80;
+  width: min(330px, calc(100vw - 16px));
+  max-height: calc(100dvh - 180px);
+  transform: translate3d(calc(100% - 68px), -50%, 0);
+  border: 1px solid #ffffff20;
+  border-right: 0;
+  border-radius: 28px 0 0 28px;
+  background: rgba(17, 18, 26, 0.83);
+  backdrop-filter: blur(10px);
+  box-shadow: -8px 10px 30px #0004;
+  overflow: hidden;
+  transition: transform 300ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  font-family: "Nunito", sans-serif;
+  color: #eceaf2;
+}
+.friends-dock.is-expanded {
+  transform: translate3d(0, -50%, 0);
+}
+.friends-dock-toggle {
+  width: 100%;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 0 23px;
+  border: 0;
+  background: transparent;
+  color: #aaa5b7;
+  font-size: 12px;
+  text-align: left;
+}
+.friends-dock-toggle > span {
+  flex: 1;
+  font-weight: 700;
+}
+.friends-dock-toggle > span,
+.friends-dock-toggle > svg:last-child {
+  opacity: 0;
+  transition: opacity 250ms;
+}
+.friends-dock.is-expanded .friends-dock-toggle > span,
+.friends-dock.is-expanded .friends-dock-toggle > svg:last-child {
+  opacity: 1;
+}
+.friends-dock-content {
+  max-height: min(264px, calc(100dvh - 230px));
+  overflow: hidden;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+.friends-dock.is-expanded .friends-dock-content {
+  overflow-y: auto;
+}
+.friends-dock-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 64px;
+  padding: 9px 12px;
+  color: inherit;
+  text-decoration: none;
+  border-top: 1px solid #ffffff08;
+}
+.friends-dock-row:hover,
+.friends-dock-row:focus-visible {
+  background: #ffffff08;
+}
+.friends-avatar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1px solid var(--friend-color, #ffffff30);
+  background: #2b2835;
+  font-size: 13px;
+  font-weight: 700;
+}
+.friends-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: inherit;
+}
+.friends-avatar i {
+  position: absolute;
+  right: -2px;
+  bottom: 0;
+  width: 11px;
+  height: 11px;
+  border: 2px solid #181923;
+  border-radius: 50%;
+}
+.friends-dock-info {
+  min-width: 0;
+  flex: 1;
+}
+.friends-dock-info strong {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 13px;
+  font-weight: 800;
+}
+.friends-dock-info > span {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 11px;
+  color: #a9a5b3;
+  margin-top: 3px;
+}
+.friends-score {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  color: #dfc566;
+}
+.friends-status {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--friend-color);
+  border: 1px solid color-mix(in srgb, var(--friend-color) 30%, transparent);
+  border-radius: 20px;
+  padding: 4px 7px;
+  white-space: nowrap;
+  background: color-mix(in srgb, var(--friend-color) 12%, transparent);
+}
+.friends-dock-info,
+.friends-status {
+  opacity: 0;
+  transform: translateX(8px);
+  transition:
+    opacity 200ms ease,
+    transform 300ms ease;
+}
+.friends-dock.is-expanded .friends-dock-info,
+.friends-dock.is-expanded .friends-status {
+  opacity: 1;
+  transform: translateX(0);
+  transition-delay: 60ms;
+}
+.friends-dock-message {
+  font-size: 11px;
+  color: #aaa5b7;
+  padding: 12px 18px;
+  opacity: 0;
+  pointer-events: none;
+  margin: 0;
+}
+.friends-dock.is-expanded .friends-dock-message {
+  opacity: 1;
+  pointer-events: auto;
+}
+.friends-dock-message button,
+.friends-view-more {
+  display: block;
+  border: 0;
+  background: none;
+  color: #c5a6f1;
+  font-size: 11px;
+  padding: 8px 0;
+}
+.friends-view-more {
+  margin: 0 auto 8px;
+  visibility: hidden;
+}
+.friends-dock.is-expanded .friends-view-more {
+  visibility: visible;
+}
+.friends-dock a:focus-visible,
+.friends-dock button:focus-visible {
+  outline: 2px solid #c5a6f1;
+  outline-offset: -3px;
+}
+@media (max-width: 700px) {
+  .friends-dock {
+    top: 60vh;
+    max-height: calc(100dvh - 220px);
+  }
+  .friends-dock-content {
+    max-height: 210px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .friends-dock,
+  .friends-dock * {
+    transition: none !important;
+  }
+}
