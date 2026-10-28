@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import type { useAccounts } from "../hooks/useAccounts";
 export interface PlayerProps {
+  resume?: { position?: number; duration?: number };
   title: string;
   episode: number;
   stream: { url: string; name: string };
@@ -41,7 +42,10 @@ export function VideoPlayer(props: PlayerProps) {
   )
     return (
       <React.Suspense fallback={<p role="status">Loading Ani.pm player…</p>}>
-        <AniPmPlayer {...props} />
+        <AniPmPlayer
+          key={new URL(props.stream.url).pathname.split("/")[3]}
+          {...props}
+        />
       </React.Suspense>
     );
   const native = props.stream.url.startsWith("/api/playback?");

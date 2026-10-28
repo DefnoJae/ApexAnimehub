@@ -501,6 +501,7 @@ export default function App() {
             navigate(episodePage(selectedAnime.id, episode, lang, "anipm"));
           }}
           onClose={() => navigate(animePage(selectedAnime.id, activeEpisode))}
+          resume={watchHistory.find(item=>item.anime.id===selectedAnime.id && item.episode===activeEpisode)}
           onProgress={recordProgress}
           accounts={accounts}
         />

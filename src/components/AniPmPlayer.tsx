@@ -3,6 +3,12 @@ import { Maximize, X } from "lucide-react";
 import type { PlayerProps } from "./VideoPlayer";
 import type { Player, PlayerState } from "../utils/anipm-sdk";
 import { loadAniPmSdk, validAniPmState } from "../utils/anipm";
+import {
+  readEpisodeProgress,
+  saveEpisodeProgress,
+  resumeSeconds,
+  playbackTime,
+} from "../utils/playbackResume";
 import "./nativeVideoPlayer.css";
 export default function AniPmPlayer(props: PlayerProps) {
   const host = useRef<HTMLDivElement>(null),
@@ -31,7 +37,28 @@ export default function AniPmPlayer(props: PlayerProps) {
   const id = Number(path[3]),
     episode = Number(path[4]),
     lang = path[5] === "dub" ? "dub" : "sub";
+  const savedResume = resumeSeconds(
+    readEpisodeProgress(id, episode) || props.resume,
+  );
+  const [startChoice, setStartChoice] = useState<number | null>(() =>
+    savedResume > 0 ? null : 0,
+  );
+  const latest = useRef<{
+    episode: number;
+    position: number;
+    duration: number;
+  }>();
   useEffect(() => {
+    if (startChoice === null) return;
+    let waitingForStart =
+      startChoice > 0 ? { episode, position: startChoice } : null;
+    const report = callbacks.current.onProgress;
+    const flush = () => {
+      const value = latest.current;
+      if (!value) return;
+      saveEpisodeProgress(id, value.episode, value.position, value.duration);
+      report?.(value.position, value.duration, value.episode);
+    };
     let active = true,
       last = 0;
     const watched = new Set<number>();
@@ -48,6 +75,7 @@ export default function AniPmPlayer(props: PlayerProps) {
           episode,
           lang,
           color: "#b58aff",
+          start: startChoice,
           autoplay: true,
           episodes: true,
           reportPage: false,
@@ -66,8 +94,11 @@ export default function AniPmPlayer(props: PlayerProps) {
           .join(";");
         host.current.replaceChildren(mount);
         const stateChanged = (state: PlayerState) => {
-          if (active && validAniPmState(state, id))
+          if (active && validAniPmState(state, id)) {
+            if (waitingForStart && waitingForStart.episode !== state.episode)
+              waitingForStart = null;
             callbacks.current.onEpisodeChange?.(state.episode, state.lang);
+          }
         };
         player.on("ready", stateChanged);
         player.on("episodechange", stateChanged);
@@ -85,8 +116,14 @@ export default function AniPmPlayer(props: PlayerProps) {
             position > duration + 5
           )
             return;
+          if (waitingForStart && waitingForStart.episode === state.episode) {
+            if (position + 2 < waitingForStart.position) return;
+            waitingForStart = null;
+          }
+          latest.current = { episode: state.episode, position, duration };
           if (Date.now() - last >= 5000) {
             last = Date.now();
+            saveEpisodeProgress(id, state.episode, position, duration);
             callbacks.current.onProgress?.(position, duration, state.episode);
           }
           if (
@@ -98,6 +135,8 @@ export default function AniPmPlayer(props: PlayerProps) {
             callbacks.current.onWatched(state.episode);
           }
         });
+        player.on("pause", flush);
+        player.on("ended", flush);
         player.on("error", (data) => {
           if (active)
             setError(
@@ -135,15 +174,18 @@ export default function AniPmPlayer(props: PlayerProps) {
         void player.previous().catch((e) => setError(e.message));
       }
     };
+    window.addEventListener("pagehide", flush);
     document.addEventListener("keydown", keyboard);
     return () => {
+      flush();
       active = false;
+      window.removeEventListener("pagehide", flush);
       instance.current?.destroy();
       instance.current = undefined;
       document.removeEventListener("keydown", keyboard);
     };
     // Episode/language changes use the SDK without remounting the iframe.
-  }, [id]);
+  }, [id, startChoice]);
   useEffect(() => {
     const player = instance.current;
     if (
@@ -151,7 +193,12 @@ export default function AniPmPlayer(props: PlayerProps) {
       (player.state.episode !== episode || player.state.lang !== lang)
     )
       void player
-        .loadEpisode(episode, { lang })
+        .loadEpisode(episode, {
+          lang,
+          start: resumeSeconds(
+            readEpisodeProgress(id, episode) || callbacks.current.resume,
+          ),
+        })
         .catch((e) => setError(e.message));
   }, [episode, lang]);
   return (
@@ -167,10 +214,20 @@ export default function AniPmPlayer(props: PlayerProps) {
         <span className="flex-1 min-w-0 truncate">
           {props.title} · Episode {props.episode} · {props.stream.name}
         </span>
-        <button className="player-header-icon" onClick={enterFullscreen} aria-label="Fullscreen video" title="Fullscreen (F)">
+        <button
+          className="player-header-icon"
+          onClick={enterFullscreen}
+          aria-label="Fullscreen video"
+          title="Fullscreen (F)"
+        >
           <Maximize size={18} aria-hidden="true" />
         </button>
-        <button className="player-header-icon" onClick={props.onClose} aria-label="Close video player" title="Close player">
+        <button
+          className="player-header-icon"
+          onClick={props.onClose}
+          aria-label="Close video player"
+          title="Close player"
+        >
           <X size={20} aria-hidden="true" />
         </button>
       </div>
@@ -178,6 +235,38 @@ export default function AniPmPlayer(props: PlayerProps) {
         <p role="alert" className="px-4 text-amber-300">
           {error}
         </p>
+      )}
+      {startChoice === null && (
+        <div
+          className="anipm-resume-prompt"
+          role="group"
+          aria-label="Continue watching"
+        >
+          <h2>Continue watching?</h2>
+          <p>
+            {props.title} · Episode {episode}
+          </p>
+          <div>
+            <button onClick={() => setStartChoice(savedResume)}>
+              Continue from {playbackTime(savedResume)}
+            </button>
+            <button
+              onClick={() => {
+                saveEpisodeProgress(
+                  id,
+                  episode,
+                  0,
+                  props.resume?.duration ||
+                    readEpisodeProgress(id, episode)?.duration ||
+                    1,
+                );
+                setStartChoice(0);
+              }}
+            >
+              Start from the beginning
+            </button>
+          </div>
+        </div>
       )}
       <div ref={host} className="flex-1 min-h-0" />
     </div>

@@ -15,7 +15,9 @@
   border-radius: 10px;
   background: rgba(255, 255, 255, 0.05);
   color: #e4e0ec;
-  transition: background 150ms, color 150ms;
+  transition:
+    background 150ms,
+    color 150ms;
 }
 .player-header-icon:hover {
   background: rgba(181, 138, 255, 0.18);
@@ -24,4 +26,47 @@
 .player-header-icon:focus-visible {
   outline: 2px solid #b58aff;
   outline-offset: 2px;
+}
+
+.anipm-resume-prompt {
+  position: absolute;
+  inset: 45px 0 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(ellipse, #28202f99, #08070bea);
+  color: white;
+  text-align: center;
+  padding: 24px;
+}
+.anipm-resume-prompt h2 {
+  font-size: 20px;
+  font-weight: 700;
+  margin: 0 0 10px;
+}
+.anipm-resume-prompt p {
+  color: #b8b1c2;
+  font-size: 13px;
+  margin: 0 0 22px;
+}
+.anipm-resume-prompt > div {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.anipm-resume-prompt button {
+  border: 0;
+  border-radius: 24px;
+  padding: 12px 20px;
+  background: #fff;
+  color: #18151c;
+  font-size: 14px;
+  font-weight: 600;
+}
+.anipm-resume-prompt button + button {
+  background: #ffffff12;
+  color: #ccc4d6;
 }
