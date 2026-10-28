@@ -974,7 +974,20 @@
 .detail-header-art::after {content:"";position:absolute;left:0;right:0;bottom:0;height:72px;backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);mask-image:linear-gradient(transparent,#000);pointer-events:none}
 .detail-hero .hero-artwork {mask-image:none}
 .detail-intro {position:relative}
-.detail-full-title {position:absolute;left:0;top:-38px;margin:0;white-space:nowrap;overflow:visible;font-family:"Nunito",sans-serif;font-weight:700;font-style:normal;font-size:19px;line-height:26px;letter-spacing:0;color:#f5f1fa;z-index:1}
+.detail-full-title {
+  position: relative;
+  margin: -2px 0 24px;
+  white-space: nowrap;
+  overflow: visible;
+  font-family: "Nunito", sans-serif;
+  font-weight: 700;
+  font-style: normal;
+  font-size: clamp(23px, 2.15vw, 34px);
+  line-height: 1.25;
+  letter-spacing: 0;
+  color: rgba(235, 232, 239, 0.58);
+  z-index: 1;
+}
 .detail-title-placeholder {
   display: block;
   width: min(440px, 100%);

@@ -166,6 +166,7 @@ export function AnimeDetails({
           <button className="detail-back" onClick={onBack}>
             <ArrowLeft size={18} /> Back
           </button>
+          <p className="detail-full-title">{getDisplayTitle(anime)}</p>
           <div className="detail-identity">
             <img
               className="detail-cover"
@@ -173,7 +174,6 @@ export function AnimeDetails({
               alt={getDisplayTitle(anime) + " poster"}
             />
             <div className="detail-intro">
-              <p className="detail-full-title">{getDisplayTitle(anime)}</p>
               <DetailTitle id={anime.id} title={getDisplayTitle(anime)} />
               <div className="detail-metadata">
                 <span>{anime.seasonYear || "Year TBA"}</span>
