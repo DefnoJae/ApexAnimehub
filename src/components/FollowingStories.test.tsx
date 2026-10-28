@@ -66,7 +66,7 @@ test("viewer advances automatically, pauses, navigates user previews and closes 
     root.render(
       <StoryViewer
         groups={groups}
-        seen={[]}
+        seen={[3, 2]}
         onSeen={seen}
         loading={false}
         error=""
@@ -125,9 +125,16 @@ test("empty ring uses no avatar, new activity glows, and viewed state is account
   expect(trigger.className).toContain("has-new");
   act(() => trigger.click());
   expect(document.querySelector('[role="dialog"]')).not.toBeNull();
+  expect(localStorage.getItem("apex_stories_seen_v1_123")).toBeNull();
+  act(() =>
+    document
+      .querySelector<HTMLButtonElement>('[aria-label="Next activity"]')!
+      .click(),
+  );
   expect(
     JSON.parse(localStorage.getItem("apex_stories_seen_v1_123")!),
-  ).toContain(1);
+  ).toContain(3);
+  expect(trigger.className).toContain("has-new");
   act(() =>
     document
       .querySelector<HTMLButtonElement>(
@@ -136,4 +143,41 @@ test("empty ring uses no avatar, new activity glows, and viewed state is account
       .click(),
   );
   expect(document.querySelector('[role="dialog"]')).toBeNull();
+});
+
+test("anime title closes the viewer and navigates while leaving unfinished activities unread", async () => {
+  (fetchFollowingStories as jest.Mock).mockResolvedValue({
+    groups,
+    at: Date.now(),
+  });
+  const select = jest.fn();
+  await act(async () =>
+    root.render(
+      <FollowingStories
+        identity="345"
+        connected
+        onConnect={jest.fn()}
+        onSelect={select}
+      />,
+    ),
+  );
+  act(() =>
+    host
+      .querySelector<HTMLButtonElement>(".following-stories-trigger")!
+      .click(),
+  );
+  expect(
+    document.querySelector(".following-story-card")?.textContent,
+  ).toContain("Next anime");
+  expect(
+    document.querySelectorAll(".story-person-ring svg circle"),
+  ).toHaveLength(3);
+  act(() =>
+    document.querySelector<HTMLAnchorElement>(".story-anime-title")!.click(),
+  );
+  expect(select).toHaveBeenCalledWith(expect.objectContaining({ id: 11 }));
+  expect(document.querySelector('[role="dialog"]')).toBeNull();
+  expect(host.querySelector(".following-stories-trigger")?.className).toContain(
+    "has-new",
+  );
 });

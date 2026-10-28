@@ -472,6 +472,7 @@ export default function App() {
     <div className="apex-shell">
       <FloatingNavigation
         accounts={accounts}
+        onSelectAnime={onSelectMedia}
         notificationFeed={accounts.notificationFeed}
         view={view}
         hidden={navHidden}

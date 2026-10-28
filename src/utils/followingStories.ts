@@ -67,7 +67,7 @@ export function groupStories(rows: RawActivity[]): StoryGroup[] {
     )
     .map((group) => ({
       ...group,
-      activities: group.activities.sort((a, b) => a.createdAt - b.createdAt),
+      activities: group.activities.sort((a, b) => b.createdAt - a.createdAt),
     }));
 }
 function secureImage(value?: string | null) {
@@ -186,4 +186,31 @@ export function readSeenStories(identity: string): number[] {
   } catch {
     return [];
   }
+}
+
+export function newestUnseen(
+  groups: StoryGroup[],
+  seen: number[],
+  onlyUser?: number,
+) {
+  let best = { userIndex: onlyUser ?? 0, index: 0 },
+    time = -Infinity;
+  const candidates: Array<{
+    userIndex: number;
+    index: number;
+    activity: StoryActivity;
+  }> = [];
+  groups.forEach((group, userIndex) => {
+    if (onlyUser !== undefined && onlyUser !== userIndex) return;
+    group.activities.forEach((activity, index) =>
+      candidates.push({ userIndex, index, activity }),
+    );
+  });
+  const unread = candidates.filter((item) => !seen.includes(item.activity.id));
+  for (const item of unread.length ? unread : candidates)
+    if (item.activity.createdAt > time) {
+      time = item.activity.createdAt;
+      best = { userIndex: item.userIndex, index: item.index };
+    }
+  return best;
 }

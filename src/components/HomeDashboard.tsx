@@ -86,6 +86,7 @@ export function FloatingNavigation({
   hidden,
   notificationFeed,
   accounts,
+  onSelectAnime,
 }: {
   view: string;
   onView: (view: string) => void;
@@ -94,6 +95,7 @@ export function FloatingNavigation({
   hidden: boolean;
   notificationFeed?: Accounts["notificationFeed"];
   accounts?: Accounts;
+  onSelectAnime?: (anime: DashboardAnime) => void;
 }) {
   return (
     <nav
@@ -169,6 +171,7 @@ export function FloatingNavigation({
           connected={accounts.connected.anilist}
           checking={accounts.checking}
           onConnect={onSettings}
+          onSelect={onSelectAnime}
         />
       )}
     </nav>

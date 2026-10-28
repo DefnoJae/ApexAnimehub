@@ -6,9 +6,11 @@ import {
   activityLabel,
   fetchFollowingStories,
   readSeenStories,
+  newestUnseen,
   StoryActivity,
   StoryGroup,
 } from "../utils/followingStories";
+import type { DashboardAnime } from "./HomeDashboard";
 import { getDisplayTitle } from "../utils/schedule";
 import "./followingStories.css";
 function Avatar({ user }: { user: StoryGroup["user"] }) {
@@ -28,11 +30,13 @@ export function FollowingStories({
   connected,
   checking = false,
   onConnect,
+  onSelect,
 }: {
   identity?: string;
   connected: boolean;
   checking?: boolean;
   onConnect: () => void;
+  onSelect?: (anime: DashboardAnime) => void;
 }) {
   const [open, setOpen] = useState(false),
     [groups, setGroups] = useState<StoryGroup[]>([]),
@@ -148,6 +152,10 @@ export function FollowingStories({
             groups={activeGroups}
             seen={seen}
             onSeen={markSeen}
+            onSelect={(anime) => {
+              setOpen(false);
+              onSelect?.(anime);
+            }}
             loading={loading || checking || (connected && !identity)}
             error={error}
             warning={warning}
@@ -181,6 +189,7 @@ export function StoryViewer({
   reload,
   onConnect,
   onClose,
+  onSelect,
 }: {
   groups: StoryGroup[];
   seen: number[];
@@ -192,16 +201,11 @@ export function StoryViewer({
   reload: () => void;
   onConnect: () => void;
   onClose: () => void;
+  onSelect?: (anime: DashboardAnime) => void;
 }) {
-  const [userIndex, setUserIndex] = useState(() =>
-      Math.max(
-        0,
-        groups.findIndex((group) =>
-          group.activities.some((activity) => !seen.includes(activity.id)),
-        ),
-      ),
-    ),
-    [index, setIndex] = useState(0),
+  const initial = newestUnseen(groups, seen);
+  const [userIndex, setUserIndex] = useState(initial.userIndex),
+    [index, setIndex] = useState(initial.index),
     [paused, setPaused] = useState(false),
     [hidden, setHidden] = useState(document.hidden),
     [elapsed, setElapsed] = useState(0),
@@ -210,7 +214,17 @@ export function StoryViewer({
     closeButton = useRef<HTMLButtonElement>(null);
   const group = groups[userIndex],
     activity = group?.activities[index];
+  const initialized = useRef(groups.length > 0);
+  useEffect(() => {
+    if (!initialized.current && groups.length) {
+      const start = newestUnseen(groups, seen);
+      setUserIndex(start.userIndex);
+      setIndex(start.index);
+      initialized.current = true;
+    }
+  }, [groups, seen]);
   const advance = (direction: number) => {
+    if (direction > 0 && activity) onSeen(activity.id);
     setEnded(false);
     if (direction > 0) {
       if (group && index + 1 < group.activities.length) setIndex(index + 1);
@@ -229,12 +243,9 @@ export function StoryViewer({
   };
   const advanceRef = useRef(advance);
   advanceRef.current = advance;
-  const seenCallback = useRef(onSeen);
-  seenCallback.current = onSeen;
   useEffect(() => {
     setElapsed(0);
     setEnded(false);
-    if (activity) seenCallback.current(activity.id);
   }, [activity?.id]);
   useEffect(() => {
     if (!activity || paused || hidden || ended) return;
@@ -309,7 +320,7 @@ export function StoryViewer({
   }, []);
   const choose = (next: number) => {
     setUserIndex(next);
-    setIndex(0);
+    setIndex(newestUnseen(groups, seen, next).index);
     setElapsed(0);
     setEnded(false);
     setPaused(false);
@@ -374,11 +385,42 @@ export function StoryViewer({
                 aria-pressed={i === userIndex}
                 onClick={() => choose(i)}
               >
-                <Avatar user={item.user} />
+                <span
+                  className={
+                    "story-person-ring" +
+                    (item.activities.some((a) => !seen.includes(a.id))
+                      ? " has-unseen"
+                      : "")
+                  }
+                >
+                  <Avatar user={item.user} />
+                  <svg viewBox="0 0 60 60" aria-hidden="true">
+                    {item.activities.map((a, j) => {
+                      const length =
+                        (2 * Math.PI * 27) / item.activities.length;
+                      return (
+                        <circle
+                          key={a.id}
+                          cx="30"
+                          cy="30"
+                          r="27"
+                          fill="none"
+                          stroke={seen.includes(a.id) ? "#ffffff45" : "#b98aff"}
+                          strokeWidth="2.5"
+                          strokeDasharray={`${Math.max(1, length - 3)} ${2 * Math.PI * 27 - Math.max(1, length - 3)}`}
+                          strokeDashoffset={-j * length}
+                          transform="rotate(-90 30 30)"
+                        />
+                      );
+                    })}
+                  </svg>
+                </span>
                 <strong>{item.user.name}</strong>
                 <small>
                   {activityAge(
-                    item.activities[item.activities.length - 1].createdAt,
+                    Math.max(
+                      ...item.activities.map((activity) => activity.createdAt),
+                    ),
                   )}
                 </small>
               </button>
@@ -442,7 +484,25 @@ export function StoryViewer({
               <StoryArtwork activity={activity} />
               <div className="story-anime-copy">
                 <p>{activityLabel(activity)}</p>
-                <h3>{getDisplayTitle(activity.anime)}</h3>
+                <h3>
+                  <a
+                    className="story-anime-title"
+                    href={"/anime/" + activity.anime.id}
+                    onClick={(event) => {
+                      if (
+                        event.metaKey ||
+                        event.ctrlKey ||
+                        event.shiftKey ||
+                        event.altKey
+                      )
+                        return;
+                      event.preventDefault();
+                      onSelect?.(activity.anime);
+                    }}
+                  >
+                    {getDisplayTitle(activity.anime)}
+                  </a>
+                </h3>
                 {activity.score !== undefined && (
                   <span className="story-score">
                     <Star size={15} /> {activity.score}/10{" "}
