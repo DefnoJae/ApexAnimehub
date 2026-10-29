@@ -48,13 +48,9 @@ function validateUpdate(input) {
     throw new Error("Invalid episode progress");
   if (
     input.score !== undefined &&
-    (!Number.isInteger(input.score) ||
-      input.score < 0 ||
-      input.score > 10)
+    (!Number.isInteger(input.score) || input.score < 0 || input.score > 10)
   )
-    throw new Error(
-      "Score must be a whole number from 0 to 10",
-    );
+    throw new Error("Score must be a whole number from 0 to 10");
   for (const field of ["automatic", "manualProgress"])
     if (input[field] !== undefined && typeof input[field] !== "boolean")
       throw new Error("Invalid update mode");
@@ -150,7 +146,7 @@ async function readList(provider, account, page = 1) {
     account.identity = Viewer;
     const data = await graphql(
       account.accessToken,
-      "query($user:Int,$page:Int){Page(page:$page,perPage:50){pageInfo{hasNextPage} mediaList(userId:$user,type:ANIME){status progress score(format:POINT_100) updatedAt media{id idMal episodes title{english romaji} coverImage{extraLarge} bannerImage}}}}",
+      "query($user:Int,$page:Int){Page(page:$page,perPage:50){pageInfo{hasNextPage} mediaList(userId:$user,type:ANIME){status progress score(format:POINT_100) updatedAt media{id idMal averageScore episodes title{english romaji} coverImage{extraLarge} bannerImage}}}}",
       { user: Viewer.id, page },
     );
     return {
@@ -176,7 +172,7 @@ async function readList(provider, account, page = 1) {
   const data = await upstream(
     "https://api.myanimelist.net/v2/users/@me/animelist?limit=100&offset=" +
       (page - 1) * 100 +
-      "&nsfw=true&fields=list_status,num_episodes",
+      "&nsfw=true&fields=list_status,num_episodes,mean",
     { headers },
   );
   return {
@@ -192,6 +188,7 @@ async function readList(provider, account, page = 1) {
           extraLarge: node.main_picture?.large || node.main_picture?.medium,
         },
         episodes: node.num_episodes || null,
+        malScore: node.mean || null,
       },
       status: reverse(entry.status),
       progress: entry.num_episodes_watched,
@@ -229,3 +226,48 @@ async function readEntry(provider, account, id) {
   };
 }
 module.exports = { updateList, readList, readEntry, validateUpdate, statusMap };
+
+async function deleteList(provider, account, id) {
+  validateUpdate({ id, status: "watching" });
+  if (provider === "anilist") {
+    const data = await graphql(
+      account.accessToken,
+      "query($id:Int){Media(id:$id,type:ANIME){mediaListEntry{id}}}",
+      { id },
+    );
+    const entryId = data.Media?.mediaListEntry?.id;
+    if (!entryId) return true;
+    const deleted = await graphql(
+      account.accessToken,
+      "mutation($id:Int){DeleteMediaListEntry(id:$id){deleted}}",
+      { id: entryId },
+    );
+    if (!deleted.DeleteMediaListEntry?.deleted)
+      throw new Error("AniList did not confirm removal");
+    return true;
+  }
+  const response = await fetch(
+    "https://api.myanimelist.net/v2/anime/" + id + "/my_list_status",
+    {
+      method: "DELETE",
+      headers: { Authorization: "Bearer " + account.accessToken },
+      signal: AbortSignal.timeout(15000),
+    },
+  );
+  if (!response.ok && response.status !== 404)
+    throw new Error("MyAnimeList removal failed (" + response.status + ")");
+  return true;
+}
+module.exports.deleteList = deleteList;
+
+async function readPublicRating(account, id) {
+  validateUpdate({ id, status: "watching" });
+  const data = await upstream(
+    "https://api.myanimelist.net/v2/anime/" + id + "?fields=mean",
+    { headers: { Authorization: "Bearer " + account.accessToken } },
+  );
+  return typeof data.mean === "number" && data.mean > 0 && data.mean <= 10
+    ? data.mean
+    : null;
+}
+module.exports.readPublicRating = readPublicRating;

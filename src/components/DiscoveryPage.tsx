@@ -400,13 +400,17 @@ export function DiscoveryPage({
                 <strong>{anime.title.english || anime.title.romaji}</strong>
                 <small>
                   {anime.year || "TBA"} · {anime.format}
-                  {anime.anilistScore != null
-                    ? " · ★ " + anime.anilistScore.toFixed(1)
-                    : ""}
                 </small>
               </div>
             </div>
-            <AnimeBadges idMal={anime.idMal} providedScore={anime.malScore} />
+            <AnimeBadges
+              id={anime.id}
+              idMal={anime.idMal}
+              averageScore={
+                anime.anilistScore == null ? undefined : anime.anilistScore * 10
+              }
+              providedScore={anime.malScore}
+            />
           </article>
         ))}
       </div>

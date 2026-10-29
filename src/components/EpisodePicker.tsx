@@ -9,6 +9,7 @@ export function EpisodePicker({
   entries,
   importing,
   onSelect,
+  episodeNumbers,
 }: {
   anime: ListAnime;
   total: number;
@@ -16,6 +17,7 @@ export function EpisodePicker({
   entries: Array<LibraryEntry & { provider: AccountProvider }>;
   importing: boolean;
   onSelect: (episode: number) => void;
+  episodeNumbers?: number[];
 }) {
   const matches = entries.filter((entry) => sameAnime(entry.anime, anime));
   const progress = Math.min(
@@ -29,7 +31,7 @@ export function EpisodePicker({
   );
   return (
     <section className="episode-picker" aria-label="Episodes">
-      <h3>Episodes ({total})</h3>
+      <h3>Episodes ({episodeNumbers?.length ?? total})</h3>
       <p className="episode-progress-summary">
         {progress
           ? "Watched through episode " + progress
@@ -50,31 +52,32 @@ export function EpisodePicker({
         )}
       </p>
       <div className="episode-grid">
-        {Array.from({ length: total }, (_, index) => {
-          const episode = index + 1,
-            watched = episode <= progress;
-          return (
-            <button
-              key={episode}
-              className={
-                "episode-cell" +
-                (watched ? " is-watched" : "") +
-                (episode === selected ? " is-selected" : "")
-              }
-              aria-label={
-                "Episode " +
-                episode +
-                (watched ? ", watched" : ", not marked watched")
-              }
-              aria-pressed={episode === selected}
-              title={watched ? "Watched on your list" : "Not marked watched"}
-              onClick={() => onSelect(episode)}
-            >
-              {episode}
-              {watched && <Check size={13} aria-hidden="true" />}
-            </button>
-          );
-        })}
+        {(episodeNumbers || Array.from({ length: total }, (_, i) => i + 1)).map(
+          (episode) => {
+            const watched = episode <= progress;
+            return (
+              <button
+                key={episode}
+                className={
+                  "episode-cell" +
+                  (watched ? " is-watched" : "") +
+                  (episode === selected ? " is-selected" : "")
+                }
+                aria-label={
+                  "Episode " +
+                  episode +
+                  (watched ? ", watched" : ", not marked watched")
+                }
+                aria-pressed={episode === selected}
+                title={watched ? "Watched on your list" : "Not marked watched"}
+                onClick={() => onSelect(episode)}
+              >
+                {episode}
+                {watched && <Check size={13} aria-hidden="true" />}
+              </button>
+            );
+          },
+        )}
       </div>
     </section>
   );

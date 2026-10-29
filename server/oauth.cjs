@@ -3,6 +3,8 @@ const http = require("node:http");
 const { randomBytes } = require("node:crypto");
 const {
   updateList,
+  deleteList,
+  readPublicRating,
   readList,
   readEntry,
   validateUpdate,
@@ -100,9 +102,12 @@ function createServer() {
   return http.createServer(async (req, res) => {
     res.setHeader("Cache-Control", "no-store");
     const url = new URL(req.url, origin);
-    if (url.pathname === "/api/playback") return require('./playback.cjs').handler(req, res);
-    if (url.pathname === "/api/artwork") return require("./artwork.cjs").handler(req, res);
-    if (url.pathname === "/api/episode-metadata") return require("./episodes.cjs").handler(req,res);
+    if (url.pathname === "/api/playback")
+      return require("./playback.cjs").handler(req, res);
+    if (url.pathname === "/api/artwork")
+      return require("./artwork.cjs").handler(req, res);
+    if (url.pathname === "/api/episode-metadata")
+      return require("./episodes.cjs").handler(req, res);
     const id = /(?:^|; )apex_session=([a-f0-9]{64})(?:;|$)/.exec(
       req.headers.cookie || "",
     )?.[1];
@@ -271,6 +276,17 @@ function createServer() {
           return send(upstream.status, await upstream.json());
         }
       }
+      if (url.pathname === "/api/ratings/mal" && req.method === "GET") {
+        const animeId = Number(url.searchParams.get("animeId"));
+        try {
+          validateUpdate({ id: animeId, status: "watching" });
+        } catch (error) {
+          return send(400, { error: error.message });
+        }
+        const account = await accessAccount(current, "mal");
+        if (!account) return send(401, { error: "MAL connection unavailable" });
+        return send(200, { score: await readPublicRating(account, animeId) });
+      }
       const listRoute = /^\/api\/list\/(anilist|mal)$/.exec(url.pathname);
       if (listRoute && req.method === "GET") {
         const provider = listRoute[1];
@@ -305,7 +321,11 @@ function createServer() {
           });
         const input = await body(req);
         try {
-          validateUpdate(input);
+          validateUpdate(
+            input.action === "remove"
+              ? { id: input.id, status: "watching" }
+              : input,
+          );
         } catch (error) {
           return send(400, { error: error.message });
         }
@@ -313,10 +333,20 @@ function createServer() {
         const previous = locks.get(key) || Promise.resolve();
         const update = previous
           .catch(() => {})
-          .then(() => updateList(provider, account, input));
+          .then(() =>
+            input.action === "remove"
+              ? deleteList(provider, account, input.id)
+              : updateList(provider, account, input),
+          );
         locks.set(key, update);
         try {
-          return send(200, { success: true, entry: await update });
+          const result = await update;
+          return send(
+            200,
+            input.action === "remove"
+              ? { success: true, removed: result }
+              : { success: true, entry: result },
+          );
         } finally {
           if (locks.get(key) === update) locks.delete(key);
         }

@@ -1,17 +1,22 @@
 import React, { useEffect, useRef, useState } from "react";
-import { AudioLines, Star } from "lucide-react";
-import { getDubIndex, getMalScore } from "../utils/animeMetadata";
+import { AudioLines } from "lucide-react";
+import { RatingPills } from "./RatingPills";
+import { getDubIndex } from "../utils/animeMetadata";
 export function AnimeBadges({
   idMal,
   providedScore,
+  id,
+  averageScore,
 }: {
   idMal?: number | null;
+  id?: number;
+  averageScore?: number | null;
   providedScore?: number | null;
 }) {
   const element = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(false);
   const [dub, setDub] = useState("");
-  const [score, setScore] = useState<number | null>(null);
+
   useEffect(() => {
     if (!element.current) return;
     if (!window.IntersectionObserver) {
@@ -30,7 +35,7 @@ export function AnimeBadges({
   useEffect(() => {
     let active = true;
     setDub("");
-    setScore(providedScore ?? null);
+
     if (visible && idMal) {
       void getDubIndex()
         .then((index) => {
@@ -44,10 +49,6 @@ export function AnimeBadges({
             );
         })
         .catch(() => {});
-      if (providedScore === undefined)
-        void getMalScore(idMal).then((value) => {
-          if (active) setScore(value);
-        });
     }
     return () => {
       active = false;
@@ -55,6 +56,15 @@ export function AnimeBadges({
   }, [idMal, visible, providedScore]);
   return (
     <div ref={element} className="anime-badges">
+      {providedScore !== null && (
+        <RatingPills
+          id={id}
+          idMal={idMal}
+          averageScore={averageScore}
+          malScore={providedScore}
+          active={visible}
+        />
+      )}
       {dub && (
         <span
           title={
@@ -66,17 +76,6 @@ export function AnimeBadges({
           <AudioLines size={13} />
           {dub}
         </span>
-      )}
-      {score !== null && (
-        <a
-          href={"https://myanimelist.net/anime/" + idMal}
-          target="_blank"
-          rel="noreferrer"
-          title="MyAnimeList rating via Jikan"
-        >
-          <Star size={12} />
-          MAL {score.toFixed(2)}
-        </a>
       )}
     </div>
   );

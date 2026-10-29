@@ -1,0 +1,68 @@
+.public-rating-pill {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 5px !important;
+  padding: 4px 8px !important;
+  border: 1px solid #ffffff22;
+  border-radius: 999px;
+  font-size: 11px !important;
+  text-decoration: none;
+  line-height: 1.1;
+  backdrop-filter: blur(8px);
+}
+.rating-anilist {
+  color: #65c6ff !important;
+  background: #174a6d55 !important;
+  box-shadow: 0 0 8px #27aaff12;
+}
+.rating-mal {
+  color: #a89cff !important;
+  background: #35317c55 !important;
+  box-shadow: 0 0 8px #7a6aff12;
+}
+.rating-brand {
+  width: 23px;
+  height: 17px;
+  display: inline-block;
+  flex-shrink: 0;
+  background: currentColor;
+  mask-size: contain;
+  mask-position: center;
+  mask-repeat: no-repeat;
+  -webkit-mask-size: contain;
+  -webkit-mask-position: center;
+  -webkit-mask-repeat: no-repeat;
+}
+.personal-rating-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border: 1px solid;
+  border-radius: 999px;
+  color: #f5fff9;
+  font-size: 12px;
+  line-height: 1;
+  white-space: nowrap;
+}
+.my-list-score {
+  position: absolute;
+  bottom: 10px;
+  right: 10px;
+  pointer-events: none;
+  z-index: 3;
+}
+.library-card-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  align-items: center;
+  margin-top: 6px;
+}
+
+.anime-badges .rating-brand {
+  padding: 0 !important;
+  background: currentColor !important;
+  border-radius: 0 !important;
+}

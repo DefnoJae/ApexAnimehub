@@ -65,6 +65,21 @@ export function getMalScore(id: number): Promise<number | null> {
     .catch(() => {})
     .then(async () => {
       try {
+        try {
+          const own = await fetch("/api/ratings/mal?animeId=" + id, {
+            credentials: "same-origin",
+            signal: AbortSignal.timeout(12000),
+          });
+          if (own.ok) {
+            const { score } = await own.json();
+            if (typeof score === "number" && score > 0 && score <= 10) {
+              save(key, score);
+              return score;
+            }
+          }
+        } catch {
+          /* Public metadata remains available without a connected account. */
+        }
         const response = await fetch("https://api.jikan.moe/v4/anime/" + id, {
           signal: AbortSignal.timeout(12000),
         });

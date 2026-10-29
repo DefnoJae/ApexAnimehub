@@ -31,6 +31,7 @@ import { HeroBackdrop } from "./HeroBackdrop";
 import "./dashboard.css";
 import { sectionPaths } from "../hooks/usePageRoute";
 import { useMissingLibrary } from "../hooks/useMissingLibrary";
+import { RatingPills } from "./RatingPills";
 import { AnimeBadges } from "./AnimeBadges";
 import {
   fetchEpisodeMetadata,
@@ -303,6 +304,7 @@ export function PosterRow({
   onSelect: (anime: DashboardAnime) => void;
   notice?: string;
 }) {
+  const [hovered, setHovered] = useState<number | null>(null);
   if (!animes.length && !notice) return null;
   return (
     <section className="discovery-section home-poster-row" aria-label={title}>
@@ -315,6 +317,10 @@ export function PosterRow({
             <div className="poster-art">
               <button
                 className="poster-open"
+                onPointerEnter={() => setHovered(anime.id)}
+                onPointerLeave={() => setHovered(null)}
+                onFocus={() => setHovered(anime.id)}
+                onBlur={() => setHovered(null)}
                 aria-label={"View details: " + getDisplayTitle(anime)}
                 onClick={() => onSelect(anime)}
               >
@@ -327,9 +333,13 @@ export function PosterRow({
                   <span>
                     View episodes <ChevronRight size={18} />
                   </span>
-                  {anime.averageScore ? (
-                    <small>★ {(anime.averageScore / 10).toFixed(1)}</small>
-                  ) : null}
+                  <RatingPills
+                    asText
+                    active={hovered === anime.id}
+                    id={anime.id}
+                    idMal={anime.idMal}
+                    averageScore={anime.averageScore}
+                  />
                 </span>
               </button>
               <QuickList anime={anime} accounts={accounts} />
@@ -342,7 +352,7 @@ export function PosterRow({
               {getDisplayTitle(anime)}
             </button>
             <div className="home-poster-metadata">
-              <AnimeBadges idMal={anime.idMal} />
+              <AnimeBadges idMal={anime.idMal} providedScore={null} />
             </div>
           </article>
         ))}

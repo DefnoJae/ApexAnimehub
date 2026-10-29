@@ -193,3 +193,29 @@ test.each([
     expect(document.querySelector('[role="dialog"]')).toBeNull();
   },
 );
+
+test("personal rating stays before the far-right trailer control", () => {
+  const accounts = {
+    connected: { anilist: true, mal: false },
+    libraryEntries: [
+      { anime, provider: "anilist", status: "watching", progress: 2, score: 9 },
+    ],
+  } as unknown as ReturnType<typeof useAccounts>;
+  act(() =>
+    root.render(
+      <ListEntryEditor
+        anime={anime}
+        accounts={accounts}
+        onConnect={jest.fn()}
+        afterEdit={<button data-trailer="true">Trailer</button>}
+      />,
+    ),
+  );
+  const rating = node.querySelector(".personal-rating-pill")!,
+    trailer = node.querySelector("[data-trailer]")!;
+  expect(rating.textContent).toBe("9");
+  expect(
+    rating.compareDocumentPosition(trailer) & Node.DOCUMENT_POSITION_FOLLOWING,
+  ).toBeTruthy();
+  expect(node.lastElementChild).toBe(trailer);
+});

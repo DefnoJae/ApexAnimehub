@@ -152,6 +152,10 @@ export function AnimeDetails({
       onConnect();
       return;
     }
+    if (status === "remove") {
+      void accounts.remove(anime);
+      return;
+    }
     void accounts.sync(
       anime,
       status as ListStatus,
@@ -202,13 +206,11 @@ export function AnimeDetails({
                 ))}
               </div>
               <div className="detail-rating-line">
-                {anime.averageScore ? (
-                  <span className="detail-anilist-rating">
-                    <Star size={14} />
-                    AniList {(anime.averageScore / 10).toFixed(1)}
-                  </span>
-                ) : null}
-                <AnimeBadges idMal={anime.idMal} />
+                <AnimeBadges
+                  id={anime.id}
+                  idMal={anime.idMal}
+                  averageScore={anime.averageScore}
+                />
                 <ListEntryEditor
                   anime={anime}
                   accounts={accounts}
@@ -275,6 +277,9 @@ export function AnimeDetails({
                         {label}
                       </option>
                     ))}
+                    {matches.length > 0 && (
+                      <option value="remove">Remove from lists</option>
+                    )}
                   </select>
                 </label>
                 <button
@@ -388,6 +393,7 @@ export function AnimeDetails({
                 selected={selected}
                 accounts={accounts}
                 onSelect={onEpisode}
+                onLanguage={changeAudio}
               />
             </div>
           )}
@@ -426,13 +432,11 @@ export function AnimeDetails({
                     </div>
                     <small>{label}</small>
                     <div className="detail-related-badges">
-                      {item.averageScore ? (
-                        <span className="detail-related-rating">
-                          <Star size={12} /> AniList{" "}
-                          {(item.averageScore / 10).toFixed(1)}
-                        </span>
-                      ) : null}
-                      <AnimeBadges idMal={item.idMal} providedScore={null} />
+                      <AnimeBadges
+                        id={item.id}
+                        idMal={item.idMal}
+                        averageScore={item.averageScore}
+                      />
                     </div>
                     <button
                       className="poster-title"

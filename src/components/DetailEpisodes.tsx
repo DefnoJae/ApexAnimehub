@@ -4,6 +4,10 @@ import {
   fetchEpisodeMetadata,
   EpisodeMetadata,
 } from "../utils/episodeMetadata";
+import {
+  fetchEpisodeAvailability,
+  EpisodeAvailability,
+} from "../utils/episodeAvailability";
 import { EpisodePicker } from "./EpisodePicker";
 import type { DashboardAnime } from "./HomeDashboard";
 import type { useAccounts } from "../hooks/useAccounts";
@@ -14,12 +18,14 @@ export function DetailEpisodes({
   selected,
   accounts,
   onSelect,
+  onLanguage,
 }: {
   anime: DashboardAnime;
   total: number;
   selected: number;
   accounts: ReturnType<typeof useAccounts>;
   onSelect: (episode: number) => void;
+  onLanguage?: (language: "sub" | "dub") => void;
 }) {
   const [data, setData] = useState<{
       id: number;
@@ -28,6 +34,42 @@ export function DetailEpisodes({
     [search, setSearch] = useState(""),
     [numbers, setNumbers] = useState(false),
     [limit, setLimit] = useState(50);
+  const [availability, setAvailability] = useState<EpisodeAvailability | null>(
+      null,
+    ),
+    [language, setLanguage] = useState<"all" | "sub" | "dub">("all"),
+    [availabilityError, setAvailabilityError] = useState(""),
+    [retry, setRetry] = useState(0);
+  useEffect(() => {
+    let active = true;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 15000);
+    setAvailability(null);
+    setAvailabilityError("");
+    void fetchEpisodeAvailability(anime.id, controller.signal)
+      .then((value) => {
+        if (active) setAvailability(value);
+      })
+      .catch(() => {
+        if (active)
+          setAvailabilityError(
+            "Availability unavailable. All episodes remain accessible.",
+          );
+      })
+      .finally(() => clearTimeout(timer));
+    return () => {
+      active = false;
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [anime.id, retry]);
+  useEffect(() => {
+    if (language !== "all" && availability) {
+      const available = availability[language];
+      if (available.length && !available.includes(selected))
+        onSelect(available[0]);
+    }
+  }, [language, availability, selected, onSelect]);
   useEffect(() => {
     let active = true;
     setSearch("");
@@ -46,7 +88,20 @@ export function DetailEpisodes({
       .filter((e) => sameAnime(e.anime, anime))
       .map((e) => e.progress),
   );
-  const filtered = Array.from({ length: total }, (_, i) => i + 1).filter(
+  const filtered = (
+    language !== "all" && availability
+      ? availability[language]
+      : Array.from(
+          {
+            length: Math.max(
+              total,
+              ...(availability?.sub || []),
+              ...(availability?.dub || []),
+            ),
+          },
+          (_, i) => i + 1,
+        )
+  ).filter(
     (n) =>
       !search ||
       String(n) === search.trim() ||
@@ -79,11 +134,49 @@ export function DetailEpisodes({
           <ListOrdered size={17} />
         </button>
       </div>
+      <div
+        className="detail-availability-filters"
+        role="group"
+        aria-label="Episode availability"
+      >
+        <button
+          aria-pressed={language === "all"}
+          onClick={() => {
+            setLanguage("all");
+            setLimit(50);
+          }}
+        >
+          All episodes
+        </button>
+        {(["sub", "dub"] as const).map((value) => (
+          <button
+            key={value}
+            disabled={!availability}
+            aria-pressed={language === value}
+            onClick={() => {
+              setLanguage(value);
+              onLanguage?.(value);
+              setLimit(50);
+            }}
+          >
+            {value === "sub" ? "Sub only" : "Dub only"}{" "}
+            {availability ? availability[value].length : "…"}
+          </button>
+        ))}
+        <small>Availability on Ani.pm</small>
+      </div>
+      {availabilityError && (
+        <p role="status">
+          {availabilityError}{" "}
+          <button onClick={() => setRetry((v) => v + 1)}>Retry</button>
+        </p>
+      )}
       {numbers ? (
         <EpisodePicker
           anime={anime}
           total={total}
           selected={selected}
+          episodeNumbers={filtered}
           entries={accounts.libraryEntries}
           importing={accounts.libraryLoading}
           onSelect={onSelect}

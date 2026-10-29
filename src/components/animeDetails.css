@@ -1039,3 +1039,31 @@
   color: #f0ce70;
   font-size: 11px;
 }
+
+.detail-availability-filters {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin: 12px 0 18px;
+}
+.detail-availability-filters button {
+  border-radius: 999px;
+  padding: 7px 12px;
+  background: #ffffff0a;
+  border: 1px solid #ffffff18;
+  font-size: 12px;
+  color: #c7bed7;
+}
+.detail-availability-filters button[aria-pressed="true"] {
+  color: #fff;
+  background: #9360d850;
+  border-color: #be8dff66;
+}
+.detail-availability-filters small {
+  font-size: 10px;
+  color: #aaa0b7;
+}
+.detail-availability-filters button:disabled {
+  opacity: 0.5;
+}

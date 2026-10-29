@@ -27,6 +27,7 @@ test("bulk library refresh is silent; one rating edit across providers produces 
     libraryErrors: { anilist: "Import retry pending" },
     refreshLibrary: jest.fn(),
     record: jest.fn(),
+    removeRecord: jest.fn(),
     getListStatus: jest.fn(),
   };
   library.record.mockImplementation(
@@ -93,6 +94,18 @@ test("bulk library refresh is silent; one rating edit across providers produces 
       });
     });
     expect(accounts!.notificationFeed.notifications).toHaveLength(1);
+    (global.fetch as jest.Mock).mockImplementation(async (url) => ({
+      ok: String(url).endsWith("anilist"),
+      json: async () =>
+        String(url).endsWith("anilist")
+          ? { removed: true }
+          : { error: "Reconnect required" },
+    }));
+    await act(async () => {
+      expect(await accounts!.remove(anime)).toBe(false);
+    });
+    expect(library.removeRecord).toHaveBeenCalledWith("anilist", anime);
+    expect(library.removeRecord).not.toHaveBeenCalledWith("mal", anime);
   } finally {
     act(() => root.unmount());
     host.remove();

@@ -3,6 +3,8 @@ import type { AccountProvider, ListAnime, ListStatus } from "./useAccounts";
 export interface LibraryAnime extends ListAnime {
   coverImage?: { extraLarge?: string };
   bannerImage?: string;
+  averageScore?: number;
+  malScore?: number | null;
 }
 export interface LibraryEntry {
   anime: LibraryAnime;
@@ -222,6 +224,24 @@ export function useLibrary(connected: Record<AccountProvider, boolean>) {
     libraryLoading: loading,
     refreshLibrary,
     record,
+    removeRecord: (provider: AccountProvider, anime: ListAnime) =>
+      setLists((previous) => {
+        const list = previous[provider];
+        if (!list) return previous;
+        const next = {
+          ...list,
+          entries: list.entries.filter(
+            (entry) => !sameAnime(entry.anime, anime),
+          ),
+        };
+        try {
+          localStorage.setItem(
+            "apex_library_v1_" + provider + "_" + list.identity,
+            JSON.stringify(next),
+          );
+        } catch {}
+        return { ...previous, [provider]: next };
+      }),
     getListStatus: (anime: ListAnime) =>
       entries.find((entry) => sameAnime(entry.anime, anime))?.status,
   };

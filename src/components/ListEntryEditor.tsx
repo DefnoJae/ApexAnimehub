@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { PersonalRating } from "./RatingPills";
 import { Pencil, X } from "lucide-react";
 import type {
   AccountProvider,
@@ -58,14 +59,19 @@ export function ListEntryEditor({
         </span>
         <Pencil size={15} />
       </button>
+      {entries.some((entry) => (entry.score || 0) > 0) &&
+        (commonWholeRating(entries.map((entry) => entry.score || 0)) ? (
+          <PersonalRating
+            score={Number(
+              commonWholeRating(entries.map((entry) => entry.score || 0)),
+            )}
+          />
+        ) : (
+          <span className="detail-personal-score">
+            Choose a whole-number rating
+          </span>
+        ))}
       {afterEdit}
-      {entries.some((entry) => (entry.score || 0) > 0) && (
-        <span className="detail-personal-score">
-          {commonWholeRating(entries.map((entry) => entry.score || 0))
-            ? `Your rating: ${commonWholeRating(entries.map((entry) => entry.score || 0))}/10`
-            : "Choose a whole-number rating"}
-        </span>
-      )}
       {open && (
         <EntryDialog
           anime={anime}

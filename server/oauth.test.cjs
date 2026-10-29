@@ -361,3 +361,49 @@ test("personal scores normalize AniList scale and preserve automatic progress wh
     global.fetch = browserFetch;
   }
 });
+
+test("list removal uses the AniList entry ID and accepts MAL's empty successful response", async () => {
+  const { deleteList } = require("./list.cjs");
+  const calls = [];
+  try {
+    global.fetch = async (url, options) => {
+      calls.push({ url, options });
+      if (url.includes("graphql")) {
+        const body = JSON.parse(options.body);
+        return json({
+          data: body.query.startsWith("query")
+            ? { Media: { mediaListEntry: { id: 777 } } }
+            : { DeleteMediaListEntry: { deleted: true } },
+        });
+      }
+      return {
+        ok: true,
+        status: 204,
+        json: () => {
+          throw new Error("204 has no body");
+        },
+      };
+    };
+    assert.equal(
+      await deleteList("anilist", { accessToken: "test" }, 10),
+      true,
+    );
+    assert.equal(JSON.parse(calls[1].options.body).variables.id, 777);
+    assert.equal(await deleteList("mal", { accessToken: "test" }, 20), true);
+    assert.equal(calls[2].options.method, "DELETE");
+    await assert.rejects(deleteList("mal", {}, -1), /Invalid/);
+  } finally {
+    global.fetch = browserFetch;
+  }
+});
+
+test("public MAL rating uses mean, never the user's personal score", async () => {
+  const { readPublicRating } = require("./list.cjs");
+  try {
+    global.fetch = async () =>
+      json({ mean: 8.58, my_list_status: { score: 2 } });
+    assert.equal(await readPublicRating({ accessToken: "test" }, 16498), 8.58);
+  } finally {
+    global.fetch = browserFetch;
+  }
+});

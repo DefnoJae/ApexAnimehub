@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import type { useAccounts, ListStatus } from "../hooks/useAccounts";
 import { LibraryAnime } from "../hooks/useLibrary";
 import { QuickList } from "./HomeDashboard";
+import { PersonalRating } from "./RatingPills";
 import { AnimeBadges } from "./AnimeBadges";
 const labels = {
   watching: "Watching",
@@ -22,6 +23,13 @@ export function MyList({
   const [status, setStatus] = useState<ListStatus | "all">("all");
   const [provider, setProvider] = useState("all");
   const [search, setSearch] = useState("");
+  const [sort, setSort] = useState(() => {
+    try {
+      return localStorage.getItem("apex_my_list_sort_v1") || "updated";
+    } catch {
+      return "updated";
+    }
+  });
   const filtered = accounts.libraryEntries.filter(
     (e) =>
       (provider === "all" || provider === e.provider) &&
@@ -40,6 +48,40 @@ export function MyList({
   const unique = Array.from(
     new Map(filtered.map((entry) => [keyFor(entry.anime), entry])).values(),
   );
+  const entriesFor = (anime: LibraryAnime) =>
+    (grouped.get(keyFor(anime)) || []).filter(
+      (entry) => provider === "all" || entry.provider === provider,
+    );
+  const scoreFor = (anime: LibraryAnime) => {
+    const entries = entriesFor(anime);
+    return (
+      entries.find(
+        (entry) => entry.provider === "anilist" && (entry.score || 0) > 0,
+      )?.score ||
+      entries.find((entry) => (entry.score || 0) > 0)?.score ||
+      0
+    );
+  };
+  const updated = (anime: LibraryAnime) =>
+    Math.max(0, ...entriesFor(anime).map((entry) => entry.updatedAt));
+  unique.sort((a, b) =>
+    sort === "highest"
+      ? scoreFor(b.anime) - scoreFor(a.anime)
+      : sort === "lowest"
+        ? (scoreFor(a.anime) || Infinity) - (scoreFor(b.anime) || Infinity)
+        : sort === "progress"
+          ? Math.max(0, ...entriesFor(b.anime).map((entry) => entry.progress)) -
+            Math.max(0, ...entriesFor(a.anime).map((entry) => entry.progress))
+          : sort === "title"
+            ? (
+                a.anime.title?.english ||
+                a.anime.title?.romaji ||
+                ""
+              ).localeCompare(
+                b.anime.title?.english || b.anime.title?.romaji || "",
+              )
+            : updated(b.anime) - updated(a.anime),
+  );
   return (
     <section className="my-library">
       <div className="section-heading">
@@ -52,10 +94,7 @@ export function MyList({
           {accounts.libraryLoading ? "Importing…" : "Refresh lists"}
         </button>
       </div>
-      <p>
-        Your connected lists, saved on this device. Different provider statuses
-        are shown separately; importing never overwrites either account.
-      </p>
+      <p>Your connected anime lists, saved on this device.</p>
       {!accounts.connected.anilist && !accounts.connected.mal && (
         <button className="hero-primary" onClick={onConnect}>
           Connect AniList or MyAnimeList
@@ -88,6 +127,22 @@ export function MyList({
               {label}
             </option>
           ))}
+        </select>
+        <select
+          aria-label="Sort my list"
+          value={sort}
+          onChange={(event) => {
+            setSort(event.target.value);
+            try {
+              localStorage.setItem("apex_my_list_sort_v1", event.target.value);
+            } catch {}
+          }}
+        >
+          <option value="updated">Recently updated</option>
+          <option value="highest">My highest rated</option>
+          <option value="lowest">My lowest rated</option>
+          <option value="progress">Most watched</option>
+          <option value="title">Title A–Z</option>
         </select>
       </div>
       {Object.entries(accounts.libraryErrors).map(([p, error]) => (
@@ -137,6 +192,10 @@ export function MyList({
                   alt=""
                 />
               </button>
+              <PersonalRating
+                score={scoreFor(entry.anime)}
+                className="my-list-score"
+              />
               <QuickList
                 anime={{ ...entry.anime, title: entry.anime.title || {} }}
                 accounts={accounts}
@@ -148,19 +207,26 @@ export function MyList({
             >
               {entry.anime.title?.english || entry.anime.title?.romaji}
             </button>
-            <AnimeBadges idMal={entry.anime.idMal} />
-            {(grouped.get(keyFor(entry.anime)) || []).map((e) => (
-              <small className="library-status" key={e.provider}>
-                {e.provider === "mal" ? "MAL" : "AniList"} · {labels[e.status]}{" "}
-                · {e.progress}/{e.anime.episodes || "?"} episodes
-                {e.score !== undefined && (
-                  <span>
-                    {" "}
-                    · Your score: {e.score > 0 ? e.score + "/10" : "Unrated"}
-                  </span>
-                )}
-              </small>
-            ))}
+            <div className="library-card-badges">
+              <AnimeBadges
+                id={
+                  (grouped.get(keyFor(entry.anime)) || []).find(
+                    (e) => e.anime.id,
+                  )?.anime.id
+                }
+                idMal={entry.anime.idMal}
+                averageScore={
+                  (grouped.get(keyFor(entry.anime)) || []).find(
+                    (e) => e.anime.averageScore,
+                  )?.anime.averageScore
+                }
+                providedScore={
+                  (grouped.get(keyFor(entry.anime)) || []).find(
+                    (e) => e.anime.malScore,
+                  )?.anime.malScore || undefined
+                }
+              />
+            </div>
           </article>
         ))}
       </div>

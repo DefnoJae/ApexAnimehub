@@ -412,6 +412,67 @@ export function useAccounts() {
     queue.current = task;
     return task;
   };
+  const remove = async (anime: ListAnime) => {
+    setPending((value) => value + 1);
+    try {
+      const next = await Promise.allSettled(
+        providers
+          .filter((provider) => connected[provider])
+          .map(async (provider) => {
+            let id = provider === "anilist" ? anime.id : anime.idMal;
+            if (!id) {
+              const data = await fetchAnilist<{ Media: ListAnime }>(
+                "query($id:Int,$idMal:Int){Media(id:$id,idMal:$idMal,type:ANIME){id idMal}}",
+                anime.id ? { id: anime.id } : { idMal: anime.idMal },
+              );
+              id = provider === "anilist" ? data.Media.id : data.Media.idMal;
+            }
+            const response = await fetch("/api/list/" + provider, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ id, action: "remove" }),
+            });
+            const data = await response.json();
+            if (!response.ok || !data.removed)
+              throw new Error(
+                (provider === "mal" ? "MyAnimeList" : "AniList") +
+                  ": " +
+                  (data.error || "Removal failed"),
+              );
+            library.removeRecord(provider, anime);
+            return provider;
+          }),
+      );
+      if (next.some((result) => result.status === "fulfilled"))
+        void library.refreshLibrary();
+      const errors = next
+        .filter(
+          (result): result is PromiseRejectedResult =>
+            result.status === "rejected",
+        )
+        .map((result) => String(result.reason));
+      notificationFeed.notify({
+        title: errors.length
+          ? "List removal needs attention"
+          : "Removed from lists",
+        kind: errors.length ? "error" : "success",
+        detail:
+          (anime.title?.english || anime.title?.romaji || "Anime") +
+          "\n" +
+          (errors.length ? errors.join("\n") : "Removed from connected lists"),
+        anime: {
+          id: anime.id,
+          idMal: anime.idMal,
+          title: anime.title?.english || anime.title?.romaji || "Anime",
+          poster: anime.coverImage?.extraLarge,
+        },
+      });
+      setMessage(errors.join(" · ") || "Removed from connected lists.");
+      return errors.length === 0;
+    } finally {
+      setPending((value) => value - 1);
+    }
+  };
   return {
     notificationFeed,
     ...library,
@@ -425,6 +486,7 @@ export function useAccounts() {
     refresh,
     disconnect,
     sync,
+    remove,
     results,
     message,
     busy: pending > 0,
