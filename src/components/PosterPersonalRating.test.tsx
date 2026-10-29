@@ -11,3 +11,8 @@ test("personal badges match IDs, prefer rated AniList values, and never invent s
   expect(personalScore(entries, { id: 99 })).toBeUndefined();
   expect(personalScore([{ ...entries[1], score: 8 }], { id: 10 })).toBe(8);
 });
+
+test("missing anime metadata hides the badge while Home data is loading", () => {
+  expect(personalScore([], undefined)).toBeUndefined();
+  expect(personalScore([], null)).toBeUndefined();
+});

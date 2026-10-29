@@ -379,3 +379,58 @@ test("latest releases show local dates and open the exact episode without openin
   );
   expect(onCalendar).not.toHaveBeenCalled();
 });
+
+test("Home refresh renders saved Continue Watching before hero data arrives and uses each card's own rating", async () => {
+  const accounts = {
+    ...fakeAccounts(),
+    libraryEntries: [
+      {
+        provider: "anilist",
+        anime,
+        status: "watching",
+        score: 9,
+        progress: 3,
+        updatedAt: 1,
+      },
+    ],
+  } as ReturnType<typeof useAccounts>;
+  const history = [
+    { anime, episode: 3, streamName: "Ani.pm (Dub)", timestamp: 1 },
+  ];
+  const props = {
+    rows: [],
+    history,
+    accounts,
+    onSelect: jest.fn(),
+    onWatch: jest.fn(),
+    onResume: jest.fn(),
+    onRemove: jest.fn(),
+    onCalendar: jest.fn(),
+  };
+  await act(async () => root.render(<HomeDashboard {...props} slides={[]} />));
+  expect(node.querySelector(".continue-card")).not.toBeNull();
+  expect(
+    node.querySelectorAll(".continue-card .personal-rating-pill"),
+  ).toHaveLength(1);
+  expect(
+    node
+      .querySelector(".continue-art .personal-rating-pill")
+      ?.getAttribute("aria-label"),
+  ).toBe("Your rating: 9/10");
+  await act(async () =>
+    root.render(
+      <HomeDashboard
+        {...props}
+        slides={[{ ...anime, id: 100, title: { english: "Different hero" } }]}
+      />,
+    ),
+  );
+  expect(
+    node.querySelectorAll(".continue-card .personal-rating-pill"),
+  ).toHaveLength(1);
+  expect(
+    node
+      .querySelector(".continue-art .personal-rating-pill")
+      ?.getAttribute("aria-label"),
+  ).toBe("Your rating: 9/10");
+});

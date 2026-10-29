@@ -6,8 +6,9 @@ type Entry = Accounts["libraryEntries"][number];
 const indexes = new WeakMap<Entry[], Map<string, number>>();
 export function personalScore(
   entries: Entry[],
-  anime: { id?: number; idMal?: number | null },
+  anime: { id?: number; idMal?: number | null } | null | undefined,
 ) {
+  if (!anime) return undefined;
   let index = indexes.get(entries);
   if (!index) {
     index = new Map<string, number>();
@@ -15,7 +16,9 @@ export function personalScore(
     for (const provider of ["mal", "anilist"])
       for (const entry of entries) {
         if (
+          !entry?.anime ||
           entry.provider !== provider ||
+          !Number.isFinite(entry.score) ||
           !entry.score ||
           entry.score < 1 ||
           entry.score > 10
@@ -38,7 +41,7 @@ export function PosterPersonalRating({
   anime,
 }: {
   accounts: Accounts;
-  anime: { id?: number; idMal?: number | null };
+  anime?: { id?: number; idMal?: number | null } | null;
 }) {
   return (
     <PersonalRating

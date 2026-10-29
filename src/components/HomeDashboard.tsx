@@ -928,12 +928,6 @@ export function HomeDashboard({
                             {getDisplayTitle(item.anime)}
                           </button>
                         </h3>
-                        {accounts && (
-                          <PosterPersonalRating
-                            anime={anime}
-                            accounts={accounts}
-                          />
-                        )}
                         <span className="episode-badge">EP {item.episode}</span>
                       </div>
                       {metadata?.title && (
