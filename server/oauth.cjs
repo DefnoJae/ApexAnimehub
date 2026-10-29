@@ -284,7 +284,8 @@ function createServer() {
           return send(400, { error: error.message });
         }
         const account = await accessAccount(current, "mal");
-        if (!account) return send(401, { error: "MAL connection unavailable" });
+        if (!account && !process.env.MAL_CLIENT_ID)
+          return send(401, { error: "MAL connection unavailable" });
         return send(200, { score: await readPublicRating(account, animeId) });
       }
       const listRoute = /^\/api\/list\/(anilist|mal)$/.exec(url.pathname);

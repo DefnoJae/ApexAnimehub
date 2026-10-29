@@ -66,3 +66,21 @@
   background: currentColor !important;
   border-radius: 0 !important;
 }
+
+.hover-rating-values {
+  display: inline-flex;
+  gap: 10px;
+  justify-content: center;
+}
+.poster-rating-number {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #f7d369;
+  font-size: 13px;
+  background: none;
+  border: 0;
+}
+.rating-values {
+  display: contents;
+}

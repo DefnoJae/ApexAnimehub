@@ -49,3 +49,34 @@ test("rating source updates immediately, remembers the choice, and uses logo-onl
     localStorage.clear();
   }
 });
+
+test("home hover uses the selected provider score without a logo pill", async () => {
+  localStorage.setItem("apex_rating_source_v1", "mal");
+  const host = document.createElement("div");
+  const root = createRoot(host);
+  try {
+    await act(async () =>
+      root.render(
+        <RatingPills
+          asText
+          active={false}
+          id={10}
+          idMal={20}
+          averageScore={85}
+          malScore={7.4}
+        />,
+      ),
+    );
+    expect(host.querySelector(".poster-rating-number")?.textContent).toBe(
+      "7.4",
+    );
+    expect(host.querySelector(".rating-brand")).toBeNull();
+    expect(host.querySelector(".public-rating-pill")).toBeNull();
+    expect(
+      host.querySelector(".poster-rating-number")?.getAttribute("aria-label"),
+    ).toBe("MyAnimeList rating 7.4");
+  } finally {
+    act(() => root.unmount());
+    localStorage.clear();
+  }
+});

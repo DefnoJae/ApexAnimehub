@@ -55,49 +55,67 @@ export function getDubIndex() {
 }
 let queue: Promise<unknown> = Promise.resolve();
 const pending = new Map<number, Promise<number | null>>();
+let officialActive = 0;
+const officialWaiters: Array<() => void> = [];
+async function officialRating(id: number): Promise<Response> {
+  if (officialActive >= 4)
+    await new Promise<void>((resolve) => officialWaiters.push(resolve));
+  officialActive++;
+  try {
+    return await fetch("/api/ratings/mal?animeId=" + id, {
+      credentials: "same-origin",
+      signal: AbortSignal.timeout(12000),
+    });
+  } finally {
+    officialActive--;
+    officialWaiters.shift()?.();
+  }
+}
+export function getCachedMalScore(id: number): number | null {
+  return read<number | null>("apex_mal_score_v1_" + id)?.value ?? null;
+}
 export function getMalScore(id: number): Promise<number | null> {
   if (pending.has(id)) return pending.get(id)!;
   const key = "apex_mal_score_v1_" + id,
     cached = read<number | null>(key);
   if (cached && Date.now() - cached.at < 86400000)
     return Promise.resolve(cached.value);
-  const request = queue
-    .catch(() => {})
-    .then(async () => {
+  const request = (async () => {
+    try {
       try {
-        try {
-          const own = await fetch("/api/ratings/mal?animeId=" + id, {
-            credentials: "same-origin",
-            signal: AbortSignal.timeout(12000),
-          });
-          if (own.ok) {
-            const { score } = await own.json();
-            if (typeof score === "number" && score > 0 && score <= 10) {
-              save(key, score);
-              return score;
-            }
+        const own = await officialRating(id);
+        if (own.ok) {
+          const { score } = await own.json();
+          if (typeof score === "number" && score > 0 && score <= 10) {
+            save(key, score);
+            return score;
           }
-        } catch {
-          /* Public metadata remains available without a connected account. */
         }
-        const response = await fetch("https://api.jikan.moe/v4/anime/" + id, {
-          signal: AbortSignal.timeout(12000),
-        });
-        if (!response.ok) throw new Error("MAL rating unavailable");
-        const payload = await response.json(),
-          score = payload.data?.score;
-        const value =
-          typeof score === "number" && score > 0 && score <= 10 ? score : null;
-        save(key, value);
-        return value;
       } catch {
-        return cached?.value ?? null;
-      } finally {
-        await new Promise((resolve) => setTimeout(resolve, 1100));
-        pending.delete(id);
+        /* Public metadata remains available without a connected account. */
       }
-    });
-  queue = request;
+      // Only the public fallback is rate limited; official requests run independently.
+      const slot = queue
+        .catch(() => {})
+        .then(() => new Promise((resolve) => setTimeout(resolve, 1100)));
+      queue = slot;
+      await slot;
+      const response = await fetch("https://api.jikan.moe/v4/anime/" + id, {
+        signal: AbortSignal.timeout(12000),
+      });
+      if (!response.ok) throw new Error("MAL rating unavailable");
+      const payload = await response.json(),
+        score = payload.data?.score;
+      const value =
+        typeof score === "number" && score > 0 && score <= 10 ? score : null;
+      save(key, value);
+      return value;
+    } catch {
+      return cached?.value ?? null;
+    } finally {
+      pending.delete(id);
+    }
+  })();
   pending.set(id, request);
   return request;
 }

@@ -264,7 +264,11 @@ async function readPublicRating(account, id) {
   validateUpdate({ id, status: "watching" });
   const data = await upstream(
     "https://api.myanimelist.net/v2/anime/" + id + "?fields=mean",
-    { headers: { Authorization: "Bearer " + account.accessToken } },
+    {
+      headers: account?.accessToken
+        ? { Authorization: "Bearer " + account.accessToken }
+        : { "X-MAL-CLIENT-ID": process.env.MAL_CLIENT_ID },
+    },
   );
   return typeof data.mean === "number" && data.mean > 0 && data.mean <= 10
     ? data.mean

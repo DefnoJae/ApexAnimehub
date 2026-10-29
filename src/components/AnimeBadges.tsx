@@ -23,12 +23,15 @@ export function AnimeBadges({
       setVisible(true);
       return;
     }
-    const observer = new IntersectionObserver(([entry]) => {
-      if (entry.isIntersecting) {
-        setVisible(true);
-        observer.disconnect();
-      }
-    });
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setVisible(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: "600px" },
+    );
     observer.observe(element.current);
     return () => observer.disconnect();
   }, []);

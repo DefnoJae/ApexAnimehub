@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Star } from "lucide-react";
 import { useRatingSource } from "../hooks/useRatingSource";
-import { getMalScore } from "../utils/animeMetadata";
+import { getMalScore, getCachedMalScore } from "../utils/animeMetadata";
 import { fetchAnilist } from "../utils/anilist";
 import "./ratingPills.css";
 const pending = new Map<string, Promise<number | null>>();
@@ -40,12 +40,34 @@ export function RatingPills({
     [al, setAl] = useState<number | null>(
       averageScore ? averageScore / 10 : null,
     ),
-    [mal, setMal] = useState<number | null>(malScore ?? null);
+    [mal, setMal] = useState<number | null>(
+      malScore ?? (idMal ? getCachedMalScore(idMal) : null),
+    );
+  const anchor = useRef<HTMLSpanElement>(null);
+  const [nearby, setNearby] = useState(false);
+  useEffect(() => {
+    if (!asText || !anchor.current) return;
+    if (!window.IntersectionObserver) {
+      setNearby(true);
+      return;
+    }
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setNearby(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: "600px" },
+    );
+    observer.observe(anchor.current.closest(".poster-card") || anchor.current);
+    return () => observer.disconnect();
+  }, [asText]);
   useEffect(() => {
     let live = true;
     setAl(averageScore ? averageScore / 10 : null);
-    setMal(malScore ?? null);
-    if (active) {
+    setMal(malScore ?? (idMal ? getCachedMalScore(idMal) : null));
+    if (active || nearby) {
       if (source !== "mal" && !averageScore && (id || idMal))
         void anilistScore(id, idMal).then((v) => {
           if (live) setAl(v);
@@ -58,10 +80,13 @@ export function RatingPills({
     return () => {
       live = false;
     };
-  }, [id, idMal, averageScore, malScore, active, source]);
+  }, [id, idMal, averageScore, malScore, active, nearby, source]);
   const Tag = asText ? "span" : "a";
   return (
-    <>
+    <span
+      ref={anchor}
+      className={asText ? "hover-rating-values" : "rating-values"}
+    >
       {(["anilist", "mal"] as const).map((provider) => {
         const score = provider === "anilist" ? al : mal;
         if ((source !== "both" && source !== provider) || !score) return null;
@@ -69,7 +94,11 @@ export function RatingPills({
         return (
           <Tag
             key={provider}
-            className={"public-rating-pill rating-" + provider}
+            className={
+              (asText
+                ? "poster-rating-number rating-"
+                : "public-rating-pill rating-") + provider
+            }
             href={
               provider === "anilist"
                 ? id
@@ -82,21 +111,23 @@ export function RatingPills({
             aria-label={label + " rating " + score.toFixed(1)}
             title={label + " rating"}
           >
-            <span
-              className="rating-brand"
-              role="img"
-              aria-label={label}
-              style={{
-                maskImage: `url(/${provider === "anilist" ? "anilist" : "mal"}-logo.svg)`,
-                WebkitMaskImage: `url(/${provider === "anilist" ? "anilist" : "mal"}-logo.svg)`,
-              }}
-            />
+            {!asText && (
+              <span
+                className="rating-brand"
+                role="img"
+                aria-label={label}
+                style={{
+                  maskImage: `url(/${provider === "anilist" ? "anilist" : "mal"}-logo.svg)`,
+                  WebkitMaskImage: `url(/${provider === "anilist" ? "anilist" : "mal"}-logo.svg)`,
+                }}
+              />
+            )}
             <Star size={12} fill="currentColor" />
             <b>{score.toFixed(1)}</b>
           </Tag>
         );
       })}
-    </>
+    </span>
   );
 }
 export function PersonalRating({
