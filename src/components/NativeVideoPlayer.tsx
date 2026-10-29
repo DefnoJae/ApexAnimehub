@@ -5,6 +5,7 @@ import type { PlayerProps } from "./VideoPlayer";
 import "./nativeVideoPlayer.css";
 import { Maximize, X } from "lucide-react";
 import { SignSync } from "./SignSync";
+import { usePlayerKeyboard } from "../hooks/usePlayerKeyboard";
 function controlButton(label: string, path: string, disabled = false) {
   return `<button type="button" aria-label="${label}" ${disabled ? "disabled" : ""} style="display:flex;align-items:center;background:none;border:0;color:inherit;padding:4px;cursor:pointer;opacity:${disabled ? ".35" : "1"}"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">${path}</svg></button>`;
 }
@@ -15,6 +16,7 @@ export default function NativeVideoPlayer(
   const host = useRef<HTMLDivElement>(null);
   const dialog = useRef<HTMLDivElement>(null);
   const clock = useRef(0);
+  const instance = useRef<Artplayer>();
   const animeId = Number(
     new URL(props.stream.url, window.location.origin).searchParams.get("id"),
   );
@@ -173,6 +175,7 @@ export default function NativeVideoPlayer(
             },
           },
         });
+        instance.current = player;
         player.on("video:timeupdate", () => {
           if (!player || controller.signal.aborted) return;
           clock.current = player.currentTime;
@@ -218,32 +221,42 @@ export default function NativeVideoPlayer(
       }
     };
     void load();
-    const keyboard = (event: KeyboardEvent) => {
-      if (
-        event.target instanceof HTMLElement &&
-        event.target.closest("input,select,textarea,[contenteditable=true]")
-      )
-        return;
-      if (event.key.toLowerCase() === "n" && callbacks.current.canNext) {
-        event.preventDefault();
-        callbacks.current.onNext();
-      }
-      if (event.key.toLowerCase() === "b" && callbacks.current.episode > 1) {
-        event.preventDefault();
-        callbacks.current.onPrevious();
-      }
-    };
-    document.addEventListener("keydown", keyboard);
     return () => {
       controller.abort();
-      document.removeEventListener("keydown", keyboard);
+      instance.current = undefined;
       hls?.destroy();
       player?.destroy(true);
     };
   }, [props.stream.url]);
+  usePlayerKeyboard(dialog, {
+    toggle: () => instance.current?.toggle(),
+    seek: (seconds) => {
+      const player = instance.current;
+      if (player)
+        player.currentTime = Math.max(
+          0,
+          Math.min(player.duration || Infinity, player.currentTime + seconds),
+        );
+    },
+    fullscreen: () =>
+      document.fullscreenElement
+        ? document.exitFullscreen()
+        : dialog.current?.requestFullscreen(),
+    next: () => {
+      if (callbacks.current.canNext) callbacks.current.onNext();
+    },
+    previous: () => {
+      if (callbacks.current.episode > 1) callbacks.current.onPrevious();
+    },
+    error: (reason) =>
+      setError(
+        reason instanceof Error ? reason.message : "Player command failed.",
+      ),
+  });
   return (
     <div
       ref={dialog}
+      tabIndex={-1}
       role="dialog"
       aria-modal="true"
       aria-label="Anime video player"

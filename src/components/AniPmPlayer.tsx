@@ -11,6 +11,7 @@ import {
 } from "../utils/playbackResume";
 import "./nativeVideoPlayer.css";
 import { SignSync } from "./SignSync";
+import { usePlayerKeyboard } from "../hooks/usePlayerKeyboard";
 export default function AniPmPlayer(props: PlayerProps) {
   const host = useRef<HTMLDivElement>(null),
     dialog = useRef<HTMLDivElement>(null),
@@ -18,6 +19,15 @@ export default function AniPmPlayer(props: PlayerProps) {
   const callbacks = useRef(props);
   callbacks.current = props;
   const [error, setError] = useState("");
+  const [reload, setReload] = useState(0);
+  const [unresponsive, setUnresponsive] = useState(false);
+  const recorded = useRef(new Set<number>());
+  const pendingCommands = useRef<Array<(player: Player) => unknown>>([]);
+  const recovery = useRef<{
+    episode: number;
+    lang: "sub" | "dub";
+    position: number;
+  }>();
   const enterFullscreen = async () => {
     try {
       const element = dialog.current;
@@ -39,7 +49,10 @@ export default function AniPmPlayer(props: PlayerProps) {
     episode = Number(path[4]),
     lang = path[5] === "dub" ? "dub" : "sub";
   const clock = useRef(0);
-  const [playingEntry, setPlayingEntry] = useState({ episode, lang });
+  const [playingEntry, setPlayingEntry] = useState<{
+    episode: number;
+    lang: "sub" | "dub";
+  }>({ episode, lang });
   const savedResume = resumeSeconds(
     readEpisodeProgress(id, episode) || props.resume,
   );
@@ -51,10 +64,71 @@ export default function AniPmPlayer(props: PlayerProps) {
     position: number;
     duration: number;
   }>();
+  const command = (action: (player: Player) => unknown) => {
+    if (startChoice === null) return;
+    if (instance.current) return action(instance.current);
+    if (pendingCommands.current.length < 10)
+      pendingCommands.current.push(action);
+  };
+  const reloadPlayer = () => {
+    const state = instance.current?.state;
+    const entry = state && validAniPmState(state, id) ? state : playingEntry;
+    const position =
+      latest.current?.episode === entry.episode
+        ? latest.current.position
+        : clock.current;
+    recovery.current = {
+      episode: entry.episode,
+      lang: entry.lang,
+      position: Math.max(0, position || 0),
+    };
+    setUnresponsive(false);
+    setError("");
+    setReload((value) => value + 1);
+  };
+  usePlayerKeyboard(dialog, {
+    toggle: () =>
+      startChoice === null
+        ? setStartChoice(savedResume)
+        : command((player) => player.togglePlay()),
+    seek: (seconds) => command((player) => player.seekBy(seconds)),
+    fullscreen: () =>
+      document.fullscreenElement
+        ? document.exitFullscreen()
+        : enterFullscreen(),
+    next: () =>
+      command((player) =>
+        player.state.hasNext === false ? undefined : player.next(),
+      ),
+    previous: () =>
+      command((player) =>
+        player.state.hasPrevious === false ? undefined : player.previous(),
+      ),
+    error: (reason) => {
+      if (
+        reason &&
+        typeof reason === "object" &&
+        "code" in reason &&
+        reason.code === "destroyed"
+      )
+        return;
+      setError(
+        reason instanceof Error
+          ? reason.message
+          : "Player command failed. Reload the player to reconnect.",
+      );
+      setUnresponsive(true);
+    },
+  });
   useEffect(() => {
     if (startChoice === null) return;
     let waitingForStart =
-      startChoice > 0 ? { episode, position: startChoice } : null;
+      (recovery.current?.position ?? startChoice) > 0
+        ? {
+            episode: recovery.current?.episode ?? episode,
+            position: recovery.current?.position ?? startChoice,
+          }
+        : null;
     const report = callbacks.current.onProgress;
     const flush = () => {
       const value = latest.current;
@@ -64,7 +138,7 @@ export default function AniPmPlayer(props: PlayerProps) {
     };
     let active = true,
       last = 0;
-    const watched = new Set<number>();
+    const watched = recorded.current;
     setError("");
     void loadAniPmSdk()
       .then(() => {
@@ -75,10 +149,10 @@ export default function AniPmPlayer(props: PlayerProps) {
         mount.style.height = "100%";
         const player = new window.AniPM.Player(mount, {
           anime: id,
-          episode,
-          lang,
+          episode: recovery.current?.episode ?? episode,
+          lang: recovery.current?.lang ?? lang,
           color: "#b58aff",
-          start: startChoice,
+          start: recovery.current?.position ?? startChoice,
           autoplay: true,
           episodes: true,
           reportPage: false,
@@ -96,11 +170,21 @@ export default function AniPmPlayer(props: PlayerProps) {
           .concat("fullscreen 'none'")
           .join(";");
         host.current.replaceChildren(mount);
+        // SDK methods queue their messages until the embed connects.
+        for (const action of pendingCommands.current.splice(0))
+          void Promise.resolve(action(player)).catch((reason) => {
+            if (active) {
+              setError(reason.message);
+              setUnresponsive(true);
+            }
+          });
         const stateChanged = (state: PlayerState) => {
           if (active && validAniPmState(state, id)) {
             if (waitingForStart && waitingForStart.episode !== state.episode)
               waitingForStart = null;
-            clock.current = Number.isFinite(state.currentTime) ? state.currentTime : 0;
+            clock.current = Number.isFinite(state.currentTime)
+              ? state.currentTime
+              : 0;
             setPlayingEntry((previous) =>
               previous.episode === state.episode && previous.lang === state.lang
                 ? previous
@@ -148,54 +232,77 @@ export default function AniPmPlayer(props: PlayerProps) {
         player.on("pause", flush);
         player.on("ended", flush);
         player.on("error", (data) => {
-          if (active)
+          if (active) {
+            setUnresponsive(true);
             setError(
-              data.message || "Ani.pm playback failed. Try another source.",
+              data.message ||
+                "Ani.pm playback failed. Try reloading the player.",
             );
+          }
         });
       })
       .catch((reason) => {
-        if (active) setError(reason.message);
+        if (active) {
+          setError(reason.message);
+          setUnresponsive(true);
+        }
       });
-    const keyboard = (event: KeyboardEvent) => {
+    // A crashed cross-origin frame cannot report a DOM error to its parent.
+    // Probe its SDK after fullscreen changes and periodically, without reloading
+    // healthy or paused playback. Recovery is an explicit, position-preserving action.
+    let checking = false,
+      misses = 0;
+    const check = async () => {
+      const player = instance.current;
       if (
-        event.target instanceof HTMLElement &&
-        event.target.closest("input,select,textarea,[contenteditable=true]")
+        !active ||
+        checking ||
+        document.visibilityState === "hidden" ||
+        typeof player?.getState !== "function"
       )
         return;
-      if (event.ctrlKey || event.altKey || event.metaKey || event.repeat)
-        return;
-      if (event.key.toLowerCase() === "f") {
-        event.preventDefault();
-        if (document.fullscreenElement)
-          void document
-            .exitFullscreen()
-            .catch(() => setError("Press Esc to leave fullscreen."));
-        else void enterFullscreen();
-        return;
-      }
-      const player = instance.current;
-      if (event.key.toLowerCase() === "n" && player) {
-        event.preventDefault();
-        void player.next().catch((e) => setError(e.message));
-      }
-      if (event.key.toLowerCase() === "b" && player) {
-        event.preventDefault();
-        void player.previous().catch((e) => setError(e.message));
+      checking = true;
+      try {
+        const state = await player.getState();
+        if (active && validAniPmState(state, id) && state.status !== "error") {
+          misses = 0;
+          setUnresponsive(false);
+          setError((previous) =>
+            previous.startsWith("The video player stopped responding.")
+              ? ""
+              : previous,
+          );
+        }
+      } catch {
+        if (active && ++misses >= 2) {
+          setUnresponsive(true);
+          setError(
+            "The video player stopped responding. Reload it to continue from your saved position.",
+          );
+        }
+      } finally {
+        checking = false;
       }
     };
+    const probe = window.setInterval(() => void check(), 20000);
+    const changed = () => {
+      flush();
+      void check();
+    };
+    document.addEventListener("fullscreenchange", changed);
     window.addEventListener("pagehide", flush);
-    document.addEventListener("keydown", keyboard);
+
     return () => {
       flush();
       active = false;
       window.removeEventListener("pagehide", flush);
       instance.current?.destroy();
       instance.current = undefined;
-      document.removeEventListener("keydown", keyboard);
+      clearInterval(probe);
+      document.removeEventListener("fullscreenchange", changed);
     };
     // Episode/language changes use the SDK without remounting the iframe.
-  }, [id, startChoice]);
+  }, [id, startChoice, reload]);
   useEffect(() => {
     const player = instance.current;
     if (
@@ -218,7 +325,7 @@ export default function AniPmPlayer(props: PlayerProps) {
       role="dialog"
       aria-modal="true"
       aria-label="Anime video player"
-      className="apex-native-player fixed inset-0 z-[500] bg-black text-white flex flex-col"
+      className="apex-native-player anipm-player fixed inset-0 z-[500] bg-black text-white flex flex-col"
     >
       <div className="native-player-header shrink-0 flex items-center gap-2 px-4 py-2 text-sm">
         <span className="flex-1 min-w-0 truncate">
@@ -250,9 +357,12 @@ export default function AniPmPlayer(props: PlayerProps) {
         </button>
       </div>
       {error && (
-        <p role="alert" className="px-4 text-amber-300">
-          {error}
-        </p>
+        <div role="alert" className="anipm-player-error">
+          <span>{error}</span>
+          {unresponsive && (
+            <button onClick={reloadPlayer}>Reload player</button>
+          )}
+        </div>
       )}
       {startChoice === null && (
         <div
@@ -286,7 +396,7 @@ export default function AniPmPlayer(props: PlayerProps) {
           </div>
         </div>
       )}
-      <div ref={host} className="flex-1 min-h-0" />
+      <div ref={host} className="anipm-player-stage" />
     </div>
   );
 }

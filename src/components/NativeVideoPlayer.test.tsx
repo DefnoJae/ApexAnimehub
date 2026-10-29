@@ -7,6 +7,7 @@ import Artplayer from "artplayer";
 let mockOptions: any;
 const mockListeners: Record<string, () => void> = {};
 const mockPlayer = {
+  toggle: jest.fn(),
   currentTime: 0,
   duration: 100,
   on: jest.fn((name, cb) => {
@@ -58,6 +59,37 @@ test("native controls route episodes and track only at 80%, once; cleanup destro
   } as unknown as PlayerProps & { onFallback: () => void };
   try {
     await act(async () => root.render(<NativeVideoPlayer {...props} />));
+    act(() =>
+      document.body.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          key: " ",
+          bubbles: true,
+          cancelable: true,
+        }),
+      ),
+    );
+    expect(mockPlayer.toggle).toHaveBeenCalled();
+    mockPlayer.currentTime = 40;
+    act(() =>
+      document.body.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          key: "ArrowRight",
+          bubbles: true,
+          cancelable: true,
+        }),
+      ),
+    );
+    expect(mockPlayer.currentTime).toBe(50);
+    act(() =>
+      document.body.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          key: "ArrowLeft",
+          bubbles: true,
+          cancelable: true,
+        }),
+      ),
+    );
+    expect(mockPlayer.currentTime).toBe(40);
     mockOptions.controls.find((c: any) => c.name === "next-episode").click();
     mockOptions.controls
       .find((c: any) => c.name === "previous-episode")
