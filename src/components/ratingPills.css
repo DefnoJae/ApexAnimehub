@@ -84,3 +84,18 @@
 .rating-values {
   display: contents;
 }
+
+.poster-personal-score {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  z-index: 4;
+  pointer-events: none;
+}
+.watch-order-node .poster-personal-score {
+  left: 28px;
+  right: auto;
+  bottom: 8px;
+  padding: 3px 5px;
+  font-size: 10px;
+}

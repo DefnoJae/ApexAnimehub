@@ -15,6 +15,7 @@ import { FriendsActivityDock } from "./FriendsActivityDock";
 import { TrailerButton } from "./TrailerButton";
 import { DetailTitle } from "./DetailTitle";
 import { HeroBackdrop } from "./HeroBackdrop";
+import { PosterPersonalRating } from "./PosterPersonalRating";
 import { AnimeBadges } from "./AnimeBadges";
 import { DetailEpisodes } from "./DetailEpisodes";
 import { QuickList } from "./HomeDashboard";
@@ -428,6 +429,7 @@ export function AnimeDetails({
                           alt=""
                         />
                       </button>
+                      <PosterPersonalRating anime={item} accounts={accounts} />
                       <QuickList anime={item} accounts={accounts} />
                     </div>
                     <small>{label}</small>

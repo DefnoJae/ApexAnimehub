@@ -10,6 +10,7 @@ import {
   playbackTime,
 } from "../utils/playbackResume";
 import "./nativeVideoPlayer.css";
+import { SignSync } from "./SignSync";
 export default function AniPmPlayer(props: PlayerProps) {
   const host = useRef<HTMLDivElement>(null),
     dialog = useRef<HTMLDivElement>(null),
@@ -37,6 +38,8 @@ export default function AniPmPlayer(props: PlayerProps) {
   const id = Number(path[3]),
     episode = Number(path[4]),
     lang = path[5] === "dub" ? "dub" : "sub";
+  const clock = useRef(0);
+  const [playingEntry, setPlayingEntry] = useState({ episode, lang });
   const savedResume = resumeSeconds(
     readEpisodeProgress(id, episode) || props.resume,
   );
@@ -97,6 +100,12 @@ export default function AniPmPlayer(props: PlayerProps) {
           if (active && validAniPmState(state, id)) {
             if (waitingForStart && waitingForStart.episode !== state.episode)
               waitingForStart = null;
+            clock.current = Number.isFinite(state.currentTime) ? state.currentTime : 0;
+            setPlayingEntry((previous) =>
+              previous.episode === state.episode && previous.lang === state.lang
+                ? previous
+                : { episode: state.episode, lang: state.lang },
+            );
             callbacks.current.onEpisodeChange?.(state.episode, state.lang);
           }
         };
@@ -120,6 +129,7 @@ export default function AniPmPlayer(props: PlayerProps) {
             if (position + 2 < waitingForStart.position) return;
             waitingForStart = null;
           }
+          clock.current = position;
           latest.current = { episode: state.episode, position, duration };
           if (Date.now() - last >= 5000) {
             last = Date.now();
@@ -214,6 +224,14 @@ export default function AniPmPlayer(props: PlayerProps) {
         <span className="flex-1 min-w-0 truncate">
           {props.title} · Episode {props.episode} · {props.stream.name}
         </span>
+        <SignSync
+          key={`${id}:${playingEntry.episode}:${playingEntry.lang}`}
+          animeId={id}
+          episode={playingEntry.episode}
+          language={playingEntry.lang}
+          root={dialog}
+          position={() => clock.current}
+        />
         <button
           className="player-header-icon"
           onClick={enterFullscreen}

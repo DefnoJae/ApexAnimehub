@@ -14,6 +14,7 @@ import type { useAccounts } from "../hooks/useAccounts";
 import { sameAnime } from "../hooks/useLibrary";
 import { getDisplayTitle } from "../utils/schedule";
 import "./watchOrder.css";
+import { PosterPersonalRating } from "./PosterPersonalRating";
 import { getDubIndex } from "../utils/animeMetadata";
 
 const width = 260,
@@ -323,6 +324,7 @@ export default function WatchOrder({
                       ) : (
                         <span className="watch-order-poster-placeholder" />
                       )}
+                      <PosterPersonalRating anime={node} accounts={accounts} />
                       <span className="watch-order-node-copy">
                         <strong>{getDisplayTitle(node)}</strong>
                         <small>

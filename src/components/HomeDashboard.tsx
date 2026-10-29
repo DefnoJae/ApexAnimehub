@@ -32,6 +32,7 @@ import "./dashboard.css";
 import { sectionPaths } from "../hooks/usePageRoute";
 import { useMissingLibrary } from "../hooks/useMissingLibrary";
 import { RatingPills } from "./RatingPills";
+import { PosterPersonalRating } from "./PosterPersonalRating";
 import { AnimeBadges } from "./AnimeBadges";
 import {
   fetchEpisodeMetadata,
@@ -342,6 +343,7 @@ export function PosterRow({
                   />
                 </span>
               </button>
+              <PosterPersonalRating anime={anime} accounts={accounts} />
               <QuickList anime={anime} accounts={accounts} />
             </div>
             <button
@@ -400,11 +402,13 @@ function MissingLibraryRow({
 }
 
 export function LatestEpisodes({
+  accounts,
   language,
   setLanguage,
   onSelect,
   onCalendar,
 }: {
+  accounts?: Accounts;
   language: "sub" | "dub";
   setLanguage: (language: "sub" | "dub") => void;
   onSelect: (anime: DashboardAnime) => void;
@@ -557,6 +561,9 @@ export function LatestEpisodes({
                   src={anime.bannerImage || anime.coverImage?.extraLarge}
                   alt=""
                 />
+                {accounts && (
+                  <PosterPersonalRating anime={anime} accounts={accounts} />
+                )}
                 <span className="episode-badge">
                   {language.toUpperCase()} · EP {anime.episode}
                 </span>
@@ -876,6 +883,10 @@ export function HomeDashboard({
                                 event.currentTarget.src = fallback;
                             }}
                           />
+                          <PosterPersonalRating
+                            anime={item.anime}
+                            accounts={accounts}
+                          />
                           <span className="resume-circle">
                             <Play size={22} fill="currentColor" />
                           </span>
@@ -917,6 +928,12 @@ export function HomeDashboard({
                             {getDisplayTitle(item.anime)}
                           </button>
                         </h3>
+                        {accounts && (
+                          <PosterPersonalRating
+                            anime={anime}
+                            accounts={accounts}
+                          />
+                        )}
                         <span className="episode-badge">EP {item.episode}</span>
                       </div>
                       {metadata?.title && (
@@ -963,6 +980,7 @@ export function HomeDashboard({
           )}
         </section>
         <LatestEpisodes
+          accounts={accounts}
           language={language}
           setLanguage={(value) => {
             setLanguage(value);

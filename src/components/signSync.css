@@ -1,0 +1,154 @@
+.signsync-trigger {
+  position: relative;
+}
+.signsync-sparkle {
+  position: absolute;
+  right: 3px;
+  top: 3px;
+  color: #bd91ff;
+}
+.signsync-panel {
+  position: absolute;
+  z-index: 20;
+  top: 58px;
+  right: 16px;
+  width: min(340px, calc(100vw - 32px));
+  max-height: calc(100dvh - 80px);
+  overflow: auto;
+  padding: 20px;
+  border: 1px solid #ffffff24;
+  border-radius: 20px;
+  background: #17131ee8;
+  backdrop-filter: blur(14px);
+  box-shadow: 0 12px 48px #0008;
+  color: #ece8f4;
+  font:
+    13px Nunito,
+    system-ui,
+    sans-serif;
+  animation: signsync-in 0.2s ease;
+}
+.signsync-panel header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.signsync-panel h2 {
+  font-size: 18px;
+  font-weight: 800;
+}
+.signsync-panel button {
+  border-radius: 10px;
+  padding: 7px 10px;
+}
+.signsync-panel header button {
+  padding: 3px;
+}
+.signsync-panel p {
+  line-height: 1.5;
+  margin: 12px 0;
+  color: #bfb6cc;
+}
+.signsync-panel .signsync-find {
+  width: 100%;
+  background: #9e57e6;
+  color: white;
+  font-weight: 700;
+  padding: 11px;
+}
+.signsync-panel button:disabled {
+  opacity: 0.55;
+}
+.signsync-panel label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 15px 0 6px;
+}
+.signsync-panel label:has(select) {
+  display: block;
+}
+.signsync-panel select {
+  display: block;
+  width: 100%;
+  margin-top: 7px;
+}
+.signsync-panel input[type="number"],
+.signsync-panel select {
+  background: #ffffff0b;
+  border: 1px solid #ffffff20;
+  border-radius: 8px;
+  padding: 7px;
+  color: inherit;
+}
+.signsync-panel input[type="number"] {
+  width: 80px;
+}
+.signsync-panel option {
+  background: #19151f;
+}
+.signsync-panel input[type="range"] {
+  width: 100%;
+  accent-color: #b58aff;
+}
+.signsync-panel input[type="checkbox"] {
+  accent-color: #b58aff;
+}
+.signsync-panel small {
+  display: block;
+  color: #aca2ba;
+  margin: 8px 0;
+  line-height: 1.5;
+}
+.signsync-panel button:focus-visible,
+.signsync-panel input:focus-visible,
+.signsync-panel select:focus-visible {
+  outline: 2px solid #b58aff;
+  outline-offset: 2px;
+}
+.signsync-captions {
+  pointer-events: none;
+  position: absolute;
+  z-index: 8;
+  bottom: 20%;
+  left: 8%;
+  right: 8%;
+  text-align: center;
+  color: white;
+  font:
+    600 clamp(15px, 2.2vw, 30px) / 1.4 Nunito,
+    system-ui,
+    sans-serif;
+  text-shadow:
+    0 2px 3px #000,
+    1px 0 #000,
+    -1px 0 #000;
+  white-space: pre-line;
+}
+.signsync-captions > div {
+  display: table;
+  margin: 4px auto;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: #0008;
+}
+.apex-native-player:fullscreen .signsync-panel,
+.apex-native-player:-webkit-full-screen .signsync-panel {
+  display: none;
+}
+@keyframes signsync-in {
+  from {
+    opacity: 0;
+    transform: translateY(-5px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .signsync-panel {
+    animation: none;
+  }
+}

@@ -10,6 +10,7 @@ import {
 } from "../utils/discovery";
 import type { useAccounts } from "../hooks/useAccounts";
 import { QuickList } from "./HomeDashboard";
+import { PosterPersonalRating } from "./PosterPersonalRating";
 import { AnimeBadges } from "./AnimeBadges";
 import "./discovery.css";
 const statuses = [
@@ -395,6 +396,7 @@ export function DiscoveryPage({
               >
                 <img loading="lazy" src={anime.coverImage?.extraLarge} alt="" />
               </button>
+              <PosterPersonalRating anime={anime} accounts={accounts} />
               <QuickList anime={anime} accounts={accounts} />
               <div className="discovery-poster-caption">
                 <strong>{anime.title.english || anime.title.romaji}</strong>

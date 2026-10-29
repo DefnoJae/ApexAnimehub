@@ -3,6 +3,8 @@ import Artplayer from "artplayer";
 import Hls from "hls.js";
 import type { PlayerProps } from "./VideoPlayer";
 import "./nativeVideoPlayer.css";
+import { Maximize, X } from "lucide-react";
+import { SignSync } from "./SignSync";
 function controlButton(label: string, path: string, disabled = false) {
   return `<button type="button" aria-label="${label}" ${disabled ? "disabled" : ""} style="display:flex;align-items:center;background:none;border:0;color:inherit;padding:4px;cursor:pointer;opacity:${disabled ? ".35" : "1"}"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">${path}</svg></button>`;
 }
@@ -12,6 +14,10 @@ export default function NativeVideoPlayer(
 ) {
   const host = useRef<HTMLDivElement>(null);
   const dialog = useRef<HTMLDivElement>(null);
+  const clock = useRef(0);
+  const animeId = Number(
+    new URL(props.stream.url, window.location.origin).searchParams.get("id"),
+  );
   const callbacks = useRef(props);
   callbacks.current = props;
   const [error, setError] = useState(""),
@@ -89,7 +95,7 @@ export default function NativeVideoPlayer(
                         }),
                       ),
                     ],
-                    onSelect: (item: {url?: unknown; html: string}) => {
+                    onSelect: (item: { url?: unknown; html: string }) => {
                       if (player) {
                         player.subtitle.show = !!item.url;
                         if (typeof item.url === "string" && item.url)
@@ -169,6 +175,7 @@ export default function NativeVideoPlayer(
         });
         player.on("video:timeupdate", () => {
           if (!player || controller.signal.aborted) return;
+          clock.current = player.currentTime;
           const position = player.currentTime,
             duration = player.duration;
           if (!Number.isFinite(duration) || duration <= 0) return;
@@ -247,8 +254,35 @@ export default function NativeVideoPlayer(
           {props.title} · Episode {props.episode} · Apex Player (Sub)
         </span>
         <button onClick={props.onFallback}>Use MegaPlay</button>
-        <button onClick={props.onClose} aria-label="Close video player">
-          Close
+        <SignSync
+          key={`${animeId}:${props.episode}`}
+          animeId={animeId}
+          episode={props.episode}
+          language="sub"
+          root={dialog}
+          position={() => clock.current}
+        />
+        <button
+          className="player-header-icon"
+          aria-label="Fullscreen video"
+          title="Fullscreen"
+          onClick={() =>
+            void dialog.current
+              ?.requestFullscreen()
+              .catch(() =>
+                setError("Fullscreen is unavailable in this browser."),
+              )
+          }
+        >
+          <Maximize size={18} />
+        </button>
+        <button
+          className="player-header-icon"
+          onClick={props.onClose}
+          aria-label="Close video player"
+          title="Close player"
+        >
+          <X size={20} />
         </button>
       </div>
       {loading && <p role="status">Loading episode source…</p>}
