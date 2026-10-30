@@ -28,6 +28,7 @@ export function RatingPills({
   malScore,
   active = true,
   asText = false,
+  showBrand = true,
 }: {
   id?: number;
   idMal?: number | null;
@@ -35,6 +36,7 @@ export function RatingPills({
   malScore?: number | null;
   active?: boolean;
   asText?: boolean;
+  showBrand?: boolean;
 }) {
   const [source] = useRatingSource(),
     [al, setAl] = useState<number | null>(
@@ -95,7 +97,7 @@ export function RatingPills({
           <Tag
             key={provider}
             className={
-              (asText
+              (asText || !showBrand
                 ? "poster-rating-number rating-"
                 : "public-rating-pill rating-") + provider
             }
@@ -111,7 +113,7 @@ export function RatingPills({
             aria-label={label + " rating " + score.toFixed(1)}
             title={label + " rating"}
           >
-            {!asText && (
+            {!asText && showBrand && (
               <span
                 className="rating-brand"
                 role="img"

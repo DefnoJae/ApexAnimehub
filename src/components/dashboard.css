@@ -1173,8 +1173,7 @@ input:focus-visible {
   font-size: 10px;
   font-weight: 700;
 }
-.anime-badges span,
-.anime-badges a {
+.anime-badges .anime-dub-badge {
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -1182,10 +1181,6 @@ input:focus-visible {
   border-radius: 6px;
   background: #b887ff20;
   color: #dfcaff;
-}
-.anime-badges a {
-  color: #f7d67c;
-  background: #f7d67c12;
 }
 .quick-add[title="Watching"] {
   color: #bd9aff;

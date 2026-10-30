@@ -7,11 +7,13 @@ export function AnimeBadges({
   providedScore,
   id,
   averageScore,
+  showRatingBrand = false,
 }: {
   idMal?: number | null;
   id?: number;
   averageScore?: number | null;
   providedScore?: number | null;
+  showRatingBrand?: boolean;
 }) {
   const element = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(false);
@@ -66,10 +68,12 @@ export function AnimeBadges({
           averageScore={averageScore}
           malScore={providedScore}
           active={visible}
+          showBrand={showRatingBrand}
         />
       )}
       {dub && (
         <span
+          className="anime-dub-badge"
           title={
             dub === "DUB"
               ? "English dub available · MyDubList"

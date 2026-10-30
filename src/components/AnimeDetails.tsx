@@ -208,6 +208,7 @@ export function AnimeDetails({
               </div>
               <div className="detail-rating-line">
                 <AnimeBadges
+                  showRatingBrand
                   id={anime.id}
                   idMal={anime.idMal}
                   averageScore={anime.averageScore}

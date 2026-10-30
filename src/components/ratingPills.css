@@ -12,11 +12,15 @@
 }
 .rating-anilist {
   color: #65c6ff !important;
+}
+.public-rating-pill.rating-anilist {
   background: #174a6d55 !important;
   box-shadow: 0 0 8px #27aaff12;
 }
 .rating-mal {
   color: #a89cff !important;
+}
+.public-rating-pill.rating-mal {
   background: #35317c55 !important;
   box-shadow: 0 0 8px #7a6aff12;
 }
@@ -70,7 +74,9 @@
 .hover-rating-values {
   display: inline-flex;
   gap: 10px;
-  justify-content: center;
+  justify-content: flex-start;
+  align-self: flex-start;
+  margin-top: 5px;
 }
 .poster-rating-number {
   display: inline-flex;
@@ -80,6 +86,9 @@
   font-size: 13px;
   background: none;
   border: 0;
+  padding: 0;
+  box-shadow: none;
+  text-decoration: none;
 }
 .rating-values {
   display: contents;
