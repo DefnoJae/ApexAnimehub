@@ -1,4 +1,5 @@
 import React from "react";
+import { useStoriesVisible } from "../hooks/useStoriesVisible";
 import { useRatingSource, RatingSource } from "../hooks/useRatingSource";
 import type { useAccounts } from "../hooks/useAccounts";
 export function AccountSettings({
@@ -8,6 +9,7 @@ export function AccountSettings({
   accounts: ReturnType<typeof useAccounts>;
   onClose: () => void;
 }) {
+  const [storiesVisible, setStoriesVisible] = useStoriesVisible();
   const [ratingSource, setRatingSource] = useRatingSource();
   return (
     <div
@@ -77,6 +79,14 @@ export function AccountSettings({
               reaches 80%. Skipping episodes does not record them as watched.
             </p>
           </span>
+        </label>
+        <label className="flex gap-3 items-center my-6">
+          <input
+            type="checkbox"
+            checked={storiesVisible}
+            onChange={(event) => setStoriesVisible(event.target.checked)}
+          />
+          Show following activity stories
         </label>
         <label className="block my-6">
           Public ratings

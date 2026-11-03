@@ -25,6 +25,7 @@ import {
 } from "../utils/weeklyReleases";
 import { getDisplayTitle } from "../utils/schedule";
 import type { ListAnime, ListStatus, useAccounts } from "../hooks/useAccounts";
+import { useStoriesVisible } from "../hooks/useStoriesVisible";
 import { FollowingStories } from "./FollowingStories";
 import { NotificationBell } from "./NotificationBell";
 import { HeroBackdrop } from "./HeroBackdrop";
@@ -99,6 +100,7 @@ export function FloatingNavigation({
   accounts?: Accounts;
   onSelectAnime?: (anime: DashboardAnime) => void;
 }) {
+  const [storiesVisible] = useStoriesVisible();
   return (
     <nav
       className={"apex-nav glass " + (hidden ? "nav-hidden" : "")}
@@ -167,7 +169,7 @@ export function FloatingNavigation({
         <Settings size={20} />
         <span className="nav-tooltip">Settings</span>
       </button>
-      {accounts && (
+      {accounts && storiesVisible && (
         <FollowingStories
           identity={accounts.lists?.anilist?.identity}
           connected={accounts.connected.anilist}

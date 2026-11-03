@@ -14,10 +14,11 @@ const origin =
   (process.env.VERCEL_BRANCH_URL || process.env.VERCEL_URL
     ? "https://" + (process.env.VERCEL_BRANCH_URL || process.env.VERCEL_URL)
     : "http://localhost:3000");
+const SESSION_AGE = 365 * 24 * 60 * 60;
 const sessions = new Map();
 const locks = new Map();
 const token = () => randomBytes(32).toString("hex");
-function cookie(res, id, age = 86400) {
+function cookie(res, id, age = SESSION_AGE) {
   res.setHeader(
     "Set-Cookie",
     "apex_session=" +
@@ -82,8 +83,15 @@ async function accessAccount(session, provider) {
         !response.ok ||
         typeof data.access_token !== "string" ||
         !Number.isFinite(data.expires_in)
-      )
-        throw new Error("MAL session expired. Please reconnect.");
+      ) {
+        const error = new Error(
+          data.error === "invalid_grant"
+            ? "MAL authorization expired. Please reconnect."
+            : "MAL is temporarily unavailable. Please retry.",
+        );
+        error.revoked = data.error === "invalid_grant";
+        throw error;
+      }
       account.accessToken = data.access_token;
       account.refreshToken = data.refresh_token || account.refreshToken;
       account.expiresAt = Date.now() + data.expires_in * 1000;
@@ -94,7 +102,7 @@ async function accessAccount(session, provider) {
     await account.refreshing;
     return account;
   } catch (error) {
-    delete session.accounts.mal;
+    if (error.revoked) delete session.accounts.mal;
     throw error;
   }
 }
@@ -115,6 +123,10 @@ function createServer() {
     )?.[1];
     if (sessions.get(id)?.expiresAt < Date.now()) sessions.delete(id);
     const current = sessions.get(id);
+    if (current && Object.keys(current.accounts || {}).length) {
+      current.expiresAt = Date.now() + SESSION_AGE * 1000;
+      cookie(res, id);
+    }
     const send = (status, data) => {
       res.writeHead(status, { "Content-Type": "application/json" });
       res.end(JSON.stringify(data));
@@ -159,7 +171,7 @@ function createServer() {
           const session = current || {
             accounts: {},
             pending: {},
-            expiresAt: Date.now() + 86400000,
+            expiresAt: Date.now() + SESSION_AGE * 1000,
           };
           const state = token(),
             verifier = token();

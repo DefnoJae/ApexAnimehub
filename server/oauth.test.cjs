@@ -407,3 +407,48 @@ test("public MAL rating uses mean, never the user's personal score", async () =>
     global.fetch = browserFetch;
   }
 });
+
+test("MAL transient refresh failure preserves credentials; invalid grant disconnects", () =>
+  serve(async (base) => {
+    const id = "d".repeat(64);
+    const account = {
+      accessToken: "old",
+      refreshToken: "refresh",
+      expiresAt: Date.now() - 1000,
+    };
+    sessions.set(id, {
+      accounts: { mal: account },
+      pending: {},
+      expiresAt: Date.now() + 60000,
+    });
+    global.fetch = async () =>
+      new Response(JSON.stringify({ error: "temporarily_unavailable" }), {
+        status: 503,
+      });
+    const temporary = await browserFetch(base + "/api/oauth/mal/session", {
+      headers: { Cookie: "apex_session=" + id },
+    });
+    assert.equal(temporary.status, 502);
+    assert.equal(sessions.get(id).accounts.mal.refreshToken, "refresh");
+    global.fetch = async () =>
+      new Response(
+        JSON.stringify({
+          access_token: "renewed",
+          refresh_token: "rotated",
+          expires_in: 3600,
+        }),
+        { status: 200 },
+      );
+    const retry = await browserFetch(base + "/api/oauth/mal/session", {
+      headers: { Cookie: "apex_session=" + id },
+    });
+    assert.equal(retry.status, 200);
+    assert.equal(account.accessToken, "renewed");
+    account.expiresAt = Date.now() - 1000;
+    global.fetch = async () =>
+      new Response(JSON.stringify({ error: "invalid_grant" }), { status: 400 });
+    await browserFetch(base + "/api/oauth/mal/session", {
+      headers: { Cookie: "apex_session=" + id },
+    });
+    assert.equal(sessions.get(id).accounts.mal, undefined);
+  }));
