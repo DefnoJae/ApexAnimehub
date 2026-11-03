@@ -563,9 +563,6 @@ export function LatestEpisodes({
                   src={anime.bannerImage || anime.coverImage?.extraLarge}
                   alt=""
                 />
-                {accounts && (
-                  <PosterPersonalRating anime={anime} accounts={accounts} />
-                )}
                 <span className="episode-badge">
                   {language.toUpperCase()} · EP {anime.episode}
                 </span>
