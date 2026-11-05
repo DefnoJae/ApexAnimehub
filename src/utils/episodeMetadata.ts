@@ -6,8 +6,11 @@ export interface EpisodeMetadata {
   runtime?: number;
 }
 type Episodes = Record<string, EpisodeMetadata>;
-const pending = new Map<number, Promise<Episodes>>();
-const memory = new Map<number, { updated: number; episodes: Episodes }>();
+const pending = new Map<string, Promise<Episodes>>();
+const memory = new Map<
+  number,
+  { updated: number; episodes: Episodes; expected: number }
+>();
 const DAY = 86400000;
 const text = (value: unknown): string | undefined =>
   typeof value === "string" && value.trim() ? value.trim() : undefined;
@@ -54,12 +57,19 @@ export function parseEpisodes(data: unknown, id: number): Episodes {
   return result;
 }
 
-export async function fetchEpisodeMetadata(id: number): Promise<Episodes> {
-  const key = `apex_episode_metadata_v3_${id}`;
+export async function fetchEpisodeMetadata(
+  id: number,
+  expected = 0,
+): Promise<Episodes> {
+  const key = `apex_episode_metadata_v4_${id}`;
   let cached = memory.get(id);
   if (!cached) {
     try {
-      const saved = JSON.parse(localStorage.getItem(key) || "null");
+      const saved = JSON.parse(
+        localStorage.getItem(key) ||
+          localStorage.getItem(`apex_episode_metadata_v3_${id}`) ||
+          "null",
+      );
       if (
         saved &&
         Number.isFinite(saved.updated) &&
@@ -71,11 +81,13 @@ export async function fetchEpisodeMetadata(id: number): Promise<Episodes> {
   }
   if (
     cached &&
+    cached.expected >= expected &&
     Date.now() - cached.updated <
       (Object.values(cached.episodes).some((e) => e.image) ? DAY : 60000)
   )
     return cached.episodes;
-  const existing = pending.get(id);
+  const requestKey = id + ":" + expected;
+  const existing = pending.get(requestKey);
   if (existing) return existing;
   const request = (async () => {
     const controller = new AbortController();
@@ -91,6 +103,8 @@ export async function fetchEpisodeMetadata(id: number): Promise<Episodes> {
       } catch {}
       if (
         !Object.keys(episodes).length ||
+        Object.keys(episodes).filter((number) => Number(number) <= expected)
+          .length < expected ||
         Object.values(episodes).some((episode) => !episode.image)
       ) {
         try {
@@ -131,7 +145,7 @@ export async function fetchEpisodeMetadata(id: number): Promise<Episodes> {
         } catch {}
       }
       if (!Object.keys(episodes).length) throw new Error("No matched episodes");
-      const entry = { updated: Date.now(), episodes };
+      const entry = { updated: Date.now(), expected, episodes };
       memory.set(id, entry);
       try {
         localStorage.setItem(key, JSON.stringify(entry));
@@ -139,13 +153,17 @@ export async function fetchEpisodeMetadata(id: number): Promise<Episodes> {
       return episodes;
     } catch {
       const fallback = cached?.episodes || {};
-      memory.set(id, { updated: Date.now() - DAY + 60000, episodes: fallback });
+      memory.set(id, {
+        updated: Date.now() - DAY + 60000,
+        episodes: fallback,
+        expected,
+      });
       return fallback;
     } finally {
       clearTimeout(timer);
-      pending.delete(id);
+      pending.delete(requestKey);
     }
   })();
-  pending.set(id, request);
+  pending.set(requestKey, request);
   return request;
 }

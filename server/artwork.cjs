@@ -108,7 +108,7 @@ async function artwork(id, ancestors = new Set()) {
   if(ancestors.has(id))return {anilistId:id,logos:[],backdrops:[]};
   const visited=new Set(ancestors);visited.add(id);
   const old = cache.get(id);
-  if (old && Date.now() - old.updated < 86400000) return old.data;
+  if (old && Date.now() - old.updated < (old.data.logos.length ? 86400000 : 900000)) return old.data;
   if (pending.has(id)) return pending.get(id);
   const request = (async () => {
     const token = process.env.TMDB_READ_ACCESS_TOKEN,
@@ -232,7 +232,9 @@ async function handler(req, res) {
     const data = await artwork(id);
     res.setHeader(
       "Cache-Control",
-      "public, s-maxage=86400, stale-while-revalidate=604800",
+      data.logos.length
+        ? "public, s-maxage=86400, stale-while-revalidate=604800"
+        : "public, s-maxage=900",
     );
     res.end(JSON.stringify(data));
   } catch {

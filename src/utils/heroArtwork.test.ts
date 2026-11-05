@@ -48,7 +48,7 @@ test("logo and backdrop requests share server fetch and daily cache", async () =
   await fetchHeroArtwork(43);
   expect(global.fetch).toHaveBeenCalledTimes(1);
   expect(global.fetch).toHaveBeenCalledWith(
-    "/api/artwork?anilist_id=43&v=4",
+    "/api/artwork?anilist_id=43&v=5",
     expect.anything(),
   );
 });

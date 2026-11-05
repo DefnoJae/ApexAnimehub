@@ -71,16 +71,23 @@ export function DetailEpisodes({
     }
   }, [language, availability, selected, onSelect]);
   useEffect(() => {
-    let active = true;
     setSearch("");
     setLimit(50);
-    void fetchEpisodeMetadata(anime.id).then((episodes) => {
+  }, [anime.id]);
+  const episodeCount = Math.max(
+    total,
+    ...(availability?.sub || []),
+    ...(availability?.dub || []),
+  );
+  useEffect(() => {
+    let active = true;
+    void fetchEpisodeMetadata(anime.id, episodeCount).then((episodes) => {
       if (active) setData({ id: anime.id, episodes });
     });
     return () => {
       active = false;
     };
-  }, [anime.id]);
+  }, [anime.id, episodeCount]);
   const episodes = data.id === anime.id ? data.episodes : {};
   const progress = Math.max(
     0,
@@ -93,11 +100,7 @@ export function DetailEpisodes({
       ? availability[language]
       : Array.from(
           {
-            length: Math.max(
-              total,
-              ...(availability?.sub || []),
-              ...(availability?.dub || []),
-            ),
+            length: episodeCount,
           },
           (_, i) => i + 1,
         )
@@ -186,6 +189,9 @@ export function DetailEpisodes({
           <div className="detail-episode-cards">
             {filtered.slice(0, limit).map((number) => {
               const meta = episodes[String(number)];
+              const fallback =
+                anime.bannerImage || anime.coverImage?.extraLarge;
+              const image = meta?.image || fallback;
               return (
                 <button
                   key={number}
@@ -203,12 +209,23 @@ export function DetailEpisodes({
                   onClick={() => onSelect(number)}
                 >
                   <div className="detail-episode-still">
-                    {meta?.image ? (
-                      <img loading="lazy" src={meta.image} alt="" />
-                    ) : (
-                      <span className="episode-image-placeholder">
-                        {number}
-                      </span>
+                    <span className="episode-image-placeholder">{number}</span>
+                    {image && (
+                      <img
+                        key={image}
+                        loading="lazy"
+                        src={image}
+                        alt=""
+                        onError={(event) => {
+                          const element = event.currentTarget;
+                          if (
+                            fallback &&
+                            element.getAttribute("src") !== fallback
+                          )
+                            element.src = fallback;
+                          else element.hidden = true;
+                        }}
+                      />
                     )}
                     <span>Episode {number}</span>
                     {meta?.runtime && <small>{meta.runtime} min</small>}

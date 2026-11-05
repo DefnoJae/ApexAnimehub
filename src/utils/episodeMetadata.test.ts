@@ -67,13 +67,16 @@ test("deduplicates requests and falls back to cached metadata on failure", async
   }
 });
 
-test("uses verified TMDB episode stills when the primary source has no episodes", async () => {
+test("uses verified TMDB episode stills when AniZip omits an episode", async () => {
   const original = global.fetch;
   global.fetch = jest
     .fn()
     .mockResolvedValueOnce({
       ok: true,
-      json: async () => ({ mappings: { anilist_id: 199446 }, episodes: {} }),
+      json: async () => ({
+        mappings: { anilist_id: 199446 },
+        episodes: { "2": { image: "https://artworks.thetvdb.com/second.jpg" } },
+      }),
     })
     .mockResolvedValueOnce({
       ok: true,
@@ -90,7 +93,7 @@ test("uses verified TMDB episode stills when the primary source has no episodes"
       }),
     });
   try {
-    const result = await fetchEpisodeMetadata(199446);
+    const result = await fetchEpisodeMetadata(199446, 2);
     expect(result["1"]).toMatchObject({
       title: "Actual episode",
       image: "https://image.tmdb.org/t/p/w780/real.jpg",

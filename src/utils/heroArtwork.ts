@@ -54,10 +54,17 @@ export function isHeroBanner(width: number, height: number): boolean {
 async function fetchHeroMedia(anilistId: number): Promise<CachedArtwork> {
   const empty = { logos: [], backdrops: [], updatedAt: 0 };
   if (!Number.isSafeInteger(anilistId) || anilistId <= 0) return empty;
-  const key = "apex_tmdb_artwork_v4_" + anilistId;
+  const key = "apex_tmdb_artwork_v5_" + anilistId;
+  let freshCache = false;
   let cached: CachedArtwork | null = null;
   try {
-    const value = JSON.parse(localStorage.getItem(key) || localStorage.getItem("apex_tmdb_artwork_v3_" + anilistId) || localStorage.getItem("apex_tmdb_artwork_v2_" + anilistId) || "null");
+    const current = localStorage.getItem(key);
+    freshCache = current !== null;
+    const value = JSON.parse(
+      current ||
+        localStorage.getItem("apex_tmdb_artwork_v4_" + anilistId) ||
+        "null",
+    );
     if (
       value &&
       Array.isArray(value.logos) &&
@@ -69,9 +76,9 @@ async function fetchHeroMedia(anilistId: number): Promise<CachedArtwork> {
       cached = value;
   } catch {}
   if (
+    freshCache &&
     cached &&
-    Date.now() - cached.updatedAt <
-      (cached.logos.length ? DAY : DAY / 96)
+    Date.now() - cached.updatedAt < (cached.logos.length ? DAY : DAY / 96)
   )
     return cached;
   const existing = pending.get(anilistId);
@@ -81,7 +88,7 @@ async function fetchHeroMedia(anilistId: number): Promise<CachedArtwork> {
       timer = setTimeout(() => controller.abort(), 45000);
     try {
       const response = await fetch(
-        "/api/artwork?anilist_id=" + anilistId + "&v=4",
+        "/api/artwork?anilist_id=" + anilistId + "&v=5",
         {
           signal: controller.signal,
           credentials: "omit",

@@ -833,9 +833,14 @@
   background: #23202b;
 }
 .detail-episode-still img {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+.detail-episode-still img[hidden] {
+  display: none;
 }
 .detail-episode-still > span:not(.episode-image-placeholder) {
   position: absolute;
@@ -1008,8 +1013,8 @@
 .detail-full-title {
   position: relative;
   margin: -2px 0 24px;
-  white-space: nowrap;
-  overflow: visible;
+  white-space: normal;
+  overflow-wrap: anywhere;
   font-family: "Nunito", sans-serif;
   font-weight: 700;
   font-style: normal;
