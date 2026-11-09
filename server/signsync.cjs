@@ -107,6 +107,39 @@ function makeCues(content, explicitSigns = false) {
         c.text.trim(),
     );
 }
+function styledAss(content, explicitSigns = false) {
+  if (!/\[Events\]/i.test(content)) return undefined;
+  const derived = deriveSignsSongsAss(content);
+  const result = explicitSigns ? content : derived.count ? derived.content : "";
+  return result && Buffer.byteLength(result, "utf8") <= 350000
+    ? result
+    : undefined;
+}
+async function releaseFonts(torrent, signal) {
+  const files = [
+    ...(torrent.attachments || []),
+    ...(torrent.files || []).flatMap((file) => file.attachments || []),
+  ];
+  const fonts = [];
+  let size = 0;
+  for (const attachment of files.filter((a) => a.type === "font").slice(0, 6)) {
+    if (!attachment.url) continue;
+    try {
+      const bytes = await read(attachment.url, signal);
+      if (bytes.length > 250000 || size + bytes.length > 700000) continue;
+      const magic = bytes.subarray(0, 4).toString("hex");
+      if (
+        !["00010000", "4f54544f", "774f4646", "774f4632", "74746366"].includes(
+          magic,
+        )
+      )
+        continue;
+      size += bytes.length;
+      fonts.push("data:font/ttf;base64," + bytes.toString("base64"));
+    } catch {}
+  }
+  return fonts;
+}
 async function search(id, episode) {
   const key = id + ":" + episode,
     saved = cache.get(key);
@@ -124,6 +157,7 @@ async function search(id, episode) {
       eid = Number(info?.anidbEid);
     if (!Number.isSafeInteger(eid) || eid <= 0)
       return {
+        fonts: [],
         tracks: [],
         message: "No episode mapping is available for subtitle search.",
       };
@@ -210,11 +244,16 @@ async function search(id, episode) {
                         " · " +
                         String(entry.title || "Subtitle release").slice(0, 180),
                       cues,
+                      ass: styledAss(content, explicit),
                     });
                 } catch {
                   /* One unavailable attachment must not replace a working track. */
                 }
                 if (out.length >= 2) break;
+              }
+              if (out.some((track) => track.ass)) {
+                const fonts = await releaseFonts(torrent, signal);
+                if (fonts.length) out[0].fonts = fonts;
               }
               return out;
             }),
@@ -231,7 +270,19 @@ async function search(id, episode) {
       throw new Error(
         "Subtitle sources are unavailable. Please try again later.",
       );
+    const fonts = [];
+    let fontBytes = 0;
+    for (const track of tracks) {
+      for (const font of track.fonts || []) {
+        if (!fonts.includes(font) && fontBytes + font.length <= 1000000) {
+          fonts.push(font);
+          fontBytes += font.length;
+        }
+      }
+      delete track.fonts;
+    }
     const value = {
+      fonts,
       tracks: [
         ...new Map(tracks.map((track) => [track.id, track])).values(),
       ].slice(0, 6),
@@ -279,4 +330,12 @@ async function handler(req, res) {
     );
   }
 }
-module.exports = { handler, search, makeCues, episodeAttachments, allowed };
+module.exports = {
+  handler,
+  search,
+  makeCues,
+  styledAss,
+  episodeAttachments,
+  allowed,
+};
+

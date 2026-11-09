@@ -2,6 +2,7 @@ const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const {
   makeCues,
+  styledAss,
   episodeAttachments,
   allowed,
   handler,
@@ -98,6 +99,8 @@ test("search reuses exact episode results and decodes styled signs without expos
   try {
     const result = await search(987654, 4);
     assert.equal(result.tracks[0].cues.length, 1);
+    assert.match(result.tracks[0].ass, /\\pos\(20,30\)/);
+    assert.doesNotMatch(result.tracks[0].ass, /Ordinary dialogue/);
     assert.equal("url" in result.tracks[0], false);
     const n = calls;
     assert.deepEqual(await search(987654, 4), result);
@@ -128,4 +131,15 @@ test("SeaSubs bounded XZ decoder validates compressed subtitle integrity", () =>
   assert.match(decode(bytes), /A street sign/);
   bytes[bytes.length - 20] ^= 1;
   assert.throws(() => decode(bytes));
+});
+
+test("styled extraction preserves ASS styles, placement, rotation and drawings", () => {
+  const source = "[Script Info]\nPlayResX: 1920\nPlayResY: 1080\n[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour\nStyle: Signs,Noto Sans,40,&H00FF00FF\n" + ass.slice(ass.indexOf("[Events]"));
+  const styled = styledAss(source);
+  assert.match(styled, /PlayResX: 1920/);
+  assert.match(styled, /Style: Signs,Noto Sans,40,&H00FF00FF/);
+  assert.match(styled, /\\pos\(20,30\)/);
+  assert.match(styled, /\\p1/);
+  assert.doesNotMatch(styled, /Ordinary dialogue/);
+  assert.equal(styledAss("WEBVTT", true), undefined);
 });

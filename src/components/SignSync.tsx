@@ -2,6 +2,7 @@ import React, { RefObject, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Captions, Sparkles, X } from "lucide-react";
 import "./signSync.css";
+import { StyledSigns } from "./StyledSigns";
 interface Cue {
   start: number;
   end: number;
@@ -11,6 +12,7 @@ interface Track {
   id: string;
   label: string;
   cues: Cue[];
+  ass?: string;
 }
 export function SignSync({
   animeId,
@@ -34,6 +36,8 @@ export function SignSync({
       return {};
     }
   };
+  const [fonts, setFonts] = useState<string[]>([]);
+  const [styledFailed, setStyledFailed] = useState(false);
   const [open, setOpen] = useState(false),
     [tracks, setTracks] = useState<Track[]>([]),
     [selected, setSelected] = useState("");
@@ -73,6 +77,18 @@ export function SignSync({
           typeof track.label === "string" &&
           Array.isArray(track.cues),
       );
+      setFonts(
+        Array.isArray(data.fonts)
+          ? data.fonts
+              .filter(
+                (font: unknown) =>
+                  typeof font === "string" &&
+                  /^data:font\/ttf;base64,[A-Za-z0-9+/=]+$/.test(font),
+              )
+              .slice(0, 6)
+          : [],
+      );
+      setStyledFailed(false);
       setTracks(valid);
       if (valid.length) setSelected(valid[0].id);
       setMessage(data.message || "No matching subtitles found.");
@@ -95,9 +111,14 @@ export function SignSync({
       localStorage.setItem(settingKey, JSON.stringify({ delay, follow }));
     } catch {}
   }, [settingKey, delay, follow]);
+  const selectedTrack = tracks.find((track) => track.id === selected);
+  const styled =
+    typeof selectedTrack?.ass === "string" &&
+    selectedTrack.ass.length > 0 &&
+    !styledFailed;
   useEffect(() => {
     const cues = tracks.find((track) => track.id === selected)?.cues;
-    if (!cues) {
+    if (!cues || styled) {
       setVisible([]);
       return;
     }
@@ -118,7 +139,7 @@ export function SignSync({
     tick();
     const timer = window.setInterval(tick, 100);
     return () => clearInterval(timer);
-  }, [selected, tracks, delay]);
+  }, [selected, tracks, delay, styled]);
   useEffect(() => {
     if (!open) return;
     close.current?.focus();
@@ -157,6 +178,21 @@ export function SignSync({
       {root.current &&
         createPortal(
           <>
+            {styled && selectedTrack?.ass && (
+              <StyledSigns
+                ass={selectedTrack.ass}
+                fonts={fonts}
+                root={root}
+                position={position}
+                delay={delay}
+                onFailure={() => {
+                  setStyledFailed(true);
+                  setMessage(
+                    "Styled rendering is unavailable. Showing plain text for this track.",
+                  );
+                }}
+              />
+            )}
             {visible.length > 0 && (
               <div
                 className="signsync-captions"
@@ -201,7 +237,10 @@ export function SignSync({
                     Subtitle source
                     <select
                       value={selected}
-                      onChange={(e) => setSelected(e.target.value)}
+                      onChange={(e) => {
+                        setSelected(e.target.value);
+                        setStyledFailed(false);
+                      }}
                     >
                       <option value="">Off</option>
                       {tracks.map((track) => (
@@ -267,7 +306,8 @@ export function SignSync({
                 </button>
                 <small>
                   Use the player’s CC menu for dialogue. SignSync displays
-                  additional text; ASS fonts and positioning are simplified.
+                  additional text with the source’s ASS styling when available.
+                  Missing fonts use a fallback typeface.
                 </small>
               </section>
             )}

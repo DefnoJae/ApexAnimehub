@@ -152,3 +152,9 @@
     animation: none;
   }
 }
+
+.signsync-ass-canvas {
+  position: absolute;
+  pointer-events: none;
+  z-index: 8;
+}
