@@ -372,3 +372,55 @@ test("fullscreen cycles preserve the frame, and an unresponsive frame can reload
     localStorage.clear();
   }
 });
+
+test("saved Signs/Songs preference applies from the SDK handshake without a ready event", async () => {
+  localStorage.clear();
+  localStorage.setItem("apex_prefer_signs_songs_v1", "true");
+  const node = document.createElement("div");
+  const root = createRoot(node);
+  const original = window.AniPM;
+  const state = {
+    anilistId: 1,
+    episode: 1,
+    lang: "dub",
+    subtitleTracks: [
+      {
+        label: "English Signs/Songs [Trix v2]",
+        language: "en",
+        showing: false,
+      },
+    ],
+  };
+  const player = {
+    iframe: document.createElement("iframe"),
+    state,
+    ready: jest.fn().mockResolvedValue(state),
+    setSubtitles: jest.fn().mockResolvedValue(state),
+    on: jest.fn(),
+    destroy: jest.fn(),
+  };
+  player.iframe.allow = "autoplay";
+  window.AniPM = {
+    Player: jest.fn().mockImplementation(() => player),
+  } as unknown as typeof window.AniPM;
+  const props = {
+    title: "Example",
+    episode: 1,
+    stream: { name: "Ani.pm (Dub)", url: aniPmUrl(1, 1, "dub") },
+    accounts: { autoSync: false },
+    onClose: jest.fn(),
+    onNext: jest.fn(),
+    onPrevious: jest.fn(),
+    onWatched: jest.fn(),
+  } as unknown as PlayerProps;
+  try {
+    await act(async () => root.render(<AniPmPlayer {...props} />));
+    expect(player.setSubtitles).toHaveBeenCalledWith({
+      label: "English Signs/Songs [Trix v2]",
+    });
+  } finally {
+    act(() => root.unmount());
+    window.AniPM = original;
+    localStorage.clear();
+  }
+});
