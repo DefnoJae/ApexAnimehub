@@ -6,27 +6,16 @@ import { aniPmUrl, validAniPmState } from "../utils/anipm";
 import type { PlayerProps } from "./VideoPlayer";
 test("Ani.pm uses explicit episode identity for 80% tracking and cleans up its SDK", async () => {
   localStorage.clear();
-  localStorage.setItem("apex_prefer_signs_songs_v1", "true");
   const node = document.createElement("div");
   document.body.append(node);
   const root = createRoot(node);
   const events: Record<string, (data: any) => void> = {};
   const player = {
     iframe: document.createElement("iframe"),
-    state: {
-      anilistId: 1,
-      episode: 2,
-      lang: "dub",
-      subtitleTracks: [] as Array<{
-        label: string;
-        language: string;
-        showing: boolean;
-      }>,
-    },
+    state: { anilistId: 1, episode: 2, lang: "dub" },
     on: (event: string, cb: (data: any) => void) => {
       events[event] = cb;
     },
-    setSubtitles: jest.fn().mockResolvedValue({}),
     destroy: jest.fn(),
     loadEpisode: jest.fn().mockResolvedValue({}),
   };
@@ -80,31 +69,6 @@ test("Ani.pm uses explicit episode identity for 80% tracking and cleans up its S
     );
     expect(player.destroy).not.toHaveBeenCalled();
     events.ready(player.state);
-    expect(player.setSubtitles).not.toHaveBeenCalled();
-    player.state.subtitleTracks = [
-      { label: "English CC (Dub)", language: "en", showing: true },
-      {
-        label: "English Signs/Songs [Trix v2]",
-        language: "en",
-        showing: false,
-      },
-    ];
-    await act(async () =>
-      events.subtitlechange({ tracks: player.state.subtitleTracks }),
-    );
-    expect(player.setSubtitles).toHaveBeenCalledWith({
-      label: "English Signs/Songs [Trix v2]",
-    });
-    events.subtitlechange({ tracks: player.state.subtitleTracks });
-    expect(player.setSubtitles).toHaveBeenCalledTimes(1);
-    localStorage.setItem("apex_prefer_signs_songs_v1", "false");
-    act(() => window.dispatchEvent(new Event("apex-prefer-signs-songs")));
-    events.ready(player.state);
-    expect(player.setSubtitles).toHaveBeenCalledTimes(1);
-    localStorage.setItem("apex_prefer_signs_songs_v1", "true");
-    act(() => window.dispatchEvent(new Event("apex-prefer-signs-songs")));
-    expect(window.AniPM.Player).toHaveBeenCalledTimes(1);
-    expect(player.setSubtitles).toHaveBeenCalledTimes(2);
     expect(changed).toHaveBeenCalledWith(2, "dub");
     events.timeupdate({ currentTime: 79, duration: 100 });
     expect(watched).not.toHaveBeenCalled();
@@ -114,8 +78,6 @@ test("Ani.pm uses explicit episode identity for 80% tracking and cleans up its S
     expect(watched).toHaveBeenLastCalledWith(2);
     player.state.episode = 3;
     events.episodechange(player.state);
-    events.ready(player.state);
-    expect(player.setSubtitles).toHaveBeenCalledTimes(3);
     events.timeupdate({ currentTime: 80, duration: 100 });
     expect(watched).toHaveBeenLastCalledWith(3);
     player.state.anilistId = 99;
@@ -127,7 +89,6 @@ test("Ani.pm uses explicit episode identity for 80% tracking and cleans up its S
     act(() => root.unmount());
     expect(player.destroy).toHaveBeenCalled();
   } finally {
-    localStorage.removeItem("apex_prefer_signs_songs_v1");
     window.AniPM = original;
     node.remove();
   }
@@ -369,58 +330,6 @@ test("fullscreen cycles preserve the frame, and an unresponsive frame can reload
     window.AniPM = original;
     node.remove();
     jest.useRealTimers();
-    localStorage.clear();
-  }
-});
-
-test("saved Signs/Songs preference applies from the SDK handshake without a ready event", async () => {
-  localStorage.clear();
-  localStorage.setItem("apex_prefer_signs_songs_v1", "true");
-  const node = document.createElement("div");
-  const root = createRoot(node);
-  const original = window.AniPM;
-  const state = {
-    anilistId: 1,
-    episode: 1,
-    lang: "dub",
-    subtitleTracks: [
-      {
-        label: "English Signs/Songs [Trix v2]",
-        language: "en",
-        showing: false,
-      },
-    ],
-  };
-  const player = {
-    iframe: document.createElement("iframe"),
-    state,
-    ready: jest.fn().mockResolvedValue(state),
-    setSubtitles: jest.fn().mockResolvedValue(state),
-    on: jest.fn(),
-    destroy: jest.fn(),
-  };
-  player.iframe.allow = "autoplay";
-  window.AniPM = {
-    Player: jest.fn().mockImplementation(() => player),
-  } as unknown as typeof window.AniPM;
-  const props = {
-    title: "Example",
-    episode: 1,
-    stream: { name: "Ani.pm (Dub)", url: aniPmUrl(1, 1, "dub") },
-    accounts: { autoSync: false },
-    onClose: jest.fn(),
-    onNext: jest.fn(),
-    onPrevious: jest.fn(),
-    onWatched: jest.fn(),
-  } as unknown as PlayerProps;
-  try {
-    await act(async () => root.render(<AniPmPlayer {...props} />));
-    expect(player.setSubtitles).toHaveBeenCalledWith({
-      label: "English Signs/Songs [Trix v2]",
-    });
-  } finally {
-    act(() => root.unmount());
-    window.AniPM = original;
     localStorage.clear();
   }
 });

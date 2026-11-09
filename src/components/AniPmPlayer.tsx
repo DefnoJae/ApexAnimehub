@@ -1,4 +1,3 @@
-import { usePreferSignsSongs } from "../hooks/usePreferSignsSongs";
 import React, { useEffect, useRef, useState } from "react";
 import { Maximize, X } from "lucide-react";
 import type { PlayerProps } from "./VideoPlayer";
@@ -14,14 +13,6 @@ import "./nativeVideoPlayer.css";
 import { SignSync } from "./SignSync";
 import { usePlayerKeyboard } from "../hooks/usePlayerKeyboard";
 export default function AniPmPlayer(props: PlayerProps) {
-  const [preferSignsSongs] = usePreferSignsSongs();
-  const preference = useRef(preferSignsSongs);
-  preference.current = preferSignsSongs;
-  const subtitleCleanup = useRef<() => void>(() => {});
-  const applySubtitlePreference = useRef<() => void>(() => {});
-  useEffect(() => {
-    applySubtitlePreference.current();
-  }, [preferSignsSongs]);
   const host = useRef<HTMLDivElement>(null),
     dialog = useRef<HTMLDivElement>(null),
     instance = useRef<Player>();
@@ -202,89 +193,7 @@ export default function AniPmPlayer(props: PlayerProps) {
             callbacks.current.onEpisodeChange?.(state.episode, state.lang);
           }
         };
-        let selectedFor = "";
-        let requestedFor = "";
-        let attempts = 0;
-        let lastRequest = 0;
-        const applySignsSongs = () => {
-          const state = player.state;
-          if (
-            !active ||
-            !preference.current ||
-            !validAniPmState(state, id) ||
-            state.lang !== "dub"
-          )
-            return;
-          const key = state.anilistId + ":" + state.episode + ":" + state.lang;
-          if (selectedFor === key) return;
-          const track = state.subtitleTracks?.find(
-            (track) =>
-              (track.language?.toLowerCase().startsWith("en") ||
-                /english/i.test(track.label)) &&
-              /signs?\s*(?:[\/&+]|and)\s*songs?/i.test(track.label),
-          );
-          if (!track) return;
-          if (track.showing) {
-            selectedFor = key;
-            return;
-          }
-          if (requestedFor !== key) {
-            requestedFor = key;
-            attempts = 0;
-            lastRequest = 0;
-          }
-          if (
-            attempts >= 3 ||
-            (attempts > 0 && Date.now() - lastRequest < 1000)
-          )
-            return;
-          attempts++;
-          lastRequest = Date.now();
-          void player.setSubtitles({ label: track.label }).catch(() => {});
-        };
-        applySubtitlePreference.current = () => {
-          selectedFor = "";
-          requestedFor = "";
-          applySignsSongs();
-        };
-        player.on("ready", (state) => {
-          stateChanged(state);
-          applySignsSongs();
-        });
-        player.on("subtitlechange", applySignsSongs);
-        // Verify delayed player track discovery, and stop after startup settles.
-        let polls = 0;
-        let polling = false;
-        const subtitlePoll = window.setInterval(async () => {
-          if (!active || ++polls > 30 || selectedFor) {
-            clearInterval(subtitlePoll);
-            return;
-          }
-          if (
-            polling ||
-            !preference.current ||
-            typeof player.getState !== "function"
-          )
-            return;
-          polling = true;
-          try {
-            await player.getState();
-            applySignsSongs();
-          } catch {
-          } finally {
-            polling = false;
-          }
-        }, 1000);
-        subtitleCleanup.current = () => clearInterval(subtitlePoll);
-        player.on("loaded", applySignsSongs);
-        player.on("playing", applySignsSongs);
-        // A fast embed can finish loading before SDK listeners are attached.
-        // The SDK handshake resolves with the current tracks without emitting ready.
-        if (typeof player.ready === "function")
-          void player
-            .ready()
-            .then(() => applySignsSongs())
-            .catch(() => {});
+        player.on("ready", stateChanged);
         player.on("episodechange", stateChanged);
         player.on("languagechange", stateChanged);
         player.on("timeupdate", (data) => {
@@ -386,8 +295,6 @@ export default function AniPmPlayer(props: PlayerProps) {
     return () => {
       flush();
       active = false;
-      applySubtitlePreference.current = () => {};
-      subtitleCleanup.current();
       window.removeEventListener("pagehide", flush);
       instance.current?.destroy();
       instance.current = undefined;

@@ -1,5 +1,4 @@
 import React from "react";
-import { usePreferSignsSongs } from "../hooks/usePreferSignsSongs";
 import { useStoriesVisible } from "../hooks/useStoriesVisible";
 import { useRatingSource, RatingSource } from "../hooks/useRatingSource";
 import type { useAccounts } from "../hooks/useAccounts";
@@ -10,7 +9,6 @@ export function AccountSettings({
   accounts: ReturnType<typeof useAccounts>;
   onClose: () => void;
 }) {
-  const [preferSignsSongs, setPreferSignsSongs] = usePreferSignsSongs();
   const [storiesVisible, setStoriesVisible] = useStoriesVisible();
   const [ratingSource, setRatingSource] = useRatingSource();
   return (
@@ -89,20 +87,6 @@ export function AccountSettings({
             onChange={(event) => setStoriesVisible(event.target.checked)}
           />
           Show following activity stories
-        </label>
-        <label className="flex gap-3 items-start my-6">
-          <input
-            type="checkbox"
-            checked={preferSignsSongs}
-            onChange={(event) => setPreferSignsSongs(event.target.checked)}
-          />
-          <span>
-            Prefer English Signs/Songs on dubbed episodes
-            <p className="text-sm text-slate-400 mt-1">
-              Automatically select an available English Signs/Songs track in
-              Ani.pm.
-            </p>
-          </span>
         </label>
         <label className="block my-6">
           Public ratings
