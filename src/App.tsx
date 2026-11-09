@@ -206,17 +206,17 @@ export default function App() {
 
   useEffect(() => {
     loadContent();
-    const savedHistory = localStorage.getItem("videasy_history");
-    if (savedHistory) {
-      try {
+    try {
+      const savedHistory = localStorage.getItem("videasy_history");
+      if (savedHistory) {
         const saved = JSON.parse(savedHistory);
         if (Array.isArray(saved))
           setWatchHistory(
             saved.filter((item) => item?.anime?.id && item.episode > 0),
           );
-      } catch (e) {
-        console.error("Failed to parse history", e);
       }
+    } catch (e) {
+      console.error("Failed to read history", e);
     }
   }, [loadContent]);
 
@@ -306,7 +306,11 @@ export default function App() {
         },
         ...filtered,
       ].slice(0, 15);
-      localStorage.setItem("videasy_history", JSON.stringify(newHistory));
+      try {
+        localStorage.setItem("videasy_history", JSON.stringify(newHistory));
+      } catch {
+        // Keep playback and in-memory history usable if browser storage is full or blocked.
+      }
       return newHistory;
     });
   };
@@ -314,7 +318,11 @@ export default function App() {
   const removeFromHistory = (animeId: number) => {
     setWatchHistory((prev) => {
       const newHistory = prev.filter((h) => h.anime.id !== animeId);
-      localStorage.setItem("videasy_history", JSON.stringify(newHistory));
+      try {
+        localStorage.setItem("videasy_history", JSON.stringify(newHistory));
+      } catch {
+        // Keep playback and in-memory history usable if browser storage is full or blocked.
+      }
       return newHistory;
     });
   };

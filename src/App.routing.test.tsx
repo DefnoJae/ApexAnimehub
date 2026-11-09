@@ -2,6 +2,7 @@ import React from "react";
 import { createRoot } from "react-dom/client";
 import { act } from "react-dom/test-utils";
 import App from "./App";
+import { AppErrorBoundary } from "./components/AppErrorBoundary";
 import { fetchAnilist } from "./utils/anilist";
 jest.mock("./utils/anilist", () => ({ fetchAnilist: jest.fn() }));
 jest.mock("./hooks/useAccounts", () => ({
@@ -110,3 +111,50 @@ test("a direct episode URL reloads the right anime, audio and episode; Back rest
     window.history.replaceState({}, "", "/");
   }
 });
+
+test.each(["setItem", "getItem"] as const)(
+  "episodes remain usable when browser storage %s throws",
+  async (method) => {
+    window.history.replaceState(
+      {},
+      "",
+      "/anime/1/episode/3?audio=dub&source=anipm",
+    );
+    const storage = jest
+      .spyOn(Storage.prototype, method)
+      .mockImplementation(() => {
+        throw new DOMException("Storage unavailable", "QuotaExceededError");
+      });
+    const consoleError = jest
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
+    const node = document.createElement("div");
+    const root = createRoot(node);
+    try {
+      await act(async () =>
+        root.render(
+          <AppErrorBoundary>
+            <App />
+          </AppErrorBoundary>,
+        ),
+      );
+      expect(node.querySelector('[role="dialog"]')?.textContent).toContain(
+        "Episode 3",
+      );
+      act(() =>
+        Array.from(node.querySelectorAll("button"))
+          .find((button) => button.textContent === "Next")!
+          .click(),
+      );
+      expect(node.querySelector('[role="dialog"]')?.textContent).toContain(
+        "Episode 4",
+      );
+      expect(node.textContent).not.toContain("This page couldn’t load");
+    } finally {
+      act(() => root.unmount());
+      storage.mockRestore();
+      consoleError.mockRestore();
+      window.history.replaceState({}, "", "/");
+    }
+  },
+);
