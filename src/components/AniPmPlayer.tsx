@@ -1,3 +1,4 @@
+import { usePreferSignsSongs } from "../hooks/usePreferSignsSongs";
 import React, { useEffect, useRef, useState } from "react";
 import { Maximize, X } from "lucide-react";
 import type { PlayerProps } from "./VideoPlayer";
@@ -13,6 +14,13 @@ import "./nativeVideoPlayer.css";
 import { SignSync } from "./SignSync";
 import { usePlayerKeyboard } from "../hooks/usePlayerKeyboard";
 export default function AniPmPlayer(props: PlayerProps) {
+  const [preferSignsSongs] = usePreferSignsSongs();
+  const preference = useRef(preferSignsSongs);
+  preference.current = preferSignsSongs;
+  const applySubtitlePreference = useRef<() => void>(() => {});
+  useEffect(() => {
+    applySubtitlePreference.current();
+  }, [preferSignsSongs]);
   const host = useRef<HTMLDivElement>(null),
     dialog = useRef<HTMLDivElement>(null),
     instance = useRef<Player>();
@@ -193,7 +201,40 @@ export default function AniPmPlayer(props: PlayerProps) {
             callbacks.current.onEpisodeChange?.(state.episode, state.lang);
           }
         };
-        player.on("ready", stateChanged);
+        let selectedFor = "";
+        const applySignsSongs = () => {
+          const state = player.state;
+          if (
+            !active ||
+            !preference.current ||
+            !validAniPmState(state, id) ||
+            state.lang !== "dub"
+          )
+            return;
+          const key = state.anilistId + ":" + state.episode + ":" + state.lang;
+          if (selectedFor === key) return;
+          const track = state.subtitleTracks?.find(
+            (track) =>
+              (track.language?.toLowerCase().startsWith("en") ||
+                /english/i.test(track.label)) &&
+              /signs?\s*(?:[\/&+]|and)\s*songs?/i.test(track.label),
+          );
+          if (!track) return;
+          selectedFor = key;
+          if (!track.showing)
+            void player.setSubtitles({ label: track.label }).catch(() => {
+              if (active && selectedFor === key) selectedFor = "";
+            });
+        };
+        applySubtitlePreference.current = () => {
+          selectedFor = "";
+          applySignsSongs();
+        };
+        player.on("ready", (state) => {
+          stateChanged(state);
+          applySignsSongs();
+        });
+        player.on("subtitlechange", applySignsSongs);
         player.on("episodechange", stateChanged);
         player.on("languagechange", stateChanged);
         player.on("timeupdate", (data) => {
@@ -295,6 +336,7 @@ export default function AniPmPlayer(props: PlayerProps) {
     return () => {
       flush();
       active = false;
+      applySubtitlePreference.current = () => {};
       window.removeEventListener("pagehide", flush);
       instance.current?.destroy();
       instance.current = undefined;
