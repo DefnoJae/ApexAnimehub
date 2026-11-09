@@ -1,3 +1,4 @@
+import { StyledSelect } from "./StyledSelect";
 import React from "react";
 import { useStoriesVisible } from "../hooks/useStoriesVisible";
 import { useRatingSource, RatingSource } from "../hooks/useRatingSource";
@@ -90,7 +91,7 @@ export function AccountSettings({
         </label>
         <label className="block my-6">
           Public ratings
-          <select
+          <StyledSelect
             aria-label="Rating source"
             className="block mt-2 bg-[#242032] rounded-xl p-3 w-full"
             value={ratingSource}
@@ -101,7 +102,7 @@ export function AccountSettings({
             <option value="anilist">AniList</option>
             <option value="mal">MyAnimeList</option>
             <option value="both">Both</option>
-          </select>
+          </StyledSelect>
         </label>
         {accounts.loginNotice && (
           <p role="status" className="text-purple-300 mb-4">

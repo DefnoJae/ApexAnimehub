@@ -66,16 +66,16 @@
   gap: 10px;
   margin: 15px 0 6px;
 }
-.signsync-panel label:has(select) {
+.signsync-panel label:has(:is(select, .styled-select-trigger)) {
   display: block;
 }
-.signsync-panel select {
+.signsync-panel :is(select, .styled-select-trigger) {
   display: block;
   width: 100%;
   margin-top: 7px;
 }
 .signsync-panel input[type="number"],
-.signsync-panel select {
+.signsync-panel :is(select, .styled-select-trigger) {
   background: #ffffff0b;
   border: 1px solid #ffffff20;
   border-radius: 8px;
@@ -103,7 +103,7 @@
 }
 .signsync-panel button:focus-visible,
 .signsync-panel input:focus-visible,
-.signsync-panel select:focus-visible {
+.signsync-panel :is(select, .styled-select-trigger):focus-visible {
   outline: 2px solid #b58aff;
   outline-offset: 2px;
 }

@@ -1,3 +1,4 @@
+import { StyledSelect } from "./StyledSelect";
 import React, { useState } from "react";
 import type { useAccounts, ListStatus } from "../hooks/useAccounts";
 import { LibraryAnime } from "../hooks/useLibrary";
@@ -107,7 +108,7 @@ export function MyList({
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
-        <select
+        <StyledSelect
           aria-label="List provider"
           value={provider}
           onChange={(e) => setProvider(e.target.value)}
@@ -115,8 +116,8 @@ export function MyList({
           <option value="all">All accounts</option>
           <option value="anilist">AniList</option>
           <option value="mal">MyAnimeList</option>
-        </select>
-        <select
+        </StyledSelect>
+        <StyledSelect
           aria-label="Filter list status"
           value={status}
           onChange={(e) => setStatus(e.target.value as ListStatus | "all")}
@@ -127,8 +128,8 @@ export function MyList({
               {label}
             </option>
           ))}
-        </select>
-        <select
+        </StyledSelect>
+        <StyledSelect
           aria-label="Sort my list"
           value={sort}
           onChange={(event) => {
@@ -143,7 +144,7 @@ export function MyList({
           <option value="lowest">My lowest rated</option>
           <option value="progress">Most watched</option>
           <option value="title">Title A–Z</option>
-        </select>
+        </StyledSelect>
       </div>
       {Object.entries(accounts.libraryErrors).map(([p, error]) => (
         <p role="alert" key={p}>

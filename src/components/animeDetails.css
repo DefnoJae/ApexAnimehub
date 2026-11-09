@@ -163,7 +163,7 @@
   padding: 0 14px;
   min-height: 48px;
 }
-.detail-list-status select {
+.detail-list-status :is(select, .styled-select-trigger) {
   background: transparent;
   border: 0;
   color: inherit;
@@ -171,7 +171,7 @@
   padding: 12px 4px;
   min-width: 130px;
 }
-.detail-list-status select option {
+.detail-list-status :is(select, .styled-select-trigger) option {
   background: #211a2d;
   color: #eee;
 }
@@ -336,7 +336,7 @@
   font-size: 12px;
   color: #a99bb8;
 }
-.detail-source select {
+.detail-source :is(select, .styled-select-trigger) {
   background: none;
   border: 0;
   color: #d8c7ef;
@@ -425,7 +425,7 @@
   text-transform: capitalize;
 }
 .anime-detail-page button:focus-visible,
-.anime-detail-page select:focus-visible {
+.anime-detail-page :is(select, .styled-select-trigger):focus-visible {
   outline: 2px solid #bd90ff;
   outline-offset: 3px;
 }
@@ -504,7 +504,7 @@
     min-height: 42px;
     padding: 0 10px;
   }
-  .detail-list-status select {
+  .detail-list-status :is(select, .styled-select-trigger) {
     min-width: 100px;
     font-size: 12px;
   }

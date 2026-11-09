@@ -1,3 +1,4 @@
+import { StyledSelect } from "./StyledSelect";
 import React, { useEffect, useRef, useState } from "react";
 import { Search, X } from "lucide-react";
 import {
@@ -244,7 +245,7 @@ export function DiscoveryPage({
   ) => (
     <label className="discovery-inline-filter">
       <span>{label}</span>
-      <select
+      <StyledSelect
         aria-label={label}
         value={String(draft[key] || "")}
         onChange={(e) => change(key, e.target.value)}
@@ -254,7 +255,7 @@ export function DiscoveryPage({
             {text}
           </option>
         ))}
-      </select>
+      </StyledSelect>
     </label>
   );
   return (

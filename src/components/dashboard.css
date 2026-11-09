@@ -1138,7 +1138,7 @@ input:focus-visible {
   margin: 24px 0;
 }
 .library-filters input,
-.library-filters select {
+.library-filters :is(select, .styled-select-trigger) {
   background: #211b2c;
   border: 1px solid #ffffff24;
   color: white;
@@ -1393,7 +1393,7 @@ input:focus-visible {
   color: #ada6bb;
   margin-top: 8px;
 }
-.discovery-page select,
+.discovery-page :is(select, .styled-select-trigger),
 .discovery-page input[type="number"] {
   background: #1d1925;
   color: #e8e2f1;
@@ -1406,7 +1406,7 @@ input:focus-visible {
   font-size: 12px;
   white-space: nowrap;
 }
-.discovery-heading select {
+.discovery-heading :is(select, .styled-select-trigger) {
   margin-left: 8px;
 }
 .discovery-search {

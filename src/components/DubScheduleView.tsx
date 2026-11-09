@@ -1,3 +1,4 @@
+import { StyledSelect } from "./StyledSelect";
 import React, { useState, useEffect } from "react";
 import { Search, Settings, Play, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import type { ScheduleEntry } from "../types/schedule";
@@ -450,7 +451,7 @@ export const DubScheduleView = ({ onSelectMedia }: DubScheduleViewProps) => {
             />
           </div>
 
-          <select
+          <StyledSelect
             value={viewMode === "weekly" ? "weekly" : "calendar"}
             onChange={(e) => {
               if (e.target.value === "calendar") {
@@ -465,7 +466,7 @@ export const DubScheduleView = ({ onSelectMedia }: DubScheduleViewProps) => {
             <option value="weekly">All Latest Episodes</option>
             <option value="previous">Previous Week</option>
             <option value="calendar">Full Calendar</option>
-          </select>
+          </StyledSelect>
         </div>
 
         {/* UPCOMING RELEASES */}

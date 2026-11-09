@@ -1,3 +1,4 @@
+import { StyledSelect } from "./StyledSelect";
 import React, { useEffect, useState } from "react";
 import type { ListAnime, ListStatus, useAccounts } from "../hooks/useAccounts";
 export function ListFeedback({
@@ -42,7 +43,7 @@ export function ListControls({
         <label className="sr-only" htmlFor="list-status">
           List status
         </label>
-        <select
+        <StyledSelect
           id="list-status"
           value={status}
           onChange={(event) => setStatus(event.target.value as ListStatus)}
@@ -53,7 +54,7 @@ export function ListControls({
           <option value="completed">Completed</option>
           <option value="paused">On hold</option>
           <option value="dropped">Dropped</option>
-        </select>
+        </StyledSelect>
         <button
           disabled={accounts.busy || accounts.checking}
           onClick={() =>

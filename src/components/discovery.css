@@ -48,7 +48,7 @@
   font-size: 10px;
   color: #999;
 }
-.discovery-inline-filter select {
+.discovery-inline-filter :is(select, .styled-select-trigger) {
   background: transparent;
   border: 0;
   border-bottom: 1px solid #ffffff55;

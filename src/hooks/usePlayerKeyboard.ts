@@ -31,7 +31,7 @@ export function usePlayerKeyboard(
       if (
         target instanceof Element &&
         target.closest(
-          'input,textarea,select,[contenteditable]:not([contenteditable="false"]),[role="textbox"],[role="slider"],.signsync-panel,.anipm-resume-prompt',
+          'input,textarea,select,[role="combobox"],[contenteditable]:not([contenteditable="false"]),[role="textbox"],[role="slider"],.signsync-panel,.anipm-resume-prompt',
         )
       )
         return;

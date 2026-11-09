@@ -1,3 +1,4 @@
+import { StyledSelect } from "./StyledSelect";
 import React, { RefObject, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Captions, Sparkles, X } from "lucide-react";
@@ -235,7 +236,7 @@ export function SignSync({
                 {tracks.length > 0 && (
                   <label>
                     Subtitle source
-                    <select
+                    <StyledSelect
                       value={selected}
                       onChange={(e) => {
                         setSelected(e.target.value);
@@ -248,7 +249,7 @@ export function SignSync({
                           {track.label}
                         </option>
                       ))}
-                    </select>
+                    </StyledSelect>
                   </label>
                 )}
                 <label>

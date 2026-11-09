@@ -1,3 +1,4 @@
+import { StyledSelect } from "./StyledSelect";
 import React, { lazy, Suspense, useState } from "react";
 import {
   ArrowLeft,
@@ -267,7 +268,7 @@ export function AnimeDetails({
                 <label className="detail-list-status glass">
                   <Bookmark size={16} />
                   <span className="sr-only">List status</span>
-                  <select
+                  <StyledSelect
                     aria-label="List status"
                     value={savedStatus || ""}
                     disabled={accounts.busy || accounts.checking}
@@ -282,7 +283,7 @@ export function AnimeDetails({
                     {matches.length > 0 && (
                       <option value="remove">Remove from lists</option>
                     )}
-                  </select>
+                  </StyledSelect>
                 </label>
                 <button
                   className="detail-watch-order-toggle"
@@ -485,7 +486,7 @@ export function AnimeDetails({
             </div>
             <label className="detail-source">
               Source
-              <select
+              <StyledSelect
                 aria-label="Playback source"
                 value={
                   audio === "dub" && source === "apex" ? "megaplay" : source
@@ -501,7 +502,7 @@ export function AnimeDetails({
                   </option>
                 )}
                 <option value="megaplay">MegaPlay</option>
-              </select>
+              </StyledSelect>
             </label>
             <button
               className="detail-play"
