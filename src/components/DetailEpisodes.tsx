@@ -18,6 +18,7 @@ export function DetailEpisodes({
   selected,
   accounts,
   onSelect,
+  onPlay,
   onLanguage,
 }: {
   anime: DashboardAnime;
@@ -25,6 +26,7 @@ export function DetailEpisodes({
   selected: number;
   accounts: ReturnType<typeof useAccounts>;
   onSelect: (episode: number) => void;
+  onPlay?: (episode: number) => void;
   onLanguage?: (language: "sub" | "dub") => void;
 }) {
   const [data, setData] = useState<{
@@ -182,7 +184,7 @@ export function DetailEpisodes({
           episodeNumbers={filtered}
           entries={accounts.libraryEntries}
           importing={accounts.libraryLoading}
-          onSelect={onSelect}
+          onSelect={onPlay || onSelect}
         />
       ) : (
         <>
@@ -206,7 +208,7 @@ export function DetailEpisodes({
                     (number <= progress ? ", watched" : ", not marked watched")
                   }
                   aria-pressed={number === selected}
-                  onClick={() => onSelect(number)}
+                  onClick={() => (onPlay || onSelect)(number)}
                 >
                   <div className="detail-episode-still">
                     <span className="episode-image-placeholder">{number}</span>

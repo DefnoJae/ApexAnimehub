@@ -20,7 +20,8 @@ test("language filters show only confirmed available episode numbers and preserv
   document.body.append(host);
   const root = createRoot(host),
     select = jest.fn(),
-    language = jest.fn();
+    language = jest.fn(),
+    play = jest.fn();
   try {
     await act(async () =>
       root.render(
@@ -35,6 +36,7 @@ test("language filters show only confirmed available episode numbers and preserv
             } as unknown as ReturnType<typeof useAccounts>
           }
           onSelect={select}
+          onPlay={play}
           onLanguage={language}
         />,
       ),
@@ -45,6 +47,15 @@ test("language filters show only confirmed available episode numbers and preserv
     act(() => dub.click());
     expect(language).toHaveBeenCalledWith("dub");
     expect(select).toHaveBeenCalledWith(1);
+    expect(play).not.toHaveBeenCalled();
+    act(() =>
+      host
+        .querySelector<HTMLButtonElement>(
+          '[aria-label="Episode 3, not marked watched"]',
+        )!
+        .click(),
+    );
+    expect(play).toHaveBeenCalledWith(3);
     expect(host.querySelectorAll(".detail-episode-card")).toHaveLength(2);
     expect(
       host.querySelector('[aria-label="Episode 2, not marked watched"]'),

@@ -396,6 +396,13 @@ export function AnimeDetails({
                 selected={selected}
                 accounts={accounts}
                 onSelect={onEpisode}
+                onPlay={(episode) =>
+                  onPlay(
+                    episode,
+                    audio,
+                    audio === "dub" && source === "apex" ? "megaplay" : source,
+                  )
+                }
                 onLanguage={changeAudio}
               />
             </div>
@@ -504,32 +511,6 @@ export function AnimeDetails({
                 <option value="megaplay">MegaPlay</option>
               </StyledSelect>
             </label>
-            <button
-              className="detail-play"
-              onClick={() =>
-                onPlay(
-                  selected,
-                  audio,
-                  audio === "dub" && source === "apex" ? "megaplay" : source,
-                )
-              }
-            >
-              <Play size={17} fill="currentColor" />
-              Play Episode {selected}
-            </button>
-            <p>Stream availability is checked by the player.</p>
-            {source === "anipm" && (
-              <p>
-                Ani.pm includes captions and episode controls. The provider may
-                open an ad tab once every five minutes.
-              </p>
-            )}
-            {source === "apex" && audio === "sub" && (
-              <p>
-                Sub only. Includes subtitles and next/previous episode controls.
-                Use MegaPlay if unavailable.
-              </p>
-            )}
           </section>
         </aside>
       </div>

@@ -37,7 +37,7 @@ afterEach(() => {
   act(() => root.unmount());
   node.remove();
 });
-test("compact detail controls preserve imported watched state and selected audio without writing on episode selection", () => {
+test("episode cards immediately play with selected language and source without changing watched progress", () => {
   const play = jest.fn(),
     episode = jest.fn(),
     sync = jest.fn();
@@ -79,7 +79,7 @@ test("compact detail controls preserve imported watched state and selected audio
   );
   act(() =>
     Array.from(node.querySelectorAll("button"))
-      .find((b) => b.textContent === "Play Episode 5")!
+      .find((b) => b.textContent === "Continue Episode 5")!
       .click(),
   );
   expect(play).toHaveBeenCalledWith(5, "dub", "anipm");
@@ -91,7 +91,25 @@ test("compact detail controls preserve imported watched state and selected audio
       ) as HTMLButtonElement
     ).click(),
   );
-  expect(episode).toHaveBeenCalledWith(6);
+  expect(play).toHaveBeenLastCalledWith(6, "dub", "anipm");
+  expect(episode).not.toHaveBeenCalled();
+  expect(node.querySelector(".detail-playback .detail-play")).toBeNull();
+  expect(node.textContent).not.toContain(
+    "Stream availability is checked by the player.",
+  );
+  const source = node.querySelector<HTMLSelectElement>(
+    ".detail-source select",
+  )!;
+  act(() => {
+    source.value = "megaplay";
+    source.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  act(() =>
+    node
+      .querySelector<HTMLButtonElement>('[aria-label="Episode 3, watched"]')!
+      .click(),
+  );
+  expect(play).toHaveBeenLastCalledWith(3, "dub", "megaplay");
   expect(sync).not.toHaveBeenCalled();
   expect(node.querySelectorAll(".is-watched")).toHaveLength(4);
   act(() =>
