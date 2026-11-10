@@ -24,6 +24,7 @@ import {
 } from "../utils/animeSchedule";
 import { StyledSelect } from "./StyledSelect";
 import { CalendarMonth } from "./CalendarMonth";
+import { ScheduleFinale } from "./ScheduleFinale";
 import "./animeCalendar.css";
 const days = [
   "Sunday",
@@ -126,6 +127,7 @@ export function ScheduleCard({
           })}
         </time>
         <span> · Episode {release.episode}</span>
+        <ScheduleFinale release={release} />
       </span>
       {release.note &&
         !["aired", "airing", "upcoming"].includes(

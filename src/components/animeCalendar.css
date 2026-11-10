@@ -270,7 +270,7 @@
 .calendar-release-card > strong {
   display: block;
   width: 100%;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 700;
   margin: 8px 0 3px;
   overflow: hidden;
@@ -278,7 +278,7 @@
   text-overflow: ellipsis;
 }
 .calendar-release-time {
-  font-size: 11px;
+  font-size: 12px;
   color: #9a8fa8;
 }
 .calendar-release-note {
@@ -414,11 +414,11 @@
 .calendar-month-grid {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
-  min-width: 700px;
+  min-width: 1050px;
   gap: 7px;
 }
 .calendar-month-weekdays {
-  font-size: 11px;
+  font-size: 13px;
   color: #a59aaf;
   text-align: center;
   margin-bottom: 9px;
@@ -426,7 +426,7 @@
 .calendar-month-cell {
   position: relative;
   min-width: 0;
-  min-height: 115px;
+  min-height: 160px;
   padding: 8px;
   border: 1px solid #ffffff10;
   border-radius: 9px;
@@ -465,8 +465,8 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 8px;
-  font-size: 11px;
+  margin-bottom: 10px;
+  font-size: 14px;
 }
 .calendar-cell-date strong {
   display: flex;
@@ -476,8 +476,8 @@
   height: 19px;
 }
 .calendar-cell-date small {
-  color: #b2a8bf;
-  font-size: 9px;
+  color: #c5bacf;
+  font-size: 11px;
 }
 .calendar-month-cell.is-today .calendar-cell-date strong {
   border-radius: 50%;
@@ -494,8 +494,10 @@
 .calendar-cell-releases > span {
   display: flex;
   align-items: center;
-  gap: 4px;
-  font-size: 9px;
+  gap: 5px;
+  font-size: 12px;
+  line-height: 1.5;
+  padding: 2px 0;
 }
 .calendar-cell-releases > span > span {
   flex: 1;
@@ -505,12 +507,12 @@
   text-overflow: ellipsis;
 }
 .calendar-cell-releases small {
-  font-size: 8px;
+  font-size: 11px;
   flex-shrink: 0;
   color: #c1b5cc;
 }
 .calendar-cell-releases em {
-  font-size: 8px;
+  font-size: 11px;
   color: #b9a4cd;
   font-style: normal;
 }
@@ -568,12 +570,12 @@
 }
 .calendar-popover-release strong {
   display: block;
-  font-size: 11px;
+  font-size: 14px;
   font-weight: 700;
 }
 .calendar-popover-release small,
 .calendar-popover-release time {
-  font-size: 10px;
+  font-size: 12px;
   color: #a99bb9;
 }
 .calendar-popover-release time {
@@ -676,6 +678,53 @@
   }
   .calendar-skeleton > div,
   .calendar-loading-icon {
+    animation: none;
+  }
+}
+
+.calendar-finale {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: #d8aa4624;
+  color: #f2ce7c;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1.3;
+  vertical-align: middle;
+  margin-left: 6px;
+}
+.calendar-finale.is-compact {
+  padding: 2px;
+  margin: 0;
+  background: transparent;
+}
+.calendar-finale svg {
+  flex-shrink: 0;
+}
+.calendar-cell-releases > span > .calendar-finale {
+  flex: 0 0 auto;
+  overflow: visible;
+}
+.calendar-cell-releases > span:hover {
+  color: white;
+}
+.calendar-cell-art {
+  animation: calendar-art-in 0.2s ease-out;
+}
+@keyframes calendar-art-in {
+  from {
+    opacity: 0.08;
+  }
+  to {
+    opacity: 0.22;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .calendar-cell-art {
     animation: none;
   }
 }

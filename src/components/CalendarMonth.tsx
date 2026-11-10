@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import Modal from "react-modal";
+import { ScheduleFinale } from "./ScheduleFinale";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { CalendarRelease, dateKey, monthGrid } from "../utils/animeSchedule";
 import { getDisplayTitle } from "../utils/schedule";
@@ -31,9 +32,14 @@ export function CalendarMonth({
     left: number;
     top: number;
   } | null>(null);
+  const [hovered, setHovered] = useState<{
+    day: string;
+    release: CalendarRelease;
+  } | null>(null);
   const popup = useRef<HTMLDivElement>(null);
   useEffect(() => {
     setExpanded(null);
+    setHovered(null);
   }, [month]);
   useEffect(() => {
     if (!expanded) return;
@@ -143,15 +149,24 @@ export function CalendarMonth({
           <div className="calendar-month-grid">
             {monthGrid(month).days.map((date) => {
               const list = entries.get(dateKey(date)) || [],
-                art = list.find(
-                  (release) =>
-                    release.anime.bannerImage ||
-                    release.anime.coverImage?.extraLarge,
+                art = (
+                  hovered?.day === dateKey(date)
+                    ? hovered.release
+                    : list.find(
+                        (release) =>
+                          release.anime.bannerImage ||
+                          release.anime.coverImage?.extraLarge,
+                      )
                 )?.anime;
               return (
                 <button
                   key={dateKey(date)}
                   data-calendar-date={dateKey(date)}
+                  onPointerLeave={() =>
+                    setHovered((previous) =>
+                      previous?.day === dateKey(date) ? null : previous,
+                    )
+                  }
                   className={
                     "calendar-month-cell" +
                     (date.getMonth() !== month.getMonth()
@@ -204,6 +219,7 @@ export function CalendarMonth({
                 >
                   {art && (
                     <img
+                      key={art.bannerImage || art.coverImage?.extraLarge}
                       className="calendar-cell-art"
                       src={art.bannerImage || art.coverImage?.extraLarge}
                       alt=""
@@ -219,9 +235,17 @@ export function CalendarMonth({
                   </span>
                   <span className="calendar-cell-releases">
                     {list.slice(0, 4).map((release) => (
-                      <span key={release.key}>
+                      <span
+                        key={release.key}
+                        onPointerEnter={() =>
+                          setHovered({ day: dateKey(date), release })
+                        }
+                      >
                         <i className={release.language} />
-                        <span>{getDisplayTitle(release.anime)}</span>
+                        <span title={getDisplayTitle(release.anime)}>
+                          {getDisplayTitle(release.anime)}
+                        </span>
+                        <ScheduleFinale release={release} compact />
                         <small>Ep {release.episode}</small>
                       </span>
                     ))}
@@ -271,6 +295,12 @@ export function CalendarMonth({
                   className="calendar-popover-release"
                   key={release.key}
                   onClick={() => onSelect(release)}
+                  onPointerEnter={() =>
+                    setHovered({ day: dateKey(expanded.date), release })
+                  }
+                  onFocus={() =>
+                    setHovered({ day: dateKey(expanded.date), release })
+                  }
                 >
                   <i className={release.language} />
                   <span>
@@ -278,6 +308,7 @@ export function CalendarMonth({
                     <small>
                       {release.language.toUpperCase()} · Episode{" "}
                       {release.episode}
+                      <ScheduleFinale release={release} />
                     </small>
                   </span>
                   <time dateTime={new Date(release.at).toISOString()}>
