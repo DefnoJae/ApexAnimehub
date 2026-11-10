@@ -7,8 +7,9 @@ interface CachedArtwork {
   logos: string[];
   backdrops: string[];
   updatedAt: number;
+  match?: string;
 }
-const DAY = 86400000;
+const DAY = 21600000;
 // TMDB assets come from its verified logos collection. Square title marks
 // (for example 18if) are valid logos too, not automatically poster artwork.
 export function isTitleTreatment(width: number, height: number): boolean {
@@ -54,17 +55,13 @@ export function isHeroBanner(width: number, height: number): boolean {
 async function fetchHeroMedia(anilistId: number): Promise<CachedArtwork> {
   const empty = { logos: [], backdrops: [], updatedAt: 0 };
   if (!Number.isSafeInteger(anilistId) || anilistId <= 0) return empty;
-  const key = "apex_tmdb_artwork_v5_" + anilistId;
+  const key = "apex_tmdb_artwork_v6_" + anilistId;
   let freshCache = false;
   let cached: CachedArtwork | null = null;
   try {
     const current = localStorage.getItem(key);
     freshCache = current !== null;
-    const value = JSON.parse(
-      current ||
-        localStorage.getItem("apex_tmdb_artwork_v4_" + anilistId) ||
-        "null",
-    );
+    const value = JSON.parse(current || "null");
     if (
       value &&
       Array.isArray(value.logos) &&
@@ -78,7 +75,12 @@ async function fetchHeroMedia(anilistId: number): Promise<CachedArtwork> {
   if (
     freshCache &&
     cached &&
-    Date.now() - cached.updatedAt < (cached.logos.length ? DAY : DAY / 96)
+    Date.now() - cached.updatedAt <
+      (cached.match === "exact" &&
+      cached.logos.length &&
+      cached.backdrops.length
+        ? DAY
+        : 900000)
   )
     return cached;
   const existing = pending.get(anilistId);
@@ -88,7 +90,7 @@ async function fetchHeroMedia(anilistId: number): Promise<CachedArtwork> {
       timer = setTimeout(() => controller.abort(), 45000);
     try {
       const response = await fetch(
-        "/api/artwork?anilist_id=" + anilistId + "&v=5",
+        "/api/artwork?anilist_id=" + anilistId + "&v=6",
         {
           signal: controller.signal,
           credentials: "omit",
@@ -103,6 +105,7 @@ async function fetchHeroMedia(anilistId: number): Promise<CachedArtwork> {
         logos,
         backdrops: artworkBackdrops(data, anilistId),
         updatedAt: Date.now(),
+        match: data.match === "exact" ? "exact" : "fallback",
       };
       try {
         localStorage.setItem(key, JSON.stringify(result));

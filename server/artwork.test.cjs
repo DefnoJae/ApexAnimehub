@@ -54,14 +54,16 @@ test("mapped movie uses movie images; concurrent calls deduplicate", async () =>
             ? {
                 mappings: { anilist_id: 999, type: "MOVIE", themoviedb_id: 12 },
               }
-            : { logos: [], backdrops: [] },
+            : url.includes("movie/12?")
+              ? { title: "Test", genres: [{ id: 16 }] }
+              : { logos: [], backdrops: [] },
     };
   };
   try {
     const [a, b] = await Promise.all([artwork(999), artwork(999)]);
     assert.deepEqual(a, b);
-    assert.equal(calls.length, 3);
-    assert.match(calls[2], /movie\/12\/images/);
+    assert.equal(calls.length, 5);
+    assert.ok(calls.some((url) => /movie\/12\/images/.test(url)));
     assert.equal(JSON.stringify(a).includes("test"), false);
   } finally {
     global.fetch = oldFetch;
@@ -161,4 +163,190 @@ test("small English TMDB logos such as 18if are retained", () => {
   ]);
 });
 
-test("unlabelled TMDB logos are valid fallbacks and English remains first",()=>{const result=selectImages({logos:[{file_path:"/unlabelled.png",iso_639_1:null,width:800,height:200,vote_average:10},{file_path:"/english.png",iso_639_1:"en",width:500,height:200,vote_average:1}],backdrops:[]});assert.equal(result.logos[0],"https://image.tmdb.org/t/p/original/english.png");assert.equal(result.logos.length,2);});
+test("unlabelled TMDB logos are valid fallbacks and English remains first", () => {
+  const result = selectImages({
+    logos: [
+      {
+        file_path: "/unlabelled.png",
+        iso_639_1: null,
+        width: 800,
+        height: 200,
+        vote_average: 10,
+      },
+      {
+        file_path: "/english.png",
+        iso_639_1: "en",
+        width: 500,
+        height: 200,
+        vote_average: 1,
+      },
+    ],
+    backdrops: [],
+  });
+  assert.equal(
+    result.logos[0],
+    "https://image.tmdb.org/t/p/original/english.png",
+  );
+  assert.equal(result.logos.length, 2);
+});
+
+test("dedicated sequel/re-edit artwork wins before prequel or stale franchise mapping", async () => {
+  const originalFetch = global.fetch,
+    originalKey = process.env.TMDB_API_KEY;
+  process.env.TMDB_API_KEY = "test";
+  const calls = [];
+  global.fetch = async (url, options = {}) => {
+    calls.push(url);
+    let data;
+    if (url.includes("graphql.anilist"))
+      data = {
+        data: {
+          Media: {
+            id: 206814,
+            format: "TV",
+            seasonYear: 2026,
+            title: { english: "Dragon Ball Super: Beerus" },
+            relations: {
+              edges: [
+                {
+                  relationType: "PREQUEL",
+                  node: { id: 813, type: "ANIME", format: "TV" },
+                },
+              ],
+            },
+          },
+        },
+      };
+    else if (url.includes("search/tv"))
+      data = {
+        results: [
+          {
+            id: 312359,
+            name: "Dragon Ball Super: Beerus",
+            genre_ids: [16],
+            first_air_date: "2026-10-01",
+          },
+          {
+            id: 12609,
+            name: "Dragon Ball",
+            genre_ids: [16],
+            first_air_date: "1986-02-26",
+          },
+        ],
+      };
+    else if (url.includes("tv/312359/images"))
+      data = {
+        logos: [
+          {
+            file_path: "/beerus.png",
+            iso_639_1: "en",
+            width: 1224,
+            height: 562,
+          },
+        ],
+        backdrops: [
+          {
+            file_path: "/beerus.jpg",
+            iso_639_1: null,
+            width: 1920,
+            height: 1080,
+          },
+        ],
+      };
+    else throw new Error("Unrelated artwork must not be requested: " + url);
+    return { ok: true, json: async () => data };
+  };
+  try {
+    const data = await artwork(206814);
+    assert.equal(data.tmdbId, 312359);
+    assert.equal(data.match, "exact");
+    assert.ok(data.logos[0].endsWith("/beerus.png"));
+    assert.ok(data.backdrops[0].endsWith("/beerus.jpg"));
+    assert.equal(calls.length, 3);
+  } finally {
+    global.fetch = originalFetch;
+    if (originalKey === undefined) delete process.env.TMDB_API_KEY;
+    else process.env.TMDB_API_KEY = originalKey;
+  }
+});
+
+test("wrong franchise mappings are rejected and a failed relative preserves the exact backdrop", async () => {
+  const originalFetch = global.fetch,
+    originalKey = process.env.TMDB_API_KEY;
+  process.env.TMDB_API_KEY = "test";
+  global.fetch = async (url, options = {}) => {
+    let data;
+    if (url.includes("graphql.anilist")) {
+      const id = JSON.parse(options.body).variables.id;
+      if (id === 7711) throw new Error("Relative unavailable");
+      data = {
+        data: {
+          Media: {
+            id,
+            format: "TV",
+            seasonYear: 2026,
+            title: {
+              english: id === 7710 ? "Fresh Show" : "New Franchise Story",
+            },
+            relations: {
+              edges:
+                id === 7710
+                  ? [
+                      {
+                        relationType: "PREQUEL",
+                        node: { id: 7711, type: "ANIME", format: "TV" },
+                      },
+                    ]
+                  : [],
+            },
+          },
+        },
+      };
+    } else if (url.includes("search/tv"))
+      data = {
+        results: url.includes("Fresh%20Show")
+          ? [
+              {
+                id: 44,
+                name: "Fresh Show",
+                genre_ids: [16],
+                first_air_date: "2026-01-01",
+              },
+            ]
+          : [],
+      };
+    else if (url.includes("ani.zip"))
+      data = { mappings: { anilist_id: 7712, themoviedb_id: 33 } };
+    else if (url.includes("tv/33?"))
+      data = {
+        name: "Unrelated Franchise",
+        first_air_date: "1986-01-01",
+        genres: [{ id: 16 }],
+      };
+    else if (url.includes("tv/44/images"))
+      data = {
+        logos: [],
+        backdrops: [
+          {
+            file_path: "/fresh.jpg",
+            iso_639_1: null,
+            width: 1920,
+            height: 1080,
+          },
+        ],
+      };
+    else throw new Error("Unrelated images requested");
+    return { ok: true, json: async () => data };
+  };
+  try {
+    const own = await artwork(7710);
+    assert.ok(own.backdrops[0].endsWith("/fresh.jpg"));
+    const wrong = await artwork(7712);
+    assert.deepEqual(wrong.logos, []);
+    assert.deepEqual(wrong.backdrops, []);
+  } finally {
+    global.fetch = originalFetch;
+    if (originalKey === undefined) delete process.env.TMDB_API_KEY;
+    else process.env.TMDB_API_KEY = originalKey;
+  }
+});
