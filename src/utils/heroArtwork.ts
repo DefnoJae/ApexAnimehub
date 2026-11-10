@@ -55,15 +55,22 @@ export function isHeroBanner(width: number, height: number): boolean {
 async function fetchHeroMedia(anilistId: number): Promise<CachedArtwork> {
   const empty = { logos: [], backdrops: [], updatedAt: 0 };
   if (!Number.isSafeInteger(anilistId) || anilistId <= 0) return empty;
-  const key = "apex_tmdb_artwork_v6_" + anilistId;
+  const key = "apex_tmdb_artwork_v7_" + anilistId;
   let freshCache = false;
   let cached: CachedArtwork | null = null;
   try {
     const current = localStorage.getItem(key);
     freshCache = current !== null;
-    const value = JSON.parse(current || "null");
+    // Revalidate the previous resolver's cache, but keep verified images usable
+    // if the provider is temporarily unavailable during migration.
+    const value = JSON.parse(
+      current ||
+        localStorage.getItem("apex_tmdb_artwork_v6_" + anilistId) ||
+        "null",
+    );
     if (
       value &&
+      (freshCache || (value.match === "exact" && value.logos?.length)) &&
       Array.isArray(value.logos) &&
       value.logos.every(safeImage) &&
       Array.isArray(value.backdrops) &&
@@ -90,7 +97,7 @@ async function fetchHeroMedia(anilistId: number): Promise<CachedArtwork> {
       timer = setTimeout(() => controller.abort(), 45000);
     try {
       const response = await fetch(
-        "/api/artwork?anilist_id=" + anilistId + "&v=6",
+        "/api/artwork?anilist_id=" + anilistId + "&v=7",
         {
           signal: controller.signal,
           credentials: "omit",
@@ -101,6 +108,13 @@ async function fetchHeroMedia(anilistId: number): Promise<CachedArtwork> {
       if (!data || Number(data.anilistId) !== anilistId)
         throw new Error("Artwork ID mismatch");
       const logos = artworkLogos(data, anilistId);
+      if (
+        !logos.length &&
+        data.match === "none" &&
+        cached?.match === "exact" &&
+        cached.logos.length
+      )
+        return cached;
       const result = {
         logos,
         backdrops: artworkBackdrops(data, anilistId),

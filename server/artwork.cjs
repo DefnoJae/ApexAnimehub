@@ -5,6 +5,7 @@ const normalize = (value) =>
     .normalize("NFKD")
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
+    .replace(/[\u00d7\u2715\u2716]/gu, "x")
     .replace(/[^\p{L}\p{N}]/gu, "");
 const cache = new Map(),
   pending = new Map();
@@ -83,6 +84,21 @@ function titles(media) {
     ),
   ];
 }
+function withoutReleaseYear(value) {
+  return String(value || "")
+    .normalize("NFKC")
+    .replace(/\s*[\[(](?:19|20)\d{2}[\])]\s*$/u, "")
+    .trim();
+}
+function searchTitles(media) {
+  return [
+    ...new Set(
+      titles(media)
+        .flatMap((title) => [title, withoutReleaseYear(title)])
+        .filter(Boolean),
+    ),
+  ];
+}
 function exactCandidate(candidate, media) {
   const names = [
     candidate.name,
@@ -91,7 +107,7 @@ function exactCandidate(candidate, media) {
     candidate.original_title,
   ]
     .filter(Boolean)
-    .map(normalize);
+    .map((name) => normalize(withoutReleaseYear(name)));
   const year = Number(
     String(candidate.first_air_date || candidate.release_date || "").slice(
       0,
@@ -100,7 +116,9 @@ function exactCandidate(candidate, media) {
   );
   return (
     candidate.genre_ids?.includes(16) &&
-    titles(media).some((title) => names.includes(normalize(title))) &&
+    titles(media).some((title) =>
+      names.includes(normalize(withoutReleaseYear(title))),
+    ) &&
     (!media.seasonYear || (year > 0 && Math.abs(year - media.seasonYear) <= 1))
   );
 }
@@ -123,7 +141,7 @@ async function ownArtwork(media, tmdb) {
   let tmdbId;
   // Search the selected entry BEFORE mapping/prequel fallbacks. A sequel or
   // re-edit can have a dedicated TMDB series with its own logos and backdrops.
-  for (const title of titles(media)) {
+  for (const title of searchTitles(media)) {
     const found = await tmdb(
       "search/" + type + "?language=en-US&query=" + encodeURIComponent(title),
     );

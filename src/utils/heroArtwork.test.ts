@@ -48,7 +48,7 @@ test("logo and backdrop requests share server fetch and daily cache", async () =
   await fetchHeroArtwork(43);
   expect(global.fetch).toHaveBeenCalledTimes(1);
   expect(global.fetch).toHaveBeenCalledWith(
-    "/api/artwork?anilist_id=43&v=6",
+    "/api/artwork?anilist_id=43&v=7",
     expect.anything(),
   );
 });
@@ -58,10 +58,10 @@ test("provider outage preserves stale TMDB artwork", async () => {
     backdrops: [],
     updatedAt: Date.now() - 2 * 86400000,
   };
-  localStorage.setItem("apex_tmdb_artwork_v6_44", JSON.stringify(saved));
+  localStorage.setItem("apex_tmdb_artwork_v7_44", JSON.stringify(saved));
   global.fetch = jest.fn().mockRejectedValue(new Error("Offline"));
   expect(await fetchHeroArtwork(44)).toEqual(saved.logos);
-  expect(JSON.parse(localStorage.getItem("apex_tmdb_artwork_v6_44")!)).toEqual(
+  expect(JSON.parse(localStorage.getItem("apex_tmdb_artwork_v7_44")!)).toEqual(
     saved,
   );
 });
@@ -75,19 +75,68 @@ test("prequel-first cache is discarded and the exact artwork is fetched", async 
       updatedAt: Date.now(),
     }),
   );
+  global.fetch = jest.fn().mockResolvedValue({
+    ok: true,
+    json: async () => ({
+      anilistId: 45,
+      logos: ["https://image.tmdb.org/t/p/original/exact.png"],
+      backdrops: [],
+      match: "exact",
+    }),
+  });
+  expect(await fetchHeroArtwork(45)).toEqual([
+    "https://image.tmdb.org/t/p/original/exact.png",
+  ]);
+  expect(global.fetch).toHaveBeenCalledTimes(1);
+});
+
+test("an empty old lookup is rechecked instead of hiding an available logo", async () => {
+  localStorage.setItem(
+    "apex_tmdb_artwork_v6_46",
+    JSON.stringify({
+      logos: [],
+      backdrops: [],
+      updatedAt: Date.now(),
+      match: "fallback",
+    }),
+  );
   global.fetch = jest
     .fn()
     .mockResolvedValue({
       ok: true,
       json: async () => ({
-        anilistId: 45,
-        logos: ["https://image.tmdb.org/t/p/original/exact.png"],
-        backdrops: [],
+        anilistId: 46,
         match: "exact",
+        logos: ["https://image.tmdb.org/t/p/original/restored.png"],
+        backdrops: [],
       }),
     });
-  expect(await fetchHeroArtwork(45)).toEqual([
-    "https://image.tmdb.org/t/p/original/exact.png",
+  expect(await fetchHeroArtwork(46)).toEqual([
+    "https://image.tmdb.org/t/p/original/restored.png",
   ]);
   expect(global.fetch).toHaveBeenCalledTimes(1);
+});
+test("a transient lookup miss never replaces a previously verified clear logo", async () => {
+  const saved = {
+    logos: ["https://image.tmdb.org/t/p/original/verified.png"],
+    backdrops: [],
+    updatedAt: Date.now() - 86400000,
+    match: "exact",
+  };
+  localStorage.setItem("apex_tmdb_artwork_v7_47", JSON.stringify(saved));
+  global.fetch = jest
+    .fn()
+    .mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        anilistId: 47,
+        match: "none",
+        logos: [],
+        backdrops: [],
+      }),
+    });
+  expect(await fetchHeroArtwork(47)).toEqual(saved.logos);
+  expect(JSON.parse(localStorage.getItem("apex_tmdb_artwork_v7_47")!)).toEqual(
+    saved,
+  );
 });

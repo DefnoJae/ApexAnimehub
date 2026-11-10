@@ -350,3 +350,78 @@ test("wrong franchise mappings are rejected and a failed relative preserves the 
     else process.env.TMDB_API_KEY = originalKey;
   }
 });
+
+test("release-year suffixes and multiplication signs match the correct remake, never the older series", async () => {
+  const oldFetch = global.fetch,
+    oldKey = process.env.TMDB_API_KEY;
+  process.env.TMDB_API_KEY = "test";
+  const calls = [];
+  global.fetch = async (url) => {
+    calls.push(url);
+    let data;
+    if (url.includes("graphql.anilist"))
+      data = {
+        data: {
+          Media: {
+            id: 11061,
+            format: "TV",
+            seasonYear: 2011,
+            title: {
+              english: "Hunter x Hunter (2011)",
+              romaji: "HUNTER\u00d7HUNTER (2011)",
+            },
+            relations: { edges: [] },
+          },
+        },
+      };
+    else if (url.includes("search/tv"))
+      data = {
+        results: url.includes("2011")
+          ? []
+          : [
+              {
+                id: 1,
+                name: "Hunter \u00d7 Hunter",
+                first_air_date: "1999-10-16",
+                genre_ids: [16],
+              },
+              {
+                id: 46298,
+                name: "Hunter \u00d7 Hunter",
+                first_air_date: "2011-10-02",
+                genre_ids: [16],
+              },
+            ],
+      };
+    else if (url.includes("tv/46298/images"))
+      data = {
+        logos: [
+          {
+            file_path: "/hunter.png",
+            iso_639_1: "en",
+            width: 800,
+            height: 300,
+          },
+        ],
+        backdrops: [],
+      };
+    else throw new Error("Wrong identity requested: " + url);
+    return { ok: true, json: async () => data };
+  };
+  try {
+    const result = await artwork(11061);
+    assert.equal(result.tmdbId, 46298);
+    assert.equal(result.match, "exact");
+    assert.ok(result.logos[0].endsWith("/hunter.png"));
+    assert.ok(
+      calls.some(
+        (url) =>
+          url.includes("query=Hunter%20x%20Hunter") && !url.includes("2011"),
+      ),
+    );
+  } finally {
+    global.fetch = oldFetch;
+    if (oldKey === undefined) delete process.env.TMDB_API_KEY;
+    else process.env.TMDB_API_KEY = oldKey;
+  }
+});
