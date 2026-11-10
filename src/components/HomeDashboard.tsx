@@ -121,7 +121,7 @@ export function FloatingNavigation({
       <span className="nav-divider" />
       {[
         { key: "all", label: "Home", Icon: Home },
-        { key: "dub-releases", label: "Dub calendar", Icon: Calendar },
+        { key: "dub-releases", label: "Anime calendar", Icon: Calendar },
         { key: "my-list", label: "My List", Icon: Library },
         { key: "discover", label: "Discover anime", Icon: Compass },
       ].map(({ key, label, Icon }) => (

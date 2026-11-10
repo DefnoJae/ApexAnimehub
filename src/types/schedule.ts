@@ -1,4 +1,5 @@
 export interface DubEntry {
+  format?: string;
   title: string;
   route: string;
   native: string;
@@ -17,7 +18,9 @@ export interface DubEntry {
       description: string;
       episodes: number;
       averageScore: number;
-      airingSchedule: { nodes: Array<{ episode: number; airingAt: string | number }> };
+      airingSchedule: {
+        nodes: Array<{ episode: number; airingAt: string | number }>;
+      };
     };
   };
 }
@@ -27,4 +30,3 @@ export interface ScheduleEntry extends DubEntry {
   timeOnly: string;
   dayOfWeek: string;
 }
-

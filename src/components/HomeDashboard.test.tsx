@@ -328,7 +328,7 @@ test("navigation exposes accessible labels, active location and independent sear
   ).toBe("page");
   act(() =>
     (
-      node.querySelector('[aria-label="Dub calendar"]') as HTMLButtonElement
+      node.querySelector('[aria-label="Anime calendar"]') as HTMLButtonElement
     ).click(),
   );
   expect(view).toHaveBeenCalledWith("dub-releases");

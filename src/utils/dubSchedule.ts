@@ -31,10 +31,10 @@ export function isoWeek(date: Date): { year: number; week: number } {
   const year = d.getUTCFullYear();
   return { year, week: Math.ceil((((d.getTime() - Date.UTC(year, 0, 1)) / 86400000) + 1) / 7) };
 }
-interface TimetableItem { title: string; title_english?: string; route: string; episode_date: string; episode_number: number; air_type: string; image_url?: string; mal_id?: number; external_ids?: { anilist?: number }; delayed_text?: string; media?: { mal_id?: number; external_ids?: { anilist?: number }; image_url?: string } }
+interface TimetableItem { media_types?: string[]; title: string; title_english?: string; route: string; episode_date: string; episode_number: number; air_type: string; image_url?: string; mal_id?: number; external_ids?: { anilist?: number }; delayed_text?: string; media?: { mal_id?: number; external_ids?: { anilist?: number }; image_url?: string } }
 export function timetableEntry(item: TimetableItem): DubEntry | null {
   if (item.air_type !== 'dub' || !item.title || !Number.isFinite(Date.parse(item.episode_date)) || !Number.isFinite(item.episode_number)) return null;
-  return { title: item.title, route: item.route, native: '', episodeDate: item.episode_date, episodeNumber: item.episode_number, delayedFrom: '', delayedUntil: '', airingStatus: item.delayed_text || '', verified: false,
+  return { format: item.media_types?.[0]?.toUpperCase(), title: item.title, route: item.route, native: '', episodeDate: item.episode_date, episodeNumber: item.episode_number, delayedFrom: '', delayedUntil: '', airingStatus: item.delayed_text || '', verified: false,
     media: { media: { id: item.external_ids?.anilist || item.media?.external_ids?.anilist || 0, idMal: item.mal_id || item.media?.mal_id, title: { english: item.title_english || item.title, romaji: item.title }, coverImage: { extraLarge: item.image_url || item.media?.image_url || '' }, description: '', episodes: 0, averageScore: 0, airingSchedule: { nodes: [] } } } };
 }
 export async function fetchDubRange(start: Date, end: Date, force = false): Promise<ScheduleResult> {

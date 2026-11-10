@@ -164,7 +164,7 @@ export default function App() {
       all: "Home",
       discover: "Discover",
       "my-list": "My List",
-      "dub-releases": "Dub Calendar",
+      "dub-releases": "Anime Calendar",
       "not-found": "Page not found",
     };
     const page =
@@ -675,7 +675,7 @@ export default function App() {
             </p>
           )}
           {view === "dub-releases" && (
-            <DubScheduleView onSelectMedia={onSelectMedia} />
+            <DubScheduleView onSelectMedia={onSelectMedia} accounts={accounts} />
           )}
 
           {view === "my-list" && (
