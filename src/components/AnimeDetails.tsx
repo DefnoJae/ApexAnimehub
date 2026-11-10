@@ -13,6 +13,7 @@ import type { ListStatus, useAccounts } from "../hooks/useAccounts";
 import { sameAnime } from "../hooks/useLibrary";
 import { getDisplayTitle } from "../utils/schedule";
 import { FriendsActivityDock } from "./FriendsActivityDock";
+import { StudioLogos } from "./StudioLogos";
 import { TrailerButton } from "./TrailerButton";
 import { DetailTitle } from "./DetailTitle";
 import { HeroBackdrop } from "./HeroBackdrop";
@@ -37,7 +38,9 @@ export interface DetailAnime extends DashboardAnime {
         | null;
     }>;
   };
-  studios?: { nodes: Array<{ name: string }> };
+  studios?: {
+    nodes: Array<{ id: number; name: string; isAnimationStudio: boolean }>;
+  };
   relations?: {
     edges: Array<{
       relationType: string;
@@ -86,6 +89,7 @@ export function AnimeDetails({
   onBack,
   onSelect,
   onConnect,
+  onStudio,
 }: {
   anime: DetailAnime;
   accounts: ReturnType<typeof useAccounts>;
@@ -101,6 +105,7 @@ export function AnimeDetails({
   onBack: () => void;
   onSelect: (anime: DashboardAnime) => void;
   onConnect: () => void;
+  onStudio?: (id: number, name: string) => void;
 }) {
   const [tab, setTab] = useState<"episodes" | "related" | "recommendations">(
     "episodes",
@@ -224,6 +229,10 @@ export function AnimeDetails({
                       title={getDisplayTitle(anime)}
                     />
                   }
+                />
+                <StudioLogos
+                  studios={anime.studios?.nodes || []}
+                  onSelect={onStudio}
                 />
               </div>
               <div className="detail-synopsis">

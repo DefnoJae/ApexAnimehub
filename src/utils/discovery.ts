@@ -27,6 +27,7 @@ export interface DiscoveryFilters {
   format: string;
   sort: string;
   listStatus?: string;
+  studioId?: number;
 }
 export const defaultFilters: DiscoveryFilters = {
   search: "",
@@ -256,6 +257,111 @@ async function fetchAniDiscovery(
     source: "anilist" as const,
   };
 }
+interface StudioMedia extends DiscoveryAnime {
+  type?: string;
+  isAdult?: boolean;
+  averageScore?: number;
+  startDate?: { year?: number };
+  season?: string;
+  status?: string;
+  genres?: string[];
+  tags?: Array<{ name: string }>;
+}
+export function matchesStudioFilters(
+  anime: StudioMedia,
+  filters: DiscoveryFilters,
+) {
+  const year = anime.startDate?.year;
+  const title = [anime.title.english, anime.title.romaji]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+  return (
+    anime.type === "ANIME" &&
+    !anime.isAdult &&
+    (!filters.search.trim() ||
+      title.includes(filters.search.trim().toLowerCase())) &&
+    (!filters.from || (!!year && year >= Number(filters.from))) &&
+    (!filters.to || (!!year && year <= Number(filters.to))) &&
+    (!filters.season || anime.season === filters.season.toUpperCase()) &&
+    (!filters.format || anime.format === filters.format.toUpperCase()) &&
+    (!filters.status ||
+      anime.status ===
+        {
+          airing: "RELEASING",
+          complete: "FINISHED",
+          upcoming: "NOT_YET_RELEASED",
+        }[filters.status]) &&
+    (!Number(filters.score) ||
+      (anime.averageScore || 0) >= Number(filters.score) * 10) &&
+    filters.genres.every((id) =>
+      anime.genres?.includes(
+        id.startsWith("name:") ? id.slice(5) : genreNames.get(id) || "",
+      ),
+    ) &&
+    (filters.tags || []).every((tag) =>
+      anime.tags?.some((item) => item.name === tag),
+    )
+  );
+}
+async function fetchStudioDiscovery(
+  filters: DiscoveryFilters,
+  page: number,
+  signal: AbortSignal,
+) {
+  const sort =
+    {
+      trending: "TRENDING_DESC",
+      popularity: "POPULARITY_DESC",
+      score: "SCORE_DESC",
+      start_date: "START_DATE_DESC",
+      title: "TITLE_ROMAJI",
+    }[filters.sort] || "POPULARITY_DESC";
+  const dub = filters.audio === "dub" ? await getDubIndex() : null;
+  const dubbed = new Set([...(dub?.dubbed || []), ...(dub?.partial || [])]);
+  const items: DiscoveryAnime[] = [];
+  let more = false;
+  // Studio connections allow 25 per page; two pages preserve Discovery's 50-item batches.
+  for (let offset = 0; offset < 2; offset++) {
+    const data = await fetchAnilist<{
+      Studio: {
+        name: string;
+        media: { pageInfo: { hasNextPage: boolean }; nodes: StudioMedia[] };
+      } | null;
+    }>(
+      "query($id:Int!,$page:Int!,$sort:[MediaSort]){Studio(id:$id){name media(page:$page,perPage:25,sort:$sort){pageInfo{hasNextPage} nodes{id idMal type isAdult title{english romaji} coverImage{extraLarge} bannerImage episodes averageScore startDate{year} season status format genres tags{name}}}}}",
+      { id: filters.studioId, page: (page - 1) * 2 + 1 + offset, sort: [sort] },
+      signal,
+    );
+    if (!data.Studio)
+      throw new Error(
+        "This studio is unavailable. Remove the studio filter and try again.",
+      );
+    items.push(
+      ...data.Studio.media.nodes
+        .filter(
+          (anime) =>
+            matchesStudioFilters(anime, filters) &&
+            (filters.audio !== "dub" ||
+              (!!anime.idMal && dubbed.has(anime.idMal))),
+        )
+        .map((anime) => ({
+          ...anime,
+          malScore: null,
+          anilistScore: anime.averageScore ? anime.averageScore / 10 : null,
+          year: anime.startDate?.year,
+        })),
+    );
+    more = data.Studio.media.pageInfo.hasNextPage;
+    if (!more) break;
+  }
+  return {
+    items,
+    nextPage: more ? page + 1 : null,
+    scanned: 1,
+    source: "anilist" as const,
+  };
+}
 export async function fetchDiscovery(
   filters: DiscoveryFilters,
   page: number,
@@ -264,6 +370,7 @@ export async function fetchDiscovery(
 ) {
   if (filters.from && filters.to && Number(filters.from) > Number(filters.to))
     throw new Error("Start year must be before or equal to end year.");
+  if (filters.studioId) return fetchStudioDiscovery(filters, page, signal);
   if (
     preferred === "anilist" ||
     filters.tags?.length ||

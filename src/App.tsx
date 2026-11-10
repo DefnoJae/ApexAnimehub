@@ -675,7 +675,10 @@ export default function App() {
             </p>
           )}
           {view === "dub-releases" && (
-            <DubScheduleView onSelectMedia={onSelectMedia} accounts={accounts} />
+            <DubScheduleView
+              onSelectMedia={onSelectMedia}
+              accounts={accounts}
+            />
           )}
 
           {view === "my-list" && (
@@ -686,12 +689,24 @@ export default function App() {
             />
           )}
           {view === "discover" && (
-            <DiscoveryPage accounts={accounts} onSelect={onSelectMedia} />
+            <DiscoveryPage
+              key={route.studioId || "all-studios"}
+              studioId={route.studioId}
+              studioName={route.studioName}
+              onClearStudio={() => navigate("/discover")}
+              accounts={accounts}
+              onSelect={onSelectMedia}
+            />
           )}
           {view === "details" &&
             selectedAnime?.id === route.animeId &&
             !detailError && (
               <AnimeDetails
+                onStudio={(id, name) =>
+                  navigate(
+                    `/discover?studio=${id}&studioName=${encodeURIComponent(name)}`,
+                  )
+                }
                 key={selectedAnime.id}
                 anime={selectedAnime}
                 accounts={accounts}

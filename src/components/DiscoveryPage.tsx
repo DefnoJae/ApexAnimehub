@@ -32,6 +32,7 @@ function savedFilters(): DiscoveryFilters {
       return {
         ...defaultFilters,
         ...saved,
+        studioId: undefined,
         genres: Array.isArray(saved.genres)
           ? saved.genres.filter(
               (v: unknown) => typeof v === "string" && v.startsWith("name:"),
@@ -96,12 +97,22 @@ function Choices({
 export function DiscoveryPage({
   accounts,
   onSelect,
+  studioId,
+  studioName,
+  onClearStudio,
 }: {
+  studioId?: number;
+  studioName?: string;
+  onClearStudio?: () => void;
   accounts: ReturnType<typeof useAccounts>;
   onSelect: (anime: DiscoveryAnime) => void;
 }) {
-  const [draft, setDraft] = useState(savedFilters),
-    [applied, setApplied] = useState(savedFilters);
+  const initialFilters = () =>
+    studioId
+      ? { ...defaultFilters, sort: "popularity", studioId }
+      : savedFilters();
+  const [draft, setDraft] = useState(initialFilters),
+    [applied, setApplied] = useState(initialFilters);
   const [options, setOptions] = useState<{ genres: string[]; tags: string[] }>({
       genres: [],
       tags: [],
@@ -140,11 +151,12 @@ export function DiscoveryPage({
       setPage(1);
       setError("");
       try {
-        localStorage.setItem("apex_discovery_v2", JSON.stringify(draft));
+        if (!studioId)
+          localStorage.setItem("apex_discovery_v2", JSON.stringify(draft));
       } catch {}
     }, 350);
     return () => clearTimeout(timer);
-  }, [draft, applied]);
+  }, [draft, applied, studioId]);
   useEffect(() => {
     const controller = new AbortController();
     let disposed = false;
@@ -348,6 +360,11 @@ export function DiscoveryPage({
         {select("My list status", "listStatus", statuses)}
       </div>
       <div className="discovery-active-filters">
+        {studioId && (
+          <button onClick={onClearStudio} aria-label="Remove studio filter">
+            Studio: {studioName || studioId} <X size={12} />
+          </button>
+        )}
         {chips.map((chip) => (
           <button key={chip.label} onClick={chip.remove}>
             {chip.label}
@@ -356,7 +373,10 @@ export function DiscoveryPage({
         ))}
         <button
           className="discovery-clear"
-          onClick={() => setDraft({ ...defaultFilters, sort: "trending" })}
+          onClick={() => {
+            if (studioId) onClearStudio?.();
+            else setDraft({ ...defaultFilters, sort: "trending" });
+          }}
         >
           Clear all
         </button>

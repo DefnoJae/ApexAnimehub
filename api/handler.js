@@ -8,7 +8,13 @@ module.exports = (req, res) => {
   }
   if (new URL(req.url, "https://localhost").pathname === "/api/playback")
     return require("../server/playback.cjs").handler(req, res);
-  if (new URL(req.url, "https://localhost").pathname === "/api/artwork") return require("../server/artwork.cjs").handler(req, res);
-  if (new URL(req.url,"https://localhost").pathname === "/api/episode-metadata") return require("../server/episodes.cjs").handler(req,res);
+  if (new URL(req.url, "https://localhost").pathname === "/api/artwork")
+    return require("../server/artwork.cjs").handler(req, res);
+  if (
+    new URL(req.url, "https://localhost").pathname === "/api/episode-metadata"
+  )
+    return require("../server/episodes.cjs").handler(req, res);
+  if (new URL(req.url, "https://localhost").pathname === "/api/studio-logo")
+    return require("../server/studios.cjs").handler(req, res);
   return handler(req, res);
 };

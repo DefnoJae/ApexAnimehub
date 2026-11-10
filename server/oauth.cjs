@@ -114,6 +114,8 @@ function createServer() {
       return require("./signsync.cjs").handler(req, res);
     if (url.pathname === "/api/playback")
       return require("./playback.cjs").handler(req, res);
+    if (url.pathname === "/api/studio-logo")
+      return require("./studios.cjs").handler(req, res);
     if (url.pathname === "/api/artwork")
       return require("./artwork.cjs").handler(req, res);
     if (url.pathname === "/api/episode-metadata")

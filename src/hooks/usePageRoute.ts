@@ -10,6 +10,8 @@ export interface PageRoute {
     | "dub-releases"
     | "details"
     | "not-found";
+  studioId?: number;
+  studioName?: string;
   animeId?: number;
   episode?: number;
   play?: boolean;
@@ -42,6 +44,12 @@ export function parsePageRoute(pathname: string, search = ""): PageRoute {
   if (section || path === "/home")
     return {
       view: (section?.[0] || "all") as PageRoute["view"],
+      studioId:
+        path === "/discover" ? positiveId(params.get("studio")) : undefined,
+      studioName:
+        path === "/discover"
+          ? params.get("studioName") || undefined
+          : undefined,
       audio,
       source,
     };

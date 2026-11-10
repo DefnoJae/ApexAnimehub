@@ -141,3 +141,13 @@ test("list filters match either provider by shared IDs and exclude all listed st
   );
   expect(matchesListStatus(anime, entries, "")).toBe(true);
 });
+
+test("studio catalog is ID-based, paginated and retains genre filters", async () => {
+ (fetchAnilist as jest.Mock).mockReset().mockResolvedValueOnce({Studio:{name:"Studio",media:{pageInfo:{hasNextPage:true},nodes:[{id:1,type:"ANIME",title:{english:"Anime"},genres:["Action"],averageScore:80},{id:2,type:"MANGA",title:{english:"Manga"}}]}}}).mockResolvedValueOnce({Studio:{name:"Studio",media:{pageInfo:{hasNextPage:false},nodes:[]}}});
+ const result=await fetchDiscovery({...defaultFilters,studioId:14,genres:["name:Action"]},1,new AbortController().signal);
+ expect(result.items.map(item=>item.id)).toEqual([1]);
+ expect(result.items[0].anilistScore).toBe(8);
+ expect(result.nextPage).toBeNull();
+ expect(fetchAnilist).toHaveBeenNthCalledWith(1,expect.stringContaining("Studio(id:$id)"),expect.objectContaining({id:14,page:1}),expect.anything());
+ expect(fetchAnilist).toHaveBeenNthCalledWith(2,expect.any(String),expect.objectContaining({id:14,page:2}),expect.anything());
+});

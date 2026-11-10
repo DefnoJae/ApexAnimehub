@@ -1072,3 +1072,35 @@
 .detail-availability-filters button:disabled {
   opacity: 0.5;
 }
+
+.detail-studio-logo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  max-width: 140px;
+  padding: 5px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  background: rgba(24, 22, 31, 0.35);
+  backdrop-filter: blur(8px);
+  color: #eeeaf5;
+  text-decoration: none;
+  font-size: 12px;
+  font-weight: 700;
+  transition:
+    background 0.2s,
+    border-color 0.2s;
+}
+.detail-studio-logo img {
+  width: auto;
+  max-width: 112px;
+  height: 24px;
+  object-fit: contain;
+}
+.detail-studio-logo:hover,
+.detail-studio-logo:focus-visible {
+  border-color: #ad80e7;
+  background: rgba(110, 68, 160, 0.25);
+  outline: 2px solid transparent;
+}
