@@ -22,6 +22,68 @@ interface Snapshot {
   updatedAt: number;
 }
 const providers: AccountProvider[] = ["anilist", "mal"];
+interface ConfirmedChange {
+  anime: ListAnime;
+  entry?: LibraryEntry;
+  savedAt: number;
+}
+const changeKey = (provider: AccountProvider, identity: string) =>
+  "apex_library_changes_v1_" + provider + "_" + identity;
+function readChanges(
+  provider: AccountProvider,
+  identity: string,
+): ConfirmedChange[] {
+  try {
+    const data = JSON.parse(
+      localStorage.getItem(changeKey(provider, identity)) || "[]",
+    );
+    return Array.isArray(data)
+      ? data.filter(
+          (change) =>
+            change &&
+            change.anime &&
+            (change.anime.id > 0 || change.anime.idMal > 0) &&
+            Number.isFinite(change.savedAt) &&
+            Date.now() - change.savedAt < 86400000 &&
+            (!change.entry ||
+              ([
+                "planning",
+                "watching",
+                "completed",
+                "paused",
+                "dropped",
+              ].includes(change.entry.status) &&
+                Number.isFinite(change.entry.progress))),
+        )
+      : [];
+  } catch {
+    return [];
+  }
+}
+function saveChanges(
+  provider: AccountProvider,
+  identity: string,
+  changes: ConfirmedChange[],
+) {
+  try {
+    localStorage.setItem(
+      changeKey(provider, identity),
+      JSON.stringify(changes),
+    );
+  } catch {}
+}
+export function mergeConfirmed(
+  entries: LibraryEntry[],
+  changes: ConfirmedChange[],
+) {
+  return changes.reduce((merged, change) => {
+    const filtered = merged.filter(
+      (entry) => !sameAnime(entry.anime, change.anime),
+    );
+    return change.entry ? [...filtered, change.entry] : filtered;
+  }, entries);
+}
+
 export const sameAnime = (a: ListAnime, b: ListAnime) =>
   !!(
     (a.id && b.id && a.id === b.id) ||
@@ -36,6 +98,30 @@ export function useLibrary(connected: Record<AccountProvider, boolean>) {
   >({});
   const [loading, setLoading] = useState(false);
   const generation = useRef(0);
+  const changes = useRef(new Map<string, ConfirmedChange[]>());
+  const confirmed = useCallback(
+    (provider: AccountProvider, identity: string) => {
+      const key = changeKey(provider, identity);
+      if (!changes.current.has(key))
+        changes.current.set(key, readChanges(provider, identity));
+      return changes.current.get(key)!;
+    },
+    [],
+  );
+  const remember = (
+    provider: AccountProvider,
+    identity: string,
+    change: ConfirmedChange,
+  ) => {
+    const next = [
+      ...confirmed(provider, identity).filter(
+        (item) => !sameAnime(item.anime, change.anime),
+      ),
+      change,
+    ];
+    changes.current.set(changeKey(provider, identity), next);
+    saveChanges(provider, identity, next);
+  };
   const refreshLibrary = useCallback(async () => {
     const run = ++generation.current;
     setLoading(true);
@@ -92,10 +178,20 @@ export function useLibrary(connected: Record<AccountProvider, boolean>) {
                   ) {
                     setLists((previous) => ({
                       ...previous,
-                      [provider]: cached,
+                      [provider]:
+                        previous[provider]?.identity === identity
+                          ? previous[provider]
+                          : {
+                              ...cached,
+                              entries: mergeConfirmed(
+                                cached.entries,
+                                confirmed(provider, identity),
+                              ),
+                            },
                     }));
                     if (
                       cached.complete === false &&
+                      confirmed(provider, identity).length === 0 &&
                       Number.isSafeInteger(cached.nextPage) &&
                       cached.nextPage > 1 &&
                       cached.nextPage <= 10000 &&
@@ -112,22 +208,46 @@ export function useLibrary(connected: Record<AccountProvider, boolean>) {
               const partial = {
                 identity,
                 name,
-                entries: [...entries],
+                entries: mergeConfirmed(entries, confirmed(provider, identity)),
                 updatedAt: Date.now(),
                 complete: !data.hasNextPage,
                 nextPage: page + 1,
               };
-              try {
-                localStorage.setItem(
-                  "apex_library_v1_" + provider + "_" + identity,
-                  JSON.stringify(partial),
-                );
-              } catch {}
-              setLists((previous) =>
-                previous[provider]?.complete
-                  ? previous
-                  : { ...previous, [provider]: partial },
-              );
+              setLists((previous) => {
+                const current = previous[provider];
+                const next =
+                  current?.identity === identity
+                    ? {
+                        ...partial,
+                        complete: current.complete || partial.complete,
+                        entries: mergeConfirmed(
+                          [
+                            ...current.entries.filter(
+                              (entry) =>
+                                !partial.entries.some((fresh) =>
+                                  sameAnime(entry.anime, fresh.anime),
+                                ),
+                            ),
+                            ...partial.entries,
+                          ],
+                          confirmed(provider, identity),
+                        ),
+                      }
+                    : {
+                        ...partial,
+                        entries: mergeConfirmed(
+                          partial.entries,
+                          confirmed(provider, identity),
+                        ),
+                      };
+                try {
+                  localStorage.setItem(
+                    "apex_library_v1_" + provider + "_" + identity,
+                    JSON.stringify(next),
+                  );
+                } catch {}
+                return { ...previous, [provider]: next };
+              });
               if (!data.hasNextPage) break;
               await new Promise((resolve) => setTimeout(resolve, 2200));
               if (run !== generation.current) return;
@@ -135,15 +255,41 @@ export function useLibrary(connected: Record<AccountProvider, boolean>) {
               if (page > 10000)
                 throw new Error("List import exceeded page limit");
             }
+            if (run !== generation.current) return;
+            const outstanding = confirmed(provider, identity).filter(
+              (change) => {
+                const entry = entries.find((entry) =>
+                  sameAnime(entry.anime, change.anime),
+                );
+                return change.entry
+                  ? !entry ||
+                      entry.status !== change.entry.status ||
+                      entry.progress !== change.entry.progress ||
+                      (change.entry.score !== undefined &&
+                        entry.score !== change.entry.score)
+                  : !!entry;
+              },
+            );
+            changes.current.set(changeKey(provider, identity), outstanding);
+            saveChanges(provider, identity, outstanding);
             const snapshot = {
               identity,
               name,
-              entries,
+              entries: mergeConfirmed(entries, confirmed(provider, identity)),
               updatedAt: Date.now(),
               complete: true,
             };
             if (run !== generation.current) return;
-            setLists((previous) => ({ ...previous, [provider]: snapshot }));
+            setLists((previous) => ({
+              ...previous,
+              [provider]: {
+                ...snapshot,
+                entries: mergeConfirmed(
+                  snapshot.entries,
+                  confirmed(provider, identity),
+                ),
+              },
+            }));
             try {
               localStorage.setItem(
                 "apex_library_v1_" + provider + "_" + identity,
@@ -161,7 +307,7 @@ export function useLibrary(connected: Record<AccountProvider, boolean>) {
         }),
     );
     if (run === generation.current) setLoading(false);
-  }, [connected.anilist, connected.mal]);
+  }, [connected.anilist, connected.mal, confirmed]);
   useEffect(() => {
     void refreshLibrary();
     return () => {
@@ -196,6 +342,7 @@ export function useLibrary(connected: Record<AccountProvider, boolean>) {
         score: edit?.score !== undefined ? edit.score : existing?.score,
         updatedAt: Date.now(),
       };
+      remember(provider, list.identity, { anime, entry, savedAt: Date.now() });
       const next = {
         ...list,
         entries: [
@@ -228,6 +375,7 @@ export function useLibrary(connected: Record<AccountProvider, boolean>) {
       setLists((previous) => {
         const list = previous[provider];
         if (!list) return previous;
+        remember(provider, list.identity, { anime, savedAt: Date.now() });
         const next = {
           ...list,
           entries: list.entries.filter(

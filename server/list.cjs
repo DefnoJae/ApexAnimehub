@@ -146,7 +146,7 @@ async function readList(provider, account, page = 1) {
     account.identity = Viewer;
     const data = await graphql(
       account.accessToken,
-      "query($user:Int,$page:Int){Page(page:$page,perPage:50){pageInfo{hasNextPage} mediaList(userId:$user,type:ANIME){status progress score(format:POINT_100) updatedAt media{id idMal averageScore episodes title{english romaji} coverImage{extraLarge} bannerImage}}}}",
+      "query($user:Int,$page:Int){Page(page:$page,perPage:50){pageInfo{hasNextPage} mediaList(userId:$user,type:ANIME,sort:UPDATED_TIME_DESC){status progress score(format:POINT_100) updatedAt media{id idMal averageScore episodes title{english romaji} coverImage{extraLarge} bannerImage}}}}",
       { user: Viewer.id, page },
     );
     return {
@@ -172,7 +172,7 @@ async function readList(provider, account, page = 1) {
   const data = await upstream(
     "https://api.myanimelist.net/v2/users/@me/animelist?limit=100&offset=" +
       (page - 1) * 100 +
-      "&nsfw=true&fields=list_status,num_episodes,mean",
+      "&sort=list_updated_at&nsfw=true&fields=list_status,num_episodes,mean",
     { headers },
   );
   return {

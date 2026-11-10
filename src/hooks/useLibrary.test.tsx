@@ -114,3 +114,111 @@ test("resumes a verified account checkpoint instead of restarting a large import
   expect(library.libraryEntries).toHaveLength(1);
   expect(library.lists.anilist?.complete).toBe(true);
 });
+
+test("confirmed status, progress and rating survive stale reimports and reload", async () => {
+  global.fetch = jest.fn(async () => ({
+    ok: true,
+    json: async () => page("alice", "planning"),
+  })) as jest.Mock;
+  await act(async () => root.render(<Harness mal={false} />));
+  act(() =>
+    library.record("anilist", anime, "completed", 12, {
+      manualProgress: true,
+      score: 9,
+    }),
+  );
+  await act(async () => {
+    await library.refreshLibrary();
+  });
+  expect(library.libraryEntries[0]).toMatchObject({
+    status: "completed",
+    progress: 12,
+    score: 9,
+  });
+  expect(
+    JSON.parse(localStorage.getItem("apex_library_v1_anilist_alice")!)
+      .entries[0],
+  ).toMatchObject({ status: "completed", progress: 12, score: 9 });
+  // Simulate an old saved snapshot on a fresh mount; the confirmed-write journal repairs it.
+  localStorage.setItem(
+    "apex_library_v1_anilist_alice",
+    JSON.stringify({ ...page("alice", "planning"), complete: true }),
+  );
+  act(() => root.unmount());
+  root = createRoot(node);
+  await act(async () => root.render(<Harness mal={false} />));
+  expect(library.libraryEntries[0]).toMatchObject({
+    status: "completed",
+    progress: 12,
+    score: 9,
+  });
+  // Once the provider acknowledges the write, retire protection so external edits can be imported.
+  global.fetch = jest.fn(async () => ({
+    ok: true,
+    json: async () => ({
+      ...page("alice", "completed"),
+      entries: [
+        {
+          anime,
+          status: "completed",
+          progress: 12,
+          score: 9,
+          updatedAt: Date.now(),
+        },
+      ],
+    }),
+  })) as jest.Mock;
+  await act(async () => {
+    await library.refreshLibrary();
+  });
+  expect(
+    JSON.parse(localStorage.getItem("apex_library_changes_v1_anilist_alice")!),
+  ).toEqual([]);
+  global.fetch = jest.fn(async () => ({
+    ok: true,
+    json: async () => page("alice", "paused"),
+  })) as jest.Mock;
+  await act(async () => {
+    await library.refreshLibrary();
+  });
+  expect(library.getListStatus(anime)).toBe("paused");
+});
+test("confirmed removals cannot be resurrected by stale imports", async () => {
+  global.fetch = jest.fn(async () => ({
+    ok: true,
+    json: async () => page("alice", "planning"),
+  })) as jest.Mock;
+  await act(async () => root.render(<Harness mal={false} />));
+  act(() => library.removeRecord("anilist", anime));
+  await act(async () => {
+    await library.refreshLibrary();
+  });
+  expect(library.libraryEntries).toHaveLength(0);
+});
+
+test("fresh first-page values replace old complete cache before a large import finishes", async () => {
+  localStorage.setItem(
+    "apex_library_v1_anilist_alice",
+    JSON.stringify({
+      identity: "alice",
+      name: "alice",
+      complete: true,
+      entries: [
+        { anime, status: "planning", progress: 0, updatedAt: 1 },
+        { anime: { id: 2 }, status: "watching", progress: 5, updatedAt: 1 },
+      ],
+    }),
+  );
+  global.fetch = jest.fn(async () => ({
+    ok: true,
+    json: async () => page("alice", "completed", true),
+  })) as jest.Mock;
+  await act(async () => root.render(<Harness mal={false} />));
+  expect(library.getListStatus(anime)).toBe("completed");
+  expect(library.libraryEntries.some((entry) => entry.anime.id === 2)).toBe(
+    true,
+  );
+  expect(
+    JSON.parse(localStorage.getItem("apex_library_v1_anilist_alice")!).entries,
+  ).toHaveLength(2);
+});

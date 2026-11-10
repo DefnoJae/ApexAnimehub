@@ -323,8 +323,7 @@ export function useAccounts() {
               },
             ),
           );
-        if (next.some((result) => result.success))
-          void library.refreshLibrary();
+
         setResults(next);
         const changes = Array.from(
           new Set(
@@ -443,8 +442,7 @@ export function useAccounts() {
             return provider;
           }),
       );
-      if (next.some((result) => result.status === "fulfilled"))
-        void library.refreshLibrary();
+
       const errors = next
         .filter(
           (result): result is PromiseRejectedResult =>
