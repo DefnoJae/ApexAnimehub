@@ -6,7 +6,7 @@ import {
   activityLabel,
   fetchFollowingStories,
   readSeenStories,
-  newestUnseen,
+  oldestUnseen,
   StoryActivity,
   StoryGroup,
 } from "../utils/followingStories";
@@ -31,7 +31,9 @@ export function FollowingStories({
   checking = false,
   onConnect,
   onSelect,
+  triggerHost,
 }: {
+  triggerHost?: HTMLElement | null;
   identity?: string;
   connected: boolean;
   checking?: boolean;
@@ -110,41 +112,48 @@ export function FollowingStories({
       } catch {}
       return next;
     });
+  const storyButton = (
+    <button
+      ref={trigger}
+      type="button"
+      className={"following-stories-trigger" + (fresh ? " has-new" : "")}
+      aria-label={
+        fresh ? "Following activity, new stories" : "Following activity"
+      }
+      title="View recent activity from people you follow"
+      aria-haspopup="dialog"
+      aria-expanded={open}
+      onClick={() => setOpen(true)}
+    >
+      <svg viewBox="0 0 48 48" aria-hidden="true">
+        <circle
+          cx="24"
+          cy="24"
+          r="20"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeDasharray="12 4"
+        />
+        <circle
+          cx="24"
+          cy="24"
+          r="15"
+          fill="none"
+          stroke="currentColor"
+          strokeOpacity=".3"
+          strokeWidth="1"
+        />
+      </svg>
+    </button>
+  );
   return (
     <>
-      <button
-        ref={trigger}
-        type="button"
-        className={"following-stories-trigger" + (fresh ? " has-new" : "")}
-        aria-label={
-          fresh ? "Following activity, new stories" : "Following activity"
-        }
-        title="View recent activity from people you follow"
-        aria-haspopup="dialog"
-        aria-expanded={open}
-        onClick={() => setOpen(true)}
-      >
-        <svg viewBox="0 0 48 48" aria-hidden="true">
-          <circle
-            cx="24"
-            cy="24"
-            r="20"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.8"
-            strokeDasharray="12 4"
-          />
-          <circle
-            cx="24"
-            cy="24"
-            r="15"
-            fill="none"
-            stroke="currentColor"
-            strokeOpacity=".3"
-            strokeWidth="1"
-          />
-        </svg>
-      </button>
+      {triggerHost === null
+        ? null
+        : triggerHost
+          ? createPortal(storyButton, triggerHost)
+          : storyButton}
       {open &&
         createPortal(
           <StoryViewer
@@ -203,7 +212,7 @@ export function StoryViewer({
   onClose: () => void;
   onSelect?: (anime: DashboardAnime) => void;
 }) {
-  const initial = newestUnseen(groups, seen);
+  const initial = oldestUnseen(groups, seen);
   const [userIndex, setUserIndex] = useState(initial.userIndex),
     [index, setIndex] = useState(initial.index),
     [paused, setPaused] = useState(false),
@@ -212,35 +221,69 @@ export function StoryViewer({
     [ended, setEnded] = useState(false);
   const dialog = useRef<HTMLDivElement>(null),
     closeButton = useRef<HTMLButtonElement>(null);
+  const [initialized, setInitialized] = useState(groups.length > 0);
+  const replay = useRef(
+    groups.length > 0 &&
+      !groups.some((group) =>
+        group.activities.some((activity) => !seen.includes(activity.id)),
+      ),
+  );
   const group = groups[userIndex],
-    activity = group?.activities[index];
-  const initialized = useRef(groups.length > 0);
+    activity = initialized ? group?.activities[index] : undefined;
   useEffect(() => {
-    if (!initialized.current && groups.length) {
-      const start = newestUnseen(groups, seen);
+    if (!initialized && groups.length) {
+      const start = oldestUnseen(groups, seen);
       setUserIndex(start.userIndex);
       setIndex(start.index);
-      initialized.current = true;
+      replay.current = !groups.some((group) =>
+        group.activities.some((activity) => !seen.includes(activity.id)),
+      );
+      setInitialized(true);
     }
-  }, [groups, seen]);
+  }, [groups, seen, initialized]);
   const advance = (direction: number) => {
-    if (direction > 0 && activity) onSeen(activity.id);
+    const timeline = groups
+      .flatMap((group, userIndex) =>
+        group.activities.map((activity, index) => ({
+          activity,
+          userIndex,
+          index,
+        })),
+      )
+      .sort(
+        (a, b) =>
+          a.activity.createdAt - b.activity.createdAt ||
+          a.activity.id - b.activity.id,
+      );
+    const current = timeline.findIndex(
+      (item) => item.activity.id === activity?.id,
+    );
+    const unread = timeline.filter(
+      (item) =>
+        item.activity.id !== activity?.id && !seen.includes(item.activity.id),
+    );
+    const next =
+      direction < 0
+        ? timeline[current - 1]
+        : replay.current
+          ? timeline[current + 1]
+          : timeline.slice(current + 1).find((item) => unread.includes(item)) ||
+            unread[0];
     setEnded(false);
-    if (direction > 0) {
-      if (group && index + 1 < group.activities.length) setIndex(index + 1);
-      else if (userIndex + 1 < groups.length) {
-        setUserIndex(userIndex + 1);
-        setIndex(0);
-      } else {
-        setEnded(true);
-        setPaused(true);
-      }
-    } else if (index > 0) setIndex(index - 1);
-    else if (userIndex > 0) {
-      setUserIndex(userIndex - 1);
-      setIndex(groups[userIndex - 1].activities.length - 1);
+    if (next) {
+      setUserIndex(next.userIndex);
+      setIndex(next.index);
+    } else if (direction > 0) {
+      setEnded(true);
+      setPaused(true);
     }
   };
+  const onSeenRef = useRef(onSeen);
+  onSeenRef.current = onSeen;
+  const activityId = activity?.id;
+  useEffect(() => {
+    if (activityId && !hidden && connected) onSeenRef.current(activityId);
+  }, [activityId, hidden, connected]);
   const advanceRef = useRef(advance);
   advanceRef.current = advance;
   useEffect(() => {
@@ -320,7 +363,7 @@ export function StoryViewer({
   }, []);
   const choose = (next: number) => {
     setUserIndex(next);
-    setIndex(newestUnseen(groups, seen, next).index);
+    setIndex(oldestUnseen(groups, seen, next).index);
     setElapsed(0);
     setEnded(false);
     setPaused(false);
@@ -430,7 +473,16 @@ export function StoryViewer({
             <button
               className="story-arrow story-previous"
               aria-label="Previous activity"
-              disabled={userIndex === 0 && index === 0}
+              disabled={
+                !groups.some((item) =>
+                  item.activities.some(
+                    (previous) =>
+                      previous.createdAt < activity.createdAt ||
+                      (previous.createdAt === activity.createdAt &&
+                        previous.id < activity.id),
+                  ),
+                )
+              }
               onClick={() => advance(-1)}
             >
               <ChevronLeft />

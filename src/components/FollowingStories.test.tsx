@@ -66,7 +66,7 @@ test("viewer advances automatically, pauses, navigates user previews and closes 
     root.render(
       <StoryViewer
         groups={groups}
-        seen={[3, 2]}
+        seen={[]}
         onSeen={seen}
         loading={false}
         error=""
@@ -80,6 +80,7 @@ test("viewer advances automatically, pauses, navigates user previews and closes 
   );
   expect(host.textContent).toContain("Watched episode 3");
   expect(host.textContent).toContain("8/10");
+  expect(seen).toHaveBeenCalledWith(1);
   act(() => jest.advanceTimersByTime(6100));
   expect(host.textContent).toContain("Completed");
   act(() =>
@@ -125,7 +126,9 @@ test("empty ring uses no avatar, new activity glows, and viewed state is account
   expect(trigger.className).toContain("has-new");
   act(() => trigger.click());
   expect(document.querySelector('[role="dialog"]')).not.toBeNull();
-  expect(localStorage.getItem("apex_stories_seen_v1_123")).toBeNull();
+  expect(JSON.parse(localStorage.getItem("apex_stories_seen_v1_123")!)).toEqual(
+    [1],
+  );
   act(() =>
     document
       .querySelector<HTMLButtonElement>('[aria-label="Next activity"]')!
@@ -133,7 +136,7 @@ test("empty ring uses no avatar, new activity glows, and viewed state is account
   );
   expect(
     JSON.parse(localStorage.getItem("apex_stories_seen_v1_123")!),
-  ).toContain(3);
+  ).toContain(2);
   expect(trigger.className).toContain("has-new");
   act(() =>
     document
@@ -145,7 +148,7 @@ test("empty ring uses no avatar, new activity glows, and viewed state is account
   expect(document.querySelector('[role="dialog"]')).toBeNull();
 });
 
-test("anime title closes the viewer and navigates while leaving unfinished activities unread", async () => {
+test("anime title closes the viewer and remembers the opened entry immediately", async () => {
   (fetchFollowingStories as jest.Mock).mockResolvedValue({
     groups,
     at: Date.now(),
@@ -168,16 +171,61 @@ test("anime title closes the viewer and navigates while leaving unfinished activ
   );
   expect(
     document.querySelector(".following-story-card")?.textContent,
-  ).toContain("Next anime");
+  ).toContain("Anime");
   expect(
     document.querySelectorAll(".story-person-ring svg circle"),
   ).toHaveLength(3);
   act(() =>
     document.querySelector<HTMLAnchorElement>(".story-anime-title")!.click(),
   );
-  expect(select).toHaveBeenCalledWith(expect.objectContaining({ id: 11 }));
+  expect(select).toHaveBeenCalledWith(expect.objectContaining({ id: 10 }));
   expect(document.querySelector('[role="dialog"]')).toBeNull();
   expect(host.querySelector(".following-stories-trigger")?.className).toContain(
     "has-new",
   );
+});
+
+test("reopening starts at the oldest remaining unseen entry without waiting for the timer", async () => {
+  (fetchFollowingStories as jest.Mock).mockResolvedValue({
+    groups,
+    at: Date.now(),
+  });
+  await act(async () =>
+    root.render(
+      <FollowingStories identity="resume" connected onConnect={jest.fn()} />,
+    ),
+  );
+  const trigger = host.querySelector<HTMLButtonElement>(
+    ".following-stories-trigger",
+  )!;
+  act(() => trigger.click());
+  expect(
+    JSON.parse(localStorage.getItem("apex_stories_seen_v1_resume")!),
+  ).toEqual([1]);
+  act(() =>
+    document
+      .querySelector<HTMLButtonElement>(
+        '[aria-label="Close following activity"]',
+      )!
+      .click(),
+  );
+  act(() => trigger.click());
+  expect(
+    document.querySelector(".following-story-card")?.textContent,
+  ).toContain("Completed");
+  expect(
+    JSON.parse(localStorage.getItem("apex_stories_seen_v1_resume")!),
+  ).toEqual([1, 2]);
+  act(() =>
+    document
+      .querySelector<HTMLButtonElement>('[aria-label="Next activity"]')!
+      .click(),
+  );
+  expect(
+    document.querySelector(".following-story-card")?.textContent,
+  ).toContain("Next anime");
+  expect(
+    JSON.parse(localStorage.getItem("apex_stories_seen_v1_resume")!),
+  ).toEqual([1, 2, 3]);
+  expect(trigger.className).not.toContain("has-new");
 });

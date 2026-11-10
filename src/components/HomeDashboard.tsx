@@ -26,7 +26,6 @@ import {
 import { getDisplayTitle } from "../utils/schedule";
 import type { ListAnime, ListStatus, useAccounts } from "../hooks/useAccounts";
 import { useStoriesVisible } from "../hooks/useStoriesVisible";
-import { FollowingStories } from "./FollowingStories";
 import { NotificationBell } from "./NotificationBell";
 import { HeroBackdrop } from "./HeroBackdrop";
 import "./dashboard.css";
@@ -159,7 +158,22 @@ export function FloatingNavigation({
         <Search size={20} />
         <span className="nav-tooltip">Search</span>
       </button>
-      {notificationFeed && <NotificationBell feed={notificationFeed} />}
+      {notificationFeed && (
+        <NotificationBell
+          feed={notificationFeed}
+          stories={
+            accounts && storiesVisible
+              ? {
+                  identity: accounts.lists?.anilist?.identity,
+                  connected: accounts.connected.anilist,
+                  checking: accounts.checking,
+                  onConnect: onSettings,
+                  onSelect: onSelectAnime,
+                }
+              : undefined
+          }
+        />
+      )}
       <button
         className="nav-icon"
         title="Account settings"
@@ -169,15 +183,6 @@ export function FloatingNavigation({
         <Settings size={20} />
         <span className="nav-tooltip">Settings</span>
       </button>
-      {accounts && storiesVisible && (
-        <FollowingStories
-          identity={accounts.lists?.anilist?.identity}
-          connected={accounts.connected.anilist}
-          checking={accounts.checking}
-          onConnect={onSettings}
-          onSelect={onSelectAnime}
-        />
-      )}
     </nav>
   );
 }

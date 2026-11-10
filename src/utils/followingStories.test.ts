@@ -1,7 +1,7 @@
 import {
   fetchFollowingStories,
   groupStories,
-  newestUnseen,
+  oldestUnseen,
   activityLabel,
 } from "./followingStories";
 const row = {
@@ -30,8 +30,8 @@ test("groups anime list updates by stable user IDs, sorts activities, and ignore
     { ...row, id: 4, media: { ...row.media, isAdult: true } },
   ]);
   expect(groups).toHaveLength(1);
-  expect(groups[0].activities.map((a) => a.id)).toEqual([1, 2]);
-  expect(activityLabel(groups[0].activities[0])).toBe("Watched episode 2 - 3");
+  expect(groups[0].activities.map((a) => a.id)).toEqual([2, 1]);
+  expect(activityLabel(groups[0].activities[1])).toBe("Watched episode 2 - 3");
   expect(
     groupStories([
       {
@@ -80,12 +80,23 @@ test("uses authenticated proxy, verifies account identity, batches ratings and c
   );
 });
 
-test("starts at the newest unseen activity, including unseen activities inside an older user group", () => {
+test("starts at the oldest unseen activity, including unseen activities inside an older user group", () => {
   const groups = groupStories([
     row,
     { ...row, id: 2, createdAt: 200 },
     { ...row, id: 3, createdAt: 300, user: { ...row.user, id: 6 } },
   ]);
-  expect(newestUnseen(groups, [3, 2])).toEqual({ userIndex: 1, index: 1 });
-  expect(newestUnseen(groups, [])).toEqual({ userIndex: 0, index: 0 });
+  expect(oldestUnseen(groups, [3, 2])).toEqual({ userIndex: 1, index: 0 });
+  expect(oldestUnseen(groups, [])).toEqual({ userIndex: 1, index: 0 });
+});
+
+test("oldest unseen advances past remembered views and falls back to chronological replay", () => {
+  const groups = groupStories([
+    row,
+    { ...row, id: 21, createdAt: 210 },
+    { ...row, id: 22, createdAt: 220, user: { ...row.user, id: 6 } },
+  ]);
+  expect(oldestUnseen(groups, [1])).toEqual({ userIndex: 1, index: 1 });
+  expect(oldestUnseen(groups, [1, 21])).toEqual({ userIndex: 0, index: 0 });
+  expect(oldestUnseen(groups, [1, 21, 22])).toEqual({ userIndex: 1, index: 0 });
 });

@@ -1,19 +1,25 @@
+import { FollowingStories } from "./FollowingStories";
 import React, { useEffect, useRef, useState } from "react";
 import { Bell, CheckCircle2, AlertCircle, RefreshCw, X } from "lucide-react";
 import { notificationPoster } from "../hooks/useNotifications";
 import type { useNotifications } from "../hooks/useNotifications";
 export function NotificationBell({
   feed,
+  stories,
 }: {
   feed: ReturnType<typeof useNotifications>;
+  stories?: React.ComponentProps<typeof FollowingStories>;
 }) {
   const [open, setOpen] = useState(false),
     [unread, setUnread] = useState(false);
+  const [storyHost, setStoryHost] = useState<HTMLSpanElement | null>(null);
   const container = useRef<HTMLDivElement>(null),
     trigger = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     if (!open) return;
     const outside = (event: PointerEvent) => {
+      if ((event.target as Element)?.closest?.(".following-story-overlay"))
+        return;
       if (!container.current?.contains(event.target as Node)) setOpen(false);
     };
     const escape = (event: KeyboardEvent) => {
@@ -54,6 +60,7 @@ export function NotificationBell({
         )}
         <span className="nav-tooltip">Notifications</span>
       </button>
+      {stories && <FollowingStories {...stories} triggerHost={storyHost} />}
       {open && (
         <section
           id="notification-panel"
@@ -83,6 +90,12 @@ export function NotificationBell({
               <button aria-pressed={unread} onClick={() => setUnread(true)}>
                 Unread
               </button>
+              {stories && (
+                <span
+                  className="notification-stories-slot"
+                  ref={setStoryHost}
+                />
+              )}
             </div>
             <button disabled={!feed.unreadCount} onClick={feed.markAllRead}>
               Mark all read

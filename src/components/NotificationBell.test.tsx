@@ -2,6 +2,11 @@ import React from "react";
 import { createRoot, Root } from "react-dom/client";
 import { act } from "react-dom/test-utils";
 import { useNotifications } from "../hooks/useNotifications";
+import { fetchFollowingStories } from "../utils/followingStories";
+jest.mock("../utils/followingStories", () => ({
+  ...jest.requireActual("../utils/followingStories"),
+  fetchFollowingStories: jest.fn(),
+}));
 import { NotificationBell } from "./NotificationBell";
 let root: Root, node: HTMLDivElement, feed: ReturnType<typeof useNotifications>;
 function Harness({ scope = "alice" }) {
@@ -108,4 +113,56 @@ test("anime updates show rounded posters while system messages do not; imports a
       .click(),
   );
   expect(node.querySelectorAll(".notification-item")).toHaveLength(0);
+});
+
+test("stories appear inside notification filters and survive viewer interactions", async () => {
+  (fetchFollowingStories as jest.Mock).mockResolvedValue({
+    groups: [],
+    at: Date.now(),
+  });
+  await act(async () =>
+    root.render(
+      <NotificationBell
+        feed={
+          {
+            notifications: [],
+            unreadCount: 0,
+            markAllRead: jest.fn(),
+            markRead: jest.fn(),
+            clearNotifications: jest.fn(),
+          } as unknown as ReturnType<typeof useNotifications>
+        }
+        stories={{ identity: "77", connected: true, onConnect: jest.fn() }}
+      />,
+    ),
+  );
+  expect(node.querySelector(".following-stories-trigger")).toBeNull();
+  act(() =>
+    node
+      .querySelector<HTMLButtonElement>('[aria-label="Notifications"]')!
+      .click(),
+  );
+  expect(
+    node.querySelector(".notification-actions .following-stories-trigger"),
+  ).not.toBeNull();
+  act(() =>
+    node
+      .querySelector<HTMLButtonElement>(".following-stories-trigger")!
+      .click(),
+  );
+  expect(document.querySelector(".following-story-overlay")).not.toBeNull();
+  act(() =>
+    document
+      .querySelector(".following-story-overlay")!
+      .dispatchEvent(new Event("pointerdown", { bubbles: true })),
+  );
+  expect(document.querySelector(".following-story-overlay")).not.toBeNull();
+  act(() =>
+    document
+      .querySelector<HTMLButtonElement>(
+        '[aria-label="Close following activity"]',
+      )!
+      .click(),
+  );
+  expect(node.querySelector("#notification-panel")).not.toBeNull();
 });
