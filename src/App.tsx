@@ -743,7 +743,7 @@ export default function App() {
                 history={watchHistory}
                 accounts={accounts}
                 onSelect={onSelectMedia}
-                onWatch={(anime) => onSelectMedia(anime, 1, "MegaPlay (Sub)")}
+                onWatch={(anime) => onSelectMedia(anime, 1, "Ani.pm (Sub)")}
                 onResume={resumePlayback}
                 onRemove={removeFromHistory}
                 onCalendar={() => navigate("/calendar")}
