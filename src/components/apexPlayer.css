@@ -390,3 +390,17 @@
 .apex-cinema .signsync-panel header button:hover {
   background: #ffffff35;
 }
+
+.apex-cinema.has-pause-overlay :is(.signsync-ass-canvas, .signsync-captions) {
+  visibility: hidden;
+}
+
+.apex-player-loading-art {
+  position: absolute;
+  inset: 0;
+  isolation: isolate;
+  pointer-events: none;
+}
+.apex-player-loading-art .hero-backdrop {
+  animation: none;
+}

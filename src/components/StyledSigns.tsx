@@ -25,8 +25,8 @@ export function StyledSigns({
     const element = canvas.current;
     const host = root.current;
     if (!element || !host) return;
+    const video = host.querySelector("video");
     const resize = () => {
-      const video = host.querySelector("video");
       const stage = host.querySelector(".anipm-player-stage") || video || host;
       const box = stage.getBoundingClientRect();
       const bounds = host.getBoundingClientRect();
@@ -34,8 +34,13 @@ export function StyledSigns({
         video?.videoWidth && video.videoHeight
           ? video.videoWidth / video.videoHeight
           : 16 / 9;
-      const width = Math.min(box.width, box.height * ratio);
-      const height = width / ratio;
+      const fit = video ? getComputedStyle(video).objectFit : "contain";
+      const width = fit === "fill"
+        ? box.width
+        : fit === "cover"
+          ? Math.max(box.width, box.height * ratio)
+          : Math.min(box.width, box.height * ratio);
+      const height = fit === "fill" ? box.height : width / ratio;
       element.style.left =
         box.left - bounds.left + (box.width - width) / 2 + "px";
       element.style.top =
@@ -74,6 +79,10 @@ export function StyledSigns({
         ? new ResizeObserver(resize)
         : undefined;
     observer?.observe(host);
+    video?.addEventListener("loadedmetadata", resize);
+    video?.addEventListener("resize", resize);
+    const styleObserver = video ? new MutationObserver(resize) : undefined;
+    if (video) styleObserver?.observe(video, { attributes: true, attributeFilter: ["style"] });
     window.addEventListener("resize", resize);
     document.addEventListener("fullscreenchange", resize);
     const timer = window.setInterval(() => {
@@ -87,6 +96,9 @@ export function StyledSigns({
       active = false;
       clearInterval(timer);
       observer?.disconnect();
+      styleObserver?.disconnect();
+      video?.removeEventListener("loadedmetadata", resize);
+      video?.removeEventListener("resize", resize);
       window.removeEventListener("resize", resize);
       document.removeEventListener("fullscreenchange", resize);
       renderer?.dispose();

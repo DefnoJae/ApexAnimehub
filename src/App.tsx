@@ -499,6 +499,7 @@ export default function App() {
       )}
       {playingStream && (
         <VideoPlayer
+          anime={selectedAnime}
           title={getDisplayTitle(selectedAnime)}
           episode={activeEpisode}
           stream={playingStream}

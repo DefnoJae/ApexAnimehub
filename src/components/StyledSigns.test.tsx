@@ -22,6 +22,7 @@ test("styled signs retain ASS, follow seeks and delay, and dispose on removal", 
     const host = useRef<HTMLDivElement>(null);
     return (
       <div ref={host}>
+        <video style={{ objectFit: "contain" }} />
         <StyledSigns
           ass="[Events]\nDialogue: styled"
           fonts={fonts}
@@ -41,6 +42,22 @@ test("styled signs retain ASS, follow seeks and delay, and dispose on removal", 
       jest.advanceTimersByTime(34);
     });
     expect(setCurrentTime).toHaveBeenLastCalledWith(209);
+    const video = node.querySelector("video")!;
+    const canvas = node.querySelector("canvas")!;
+    Object.defineProperties(video, {
+      videoWidth: { value: 1440 },
+      videoHeight: { value: 1080 },
+    });
+    jest.spyOn(video, "getBoundingClientRect").mockReturnValue({
+      left: 0, top: 0, width: 1600, height: 900,
+    } as DOMRect);
+    act(() => video.dispatchEvent(new Event("loadedmetadata")));
+    expect(canvas.style.left).toBe("200px");
+    expect(canvas.style.width).toBe("1200px");
+    video.style.objectFit = "cover";
+    act(() => video.dispatchEvent(new Event("resize")));
+    expect(canvas.style.top).toBe("-150px");
+    expect(canvas.style.height).toBe("1200px");
     time = 100;
     act(() => jest.advanceTimersByTime(34));
     expect(setCurrentTime).toHaveBeenLastCalledWith(100);

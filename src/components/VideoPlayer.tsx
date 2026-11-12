@@ -1,7 +1,9 @@
 import React, { useEffect, useRef, useState } from "react";
 import type { useAccounts } from "../hooks/useAccounts";
 import type { AudioLanguage, PlaybackSource } from "../hooks/usePageRoute";
+import type { DashboardAnime } from "./HomeDashboard";
 export interface PlayerProps {
+  anime?: DashboardAnime;
   episodeCount?: number;
   audio?: AudioLanguage;
   onPlaybackSource?: (source: PlaybackSource, audio: AudioLanguage) => void;

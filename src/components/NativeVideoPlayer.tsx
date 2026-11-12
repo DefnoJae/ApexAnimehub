@@ -32,6 +32,7 @@ import {
   resumeSeconds,
   saveEpisodeProgress,
 } from "../utils/playbackResume";
+import { HeroBackdrop } from "./HeroBackdrop";
 import { StyledSigns } from "./StyledSigns";
 import { StyledSelect } from "./StyledSelect";
 import { SignSync } from "./SignSync";
@@ -91,7 +92,11 @@ function EpisodePlayer(props: PlayerProps & {
   const [error, setError] = useState("");
   const [menu, setMenu] = useState<Menu>();
   const [paused, setPaused] = useState(true);
+  const [hasVideoFrame, setHasVideoFrame] = useState(false);
   const [pauseOverlay, setPauseOverlay] = useState(false);
+  const [loadedCaption, setLoadedCaption] = useState<{ track: string; url: string }>();
+  const [captionError, setCaptionError] = useState("");
+  const captionElement = useRef<HTMLTrackElement>(null);
   const [controls, setControls] = useState(true);
   const [duration, setDuration] = useState(0);
   const [position, setPosition] = useState(0);
@@ -282,37 +287,39 @@ function EpisodePlayer(props: PlayerProps & {
 
   useEffect(() => {
     setAss("");
+    setLoadedCaption(undefined);
+    setCaptionError("");
     const selected = source?.subtitles.find((item) => item.url === track);
-    if (selected?.format !== "ass") return;
+    if (!selected) return;
     const controller = new AbortController();
+    let objectUrl: string | undefined;
     void fetch(selected.url, { signal: controller.signal, credentials: "omit" })
       .then(async (response) => {
         if (!response.ok) throw new Error("Subtitle unavailable");
-        const text = await response.text();
-        if (text.length > 1000000 || !text.includes("[Script Info]"))
-          throw new Error("Invalid subtitle track");
-        if (!controller.signal.aborted) setAss(text);
+        const text = (await response.text()).replace(/^\uFEFF/, "").trimStart();
+        if (text.length > 4_000_000) throw new Error("Subtitle is too large");
+        if (controller.signal.aborted) return;
+        if (selected.format === "ass" && text.includes("[Script Info]")) {
+          setAss(text);
+        } else if (selected.format === "vtt" && /^WEBVTT(?:\s|$)/.test(text)) {
+          objectUrl = URL.createObjectURL(new Blob([text], { type: "text/vtt" }));
+          setLoadedCaption({ track: selected.url, url: objectUrl });
+        } else throw new Error("Invalid subtitle track");
       })
       .catch(() => {
         if (!controller.signal.aborted)
-          setError("Styled subtitles could not load. Try another track.");
+          setCaptionError("This subtitle track could not load. Try another track.");
       });
-    return () => controller.abort();
+    return () => {
+      controller.abort();
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
   }, [track, source]);
 
   useEffect(() => {
-    const media = video.current;
-    if (!media) return;
-    const sync = () => {
-      Array.from(media.querySelectorAll("track")).forEach((item) => {
-        item.track.mode =
-          item.getAttribute("src") === track ? "showing" : "disabled";
-      });
-    };
-    sync();
-    media.textTracks.addEventListener?.("addtrack", sync);
-    return () => media.textTracks.removeEventListener?.("addtrack", sync);
-  }, [track, source]);
+    const current = captionElement.current?.track;
+    if (current) current.mode = pauseOverlay ? "hidden" : "showing";
+  }, [loadedCaption, pauseOverlay]);
 
   useEffect(() => {
     if (!paused || start === null || !duration) {
@@ -420,7 +427,7 @@ function EpisodePlayer(props: PlayerProps & {
       role="dialog"
       aria-modal="true"
       aria-label="Apex Player"
-      className="apex-native-player apex-cinema"
+      className={`apex-native-player apex-cinema${pauseOverlay ? " has-pause-overlay" : ""}`}
       onPointerMove={reveal}
       onKeyDown={(event) => {
         if (event.key === "Escape" && menu) {
@@ -444,7 +451,6 @@ function EpisodePlayer(props: PlayerProps & {
         crossOrigin="anonymous"
         playsInline
         preload="metadata"
-        poster={currentEpisode?.image}
         style={{ objectFit: fit, filter }}
         muted={muted}
         onClick={(event) => {
@@ -459,6 +465,7 @@ function EpisodePlayer(props: PlayerProps & {
         }}
         onLoadedMetadata={(event) => setDuration(event.currentTarget.duration)}
         onPlay={() => setPaused(false)}
+        onPlaying={() => setHasVideoFrame(true)}
         onPause={() => {
           setPaused(true);
           persist(true);
@@ -483,22 +490,20 @@ function EpisodePlayer(props: PlayerProps & {
           if (autoNext && props.canNext) chooseEpisode(episode + 1);
         }}
       >
-        {eligibleTracks
-          .filter((item) => item.format === "vtt")
-          .map((item) => (
-            <track
-              key={item.url}
-              src={item.url}
-              label={item.label}
-              kind="subtitles"
-              srcLang={item.language || "en"}
-              onError={() => {
-                if (item.url === track)
-                  setError("This subtitle track could not load. Try another track.");
-              }}
-            />
-          ))}
+        {loadedCaption && loadedCaption.track === track && (
+          <track
+            key={loadedCaption.url}
+            ref={captionElement}
+            src={loadedCaption.url}
+            kind="subtitles"
+            label={eligibleTracks.find((item) => item.url === track)?.label}
+            onError={() => setCaptionError("This subtitle track could not render. Try another track.")}
+          />
+        )}
       </video>
+      {!hasVideoFrame && props.anime && (
+        <div className="apex-player-loading-art"><HeroBackdrop anime={props.anime} /></div>
+      )}
       {ass && (
         <StyledSigns
           ass={ass}
@@ -508,7 +513,7 @@ function EpisodePlayer(props: PlayerProps & {
           delay={0}
           onFailure={() => {
             setAss("");
-            setError("Styled subtitles could not render. Try another track.");
+            setCaptionError("Styled subtitles could not render. Try another track.");
           }}
         />
       )}
@@ -533,9 +538,9 @@ function EpisodePlayer(props: PlayerProps & {
           />
         </div>
       </header>
-      {error ? (
+      {error || (captionError && menu !== "captions") ? (
         <p role="alert" className="apex-player-status">
-          {error}
+          {error || captionError}
         </p>
       ) : !source && start !== null ? (
         <p role="status" className="apex-player-status">
@@ -573,7 +578,6 @@ function EpisodePlayer(props: PlayerProps & {
             {currentEpisode?.overview && <p>{currentEpisode.overview}</p>}
             <small>{playbackTime(Math.max(0, duration - position))} left</small>
           </div>
-          {icon("Play", <Play fill="currentColor" />, toggle)}
         </div>
       )}
       {menu === "episodes" && (
@@ -640,6 +644,7 @@ function EpisodePlayer(props: PlayerProps & {
           </header>
           {menu === "captions" && (
             <>
+              {captionError && <p role="alert">{captionError}</p>}
               <button aria-pressed={!track} onClick={() => setTrack("")}>
                 Off
               </button>
