@@ -159,6 +159,14 @@ function createServer() {
         const [, provider, action] = route;
         const cfg = config(provider);
         if (action === "start" && req.method === "GET") {
+          // The short public alias uses the registered OAuth host for account sessions.
+          if (
+            req.headers.host === "apexanime.vercel.app" &&
+            origin !== "https://apexanime.vercel.app"
+          ) {
+            res.writeHead(302, { Location: origin + url.pathname });
+            return res.end();
+          }
           if (
             req.apexSessionReady === false ||
             !cfg.clientId ||

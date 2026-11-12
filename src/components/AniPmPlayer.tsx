@@ -59,6 +59,7 @@ export default function AniPmPlayer(props: PlayerProps) {
   const [startChoice, setStartChoice] = useState<number | null>(() =>
     savedResume > 0 ? null : 0,
   );
+  const restartRequested = useRef(false);
   const latest = useRef<{
     episode: number;
     position: number;
@@ -129,6 +130,8 @@ export default function AniPmPlayer(props: PlayerProps) {
             position: recovery.current?.position ?? startChoice,
           }
         : null;
+    let waitingForRestart = restartRequested.current && !recovery.current;
+    let restartInFlight = false;
     const report = callbacks.current.onProgress;
     const flush = () => {
       const value = latest.current;
@@ -212,6 +215,33 @@ export default function AniPmPlayer(props: PlayerProps) {
           if (waitingForStart && waitingForStart.episode === state.episode) {
             if (position + 2 < waitingForStart.position) return;
             waitingForStart = null;
+          }
+          if (waitingForRestart && state.episode === episode) {
+            if (restartInFlight || position === 0) return;
+            if (position > 2) {
+              restartInFlight = true;
+              void player
+                .seek(0)
+                .then(() => {
+                  if (!active) return;
+                  waitingForRestart = false;
+                  restartRequested.current = false;
+                  clock.current = 0;
+                  saveEpisodeProgress(id, episode, 0, duration);
+                  callbacks.current.onProgress?.(0, duration, episode);
+                })
+                .catch(() => {
+                  if (!active) return;
+                  waitingForRestart = false;
+                  restartRequested.current = false;
+                  setError(
+                    "Could not restart this episode. Use the playback timeline to seek to the beginning.",
+                  );
+                });
+              return;
+            }
+            waitingForRestart = false;
+            restartRequested.current = false;
           }
           clock.current = position;
           latest.current = { episode: state.episode, position, duration };
@@ -380,14 +410,7 @@ export default function AniPmPlayer(props: PlayerProps) {
             </button>
             <button
               onClick={() => {
-                saveEpisodeProgress(
-                  id,
-                  episode,
-                  0,
-                  props.resume?.duration ||
-                    readEpisodeProgress(id, episode)?.duration ||
-                    1,
-                );
+                restartRequested.current = true;
                 setStartChoice(0);
               }}
             >

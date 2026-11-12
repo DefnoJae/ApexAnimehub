@@ -167,10 +167,15 @@ test("start from beginning resets the saved position without carrying it into an
   document.body.append(node);
   const root = createRoot(node);
   const original = window.AniPM;
+  const events: Record<string, (data: unknown) => void> = {};
+  const onProgress = jest.fn();
   const player = {
     iframe: document.createElement("iframe"),
     state: { anilistId: 8, episode: 1, lang: "sub" },
-    on: jest.fn(),
+    on: (event: string, callback: (data: unknown) => void) => {
+      events[event] = callback;
+    },
+    seek: jest.fn().mockResolvedValue({ currentTime: 0 }),
     destroy: jest.fn(),
     loadEpisode: jest.fn().mockResolvedValue({}),
   };
@@ -186,6 +191,7 @@ test("start from beginning resets the saved position without carrying it into an
     episode: 1,
     stream: { name: "Ani.pm", url: aniPmUrl(8, 1, "sub") },
     resume: { position: 100, duration: 1400 },
+    onProgress,
     accounts: { autoSync: false },
     onWatched: jest.fn(),
     onClose: jest.fn(),
@@ -204,6 +210,11 @@ test("start from beginning resets the saved position without carrying it into an
       expect.anything(),
       expect.objectContaining({ start: 0 }),
     );
+    await act(async () =>
+      events.timeupdate({ currentTime: 100, duration: 1400 }),
+    );
+    expect(player.seek).toHaveBeenCalledWith(0);
+    expect(onProgress.mock.calls).toEqual([[0, 1400, 1]]);
     await act(async () =>
       root.render(
         <AniPmPlayer

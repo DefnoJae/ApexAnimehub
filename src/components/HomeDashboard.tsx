@@ -30,7 +30,6 @@ import { NotificationBell } from "./NotificationBell";
 import { HeroBackdrop } from "./HeroBackdrop";
 import "./dashboard.css";
 import { sectionPaths } from "../hooks/usePageRoute";
-import { useMissingLibrary } from "../hooks/useMissingLibrary";
 import { RatingPills } from "./RatingPills";
 import { PosterPersonalRating } from "./PosterPersonalRating";
 import { AnimeBadges } from "./AnimeBadges";
@@ -375,39 +374,6 @@ export function PosterRow({
   );
 }
 
-function MissingLibraryRow({
-  accounts,
-  onSelect,
-  onConnect,
-}: {
-  accounts: Accounts;
-  onSelect: (anime: DashboardAnime) => void;
-  onConnect?: () => void;
-}) {
-  const missing = useMissingLibrary(accounts);
-  return (
-    <div>
-      <PosterRow
-        title="Missing from Library"
-        animes={missing.animes}
-        notice={missing.notice}
-        accounts={accounts}
-        onSelect={onSelect}
-      />
-      {!missing.connected && onConnect && (
-        <button className="home-row-action" onClick={onConnect}>
-          Connect accounts
-        </button>
-      )}
-      {missing.connected && missing.error && (
-        <button className="home-row-action" onClick={missing.retry}>
-          Try again
-        </button>
-      )}
-    </div>
-  );
-}
-
 export function LatestEpisodes({
   accounts,
   language,
@@ -603,7 +569,6 @@ export function HomeDashboard({
   onResume,
   onRemove,
   onCalendar,
-  onConnect,
 }: {
   slides: DashboardAnime[];
   rows: Array<{ title: string; animes: DashboardAnime[]; notice?: string }>;
@@ -614,7 +579,6 @@ export function HomeDashboard({
   onResume: (entry: WatchEntry) => void;
   onRemove: (id: number) => void;
   onCalendar: () => void;
-  onConnect?: () => void;
 }) {
   const [episodeMetadata, setEpisodeMetadata] = useState<
     Record<string, EpisodeMetadata>
@@ -998,11 +962,6 @@ export function HomeDashboard({
               onSelect={onSelect}
             />
           ))}
-          <MissingLibraryRow
-            accounts={accounts}
-            onSelect={onSelect}
-            onConnect={onConnect}
-          />
         </div>
         <footer className="apex-footer">
           <a href="#" aria-label="Back to top">

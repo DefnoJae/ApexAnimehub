@@ -750,7 +750,6 @@ export default function App() {
                 onResume={resumePlayback}
                 onRemove={removeFromHistory}
                 onCalendar={() => navigate("/calendar")}
-                onConnect={() => setShowAccounts(true)}
               />
             </>
           )}
