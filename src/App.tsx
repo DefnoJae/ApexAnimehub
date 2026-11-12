@@ -2,10 +2,12 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Search, X } from "lucide-react";
 import {
   HomeDashboard,
+  type DashboardAnime,
   FloatingNavigation,
   WatchEntry,
 } from "./components/HomeDashboard";
 import { fetchAnilist } from "./utils/anilist";
+import { searchAnimeTitles } from "./utils/animeSearch";
 import { aniPmUrl } from "./utils/anipm";
 import { getDisplayTitle } from "./utils/schedule";
 import { DubScheduleView } from "./components/DubScheduleView";
@@ -43,7 +45,7 @@ export default function App() {
   const [navHidden, setNavHidden] = useState(false);
   const [isSearchExpanded, setIsSearchExpanded] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [searchResults, setSearchResults] = useState<DashboardAnime[]>([]);
 
   const [heroSlides, setHeroSlides] = useState<any[]>([]);
 
@@ -255,7 +257,7 @@ export default function App() {
 
   // --- SEARCH ---
   useEffect(() => {
-    if (searchQuery.length < 3) {
+    if (searchQuery.trim().length < 2) {
       setSearchLoading(false);
       setSearchResults([]);
       setSearchError(null);
@@ -266,13 +268,8 @@ export default function App() {
     setSearchError(null);
     const delay = setTimeout(async () => {
       try {
-        const q = `query ($search: String) { Page(page: 1, perPage: 10) { media(search: $search, type: ANIME) { id idMal title { english romaji } coverImage { extraLarge } episodes nextAiringEpisode { episode } } } }`;
-        const data = await fetchAnilist<{ Page: { media: any[] } }>(
-          q,
-          { search: searchQuery },
-          controller.signal,
-        );
-        if (!controller.signal.aborted) setSearchResults(data.Page.media);
+        const results = await searchAnimeTitles(searchQuery, controller.signal);
+        if (!controller.signal.aborted) setSearchResults(results);
       } catch (error) {
         if (!controller.signal.aborted) {
           setSearchResults([]);
@@ -608,8 +605,8 @@ export default function App() {
             {!searchResults.length && (
               <p className="search-help" role="status">
                 {searchError ||
-                  (searchQuery.length < 3
-                    ? "Type at least 3 characters to search anime."
+                  (searchQuery.trim().length < 2
+                    ? "Type at least 2 characters to search anime."
                     : searchLoading
                       ? "Searching anime…"
                       : "No matches. Try another title.")}
