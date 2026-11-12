@@ -1,3 +1,4 @@
+const { resolvePlayback, serveMedia } = require("./reanime.cjs");
 const cache = new Map();
 const pending = new Map();
 function coverId(url) {
@@ -10,11 +11,7 @@ function coverId(url) {
     return 0;
   }
 }
-async function resolve(id, episode, audio) {
-  if (audio === "dub")
-    throw new Error(
-      "No verified English dub source is available in Apex Player.",
-    );
+async function resolveParadise(id, episode, audio) {
   const { HttpClient, AnimeParadiseProvider } = await import("anime-sdk");
   const provider = new AnimeParadiseProvider(
     new HttpClient({ timeoutMs: 8000 }),
@@ -80,7 +77,17 @@ function allowed(value) {
     return false;
   }
 }
+async function resolve(id, episode, audio) {
+  if (audio === "dub") return resolvePlayback(id, episode, audio);
+  try {
+    return await resolveParadise(id, episode, audio);
+  } catch {
+    return resolvePlayback(id, episode, audio);
+  }
+}
 async function handler(req, res) {
+  const relay = new URL(req.url, "https://localhost").searchParams.get("media");
+  if (relay !== null) return serveMedia(req, res, relay);
   res.setHeader("Content-Type", "application/json");
   res.setHeader("Cache-Control", "no-store");
   if (req.method !== "GET") {

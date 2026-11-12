@@ -64,7 +64,7 @@ function remember(key: string, value: string) {
 }
 function trackKind(track: Track) {
   if (/signs|songs|forced/i.test(track.label)) return "signs";
-  if (/\bcc\b|closed captions/i.test(track.label)) return "cc";
+  if (/\bcc\b|closed captions|dubtitle/i.test(track.label)) return "cc";
   return "full";
 }
 
@@ -184,7 +184,7 @@ function EpisodePlayer(props: PlayerProps & {
             subtitles: Array.isArray(data.subtitles)
               ? data.subtitles.filter(
                   (item: Track) =>
-                    item.format === "vtt" || item.format === "ass",
+                    ["vtt", "ass", "srt"].includes(item.format),
                 )
               : [],
           });
@@ -297,12 +297,15 @@ function EpisodePlayer(props: PlayerProps & {
     void fetch(selected.url, { signal: controller.signal, credentials: "omit" })
       .then(async (response) => {
         if (!response.ok) throw new Error("Subtitle unavailable");
-        const text = (await response.text()).replace(/^\uFEFF/, "").trimStart();
+        let text = (await response.text()).replace(/^\uFEFF/, "").trimStart();
         if (text.length > 4_000_000) throw new Error("Subtitle is too large");
         if (controller.signal.aborted) return;
+        if (selected.format === "srt") {
+          text = "WEBVTT\n\n" + text.replace(/(\d{2}:\d{2}:\d{2}),(\d{3})/g, "$1.$2");
+        }
         if (selected.format === "ass" && text.includes("[Script Info]")) {
           setAss(text);
-        } else if (selected.format === "vtt" && /^WEBVTT(?:\s|$)/.test(text)) {
+        } else if (["vtt", "srt"].includes(selected.format) && /^WEBVTT(?:\s|$)/.test(text)) {
           objectUrl = URL.createObjectURL(new Blob([text], { type: "text/vtt" }));
           setLoadedCaption({ track: selected.url, url: objectUrl });
         } else throw new Error("Invalid subtitle track");
@@ -739,7 +742,7 @@ function EpisodePlayer(props: PlayerProps & {
                 aria-pressed={audio === "dub"}
                 onClick={() => switchAudio("dub")}
               >
-                English dub · Ani.pm fallback
+                English dub
               </button>
               <label>
                 Volume

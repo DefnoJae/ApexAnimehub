@@ -15,3 +15,16 @@ test('playback rejects invalid IDs and methods before contacting a source', asyn
     assert.ok(JSON.parse(response.body).error);
   }
 });
+
+test("Re:Anime media rejects unsigned relay requests", async () => {
+  const response = { setHeader() {}, end(body) { this.body = body; } };
+  await handler({ method: "GET", url: "/api/playback?media=forged.signature" }, response);
+  assert.equal(response.statusCode, 403);
+});
+
+test("Re:Anime media allowlist rejects redirects disguised as URLs", () => {
+  const { mediaUrl } = require("./reanime.cjs");
+  assert.equal(mediaUrl("https://fetch9.flixcloud.cc/master.m3u8").hostname, "fetch9.flixcloud.cc");
+  for (const url of ["https://fetch9.flixcloud.cc.evil.test/media", "https://127.0.0.1/media", "https://user@fetch9.flixcloud.cc/media", "http://fetch9.flixcloud.cc/media"])
+    assert.throws(() => mediaUrl(url));
+});
