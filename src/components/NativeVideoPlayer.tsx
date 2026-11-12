@@ -34,6 +34,7 @@ import {
 } from "../utils/playbackResume";
 import { HeroBackdrop } from "./HeroBackdrop";
 import { StyledSigns } from "./StyledSigns";
+import { PlayerEpisodeCarousel } from "./PlayerEpisodeCarousel";
 import { StyledSelect } from "./StyledSelect";
 import { SignSync } from "./SignSync";
 import "./nativeVideoPlayer.css";
@@ -430,7 +431,8 @@ function EpisodePlayer(props: PlayerProps & {
       className={`apex-native-player apex-cinema${pauseOverlay ? " has-pause-overlay" : ""}`}
       onPointerMove={reveal}
       onKeyDown={(event) => {
-        if (event.key === "Escape" && menu) {
+        if (menu && (event.key === "Escape" || (menu === "episodes" && event.key.toLowerCase() === "x" && !event.ctrlKey && !event.metaKey && !event.altKey))) {
+          event.preventDefault();
           event.stopPropagation();
           setMenu(undefined);
         }
@@ -580,7 +582,10 @@ function EpisodePlayer(props: PlayerProps & {
           </div>
         </div>
       )}
-      {menu === "episodes" && (
+      {menu === "episodes" && !side && (
+        <PlayerEpisodeCarousel episode={episode} numbers={episodeNumbers} episodes={episodes} onSelect={chooseEpisode} onClose={() => { setMenu(undefined); dialog.current?.focus({ preventScroll: true }); }} />
+      )}
+      {menu === "episodes" && side && (
         <section
           className={"apex-player-episodes" + (side ? " is-side" : "")}
           aria-label="Episodes"

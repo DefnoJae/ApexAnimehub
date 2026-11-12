@@ -404,3 +404,139 @@
 .apex-player-loading-art .hero-backdrop {
   animation: none;
 }
+
+.apex-player-episodes.apex-episode-carousel {
+  --episode-slot: clamp(140px, 16.7vw, 310px);
+  --episode-card: calc(var(--episode-slot) * 1.24);
+  padding: 0 0 18px;
+  border: 0;
+  border-radius: 0;
+  background: linear-gradient(to bottom, transparent, #0009 32%, #000 100%);
+  backdrop-filter: none;
+  box-shadow: none;
+}
+.apex-episode-carousel::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  backdrop-filter: blur(5px);
+  mask-image: linear-gradient(transparent, #000 55%);
+}
+.apex-episode-carousel > header {
+  position: relative;
+  margin: 0;
+  border: 0;
+  padding: 0 clamp(18px, 2.1vw, 40px) 20px;
+}
+.apex-episode-carousel h2 {
+  font-size: clamp(18px, 1.55vw, 26px);
+  font-weight: 700;
+  letter-spacing: -.025em;
+}
+.apex-episode-carousel .apex-player-close {
+  width: 26px;
+  height: 26px;
+  border: 1px solid #fffd;
+  background: #1116;
+}
+.apex-carousel-stage {
+  position: relative;
+}
+.apex-carousel-strip {
+  position: relative;
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+  padding: 12px calc((100% - var(--episode-slot)) / 2) 6px;
+  height: calc(var(--episode-card) * .5625 + 24px);
+  overflow: auto hidden;
+  overscroll-behavior-inline: contain;
+  scrollbar-width: none;
+  scroll-snap-type: x mandatory;
+}
+.apex-carousel-strip::-webkit-scrollbar {
+  display: none;
+}
+.apex-carousel-slot {
+  flex: 0 0 var(--episode-slot);
+  display: grid;
+  place-items: center;
+  position: relative;
+  scroll-snap-align: center;
+  scroll-snap-stop: always;
+}
+.apex-carousel-slot:has([data-position="center"]) {
+  z-index: 1;
+}
+.apex-carousel-card {
+  position: relative;
+  width: 98%;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border: 1px solid transparent;
+  border-radius: 13px;
+  background: #202126;
+  filter: brightness(.53);
+  transition: transform 240ms ease, filter 240ms ease, border-color 240ms ease;
+}
+.apex-carousel-card[data-position="left"] {
+  transform: translateX(-11%) perspective(650px) rotateY(14deg);
+}
+.apex-carousel-card[data-position="right"] {
+  transform: translateX(11%) perspective(650px) rotateY(-14deg);
+}
+.apex-carousel-card[data-position="center"] {
+  transform: scale(1.26);
+  filter: none;
+  border-color: #fff;
+}
+.apex-carousel-card:hover,
+.apex-carousel-card:focus-visible {
+  filter: brightness(1);
+  border-color: #fff;
+}
+.apex-carousel-card img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.apex-carousel-card span {
+  position: absolute;
+  inset: auto 0 0;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 23px 9px 8px;
+  background: linear-gradient(transparent, #000e);
+  font-size: clamp(10px, .77vw, 14px);
+  font-weight: 650;
+  text-align: left;
+}
+.apex-carousel-card b {
+  flex: none;
+  padding: 1px 5px;
+  border-radius: 99px;
+  background: #ffffff26;
+  font-size: .84em;
+}
+.apex-carousel-arrow {
+  position: absolute;
+  top: 50%;
+  translate: 0 -50%;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: #121212d9;
+}
+.apex-carousel-arrow.is-left { left: 12px; }
+.apex-carousel-arrow.is-right { right: 12px; }
+.apex-carousel-arrow:disabled { opacity: .35; }
+@media (prefers-reduced-motion: reduce) {
+  .apex-carousel-card { transition: none; }
+}
