@@ -54,7 +54,7 @@ export function VideoPlayer(props: PlayerProps) {
   if (native)
     return (
       <React.Suspense fallback={<p role="status">Loading player…</p>}>
-        <NativeVideoPlayer key={props.stream.url} {...props} />
+        <NativeVideoPlayer {...props} />
       </React.Suspense>
     );
   return <EmbedVideoPlayer {...props} />;

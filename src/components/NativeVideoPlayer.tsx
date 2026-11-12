@@ -17,6 +17,7 @@ import {
   SkipForward,
   Volume2,
   VolumeX,
+  X,
 } from "lucide-react";
 import type { PlayerProps } from "./VideoPlayer";
 import { usePlayerKeyboard } from "../hooks/usePlayerKeyboard";
@@ -32,6 +33,7 @@ import {
   saveEpisodeProgress,
 } from "../utils/playbackResume";
 import { StyledSigns } from "./StyledSigns";
+import { StyledSelect } from "./StyledSelect";
 import { SignSync } from "./SignSync";
 import "./nativeVideoPlayer.css";
 import "./apexPlayer.css";
@@ -65,6 +67,17 @@ function trackKind(track: Track) {
 }
 
 export default function NativeVideoPlayer(props: PlayerProps) {
+  const fullscreenHost = useRef<HTMLDivElement>(null);
+  return (
+    <div className="apex-player-fullscreen-host" ref={fullscreenHost}>
+      <EpisodePlayer key={props.stream.url} {...props} fullscreenHost={fullscreenHost} />
+    </div>
+  );
+}
+
+function EpisodePlayer(props: PlayerProps & {
+  fullscreenHost: React.RefObject<HTMLDivElement>;
+}) {
   const url = new URL(props.stream.url, window.location.origin);
   const id = Number(url.searchParams.get("id"));
   const { episode } = props;
@@ -338,7 +351,7 @@ export default function NativeVideoPlayer(props: PlayerProps) {
   const fullscreen = () =>
     document.fullscreenElement
       ? document.exitFullscreen()
-      : dialog.current?.requestFullscreen();
+      : props.fullscreenHost.current?.requestFullscreen();
   const chooseEpisode = (number: number) => {
     persist(true);
     setMenu(undefined);
@@ -428,6 +441,7 @@ export default function NativeVideoPlayer(props: PlayerProps) {
     >
       <video
         ref={video}
+        crossOrigin="anonymous"
         playsInline
         preload="metadata"
         poster={currentEpisode?.image}
@@ -478,6 +492,10 @@ export default function NativeVideoPlayer(props: PlayerProps) {
               label={item.label}
               kind="subtitles"
               srcLang={item.language || "en"}
+              onError={() => {
+                if (item.url === track)
+                  setError("This subtitle track could not load. Try another track.");
+              }}
             />
           ))}
       </video>
@@ -504,6 +522,16 @@ export default function NativeVideoPlayer(props: PlayerProps) {
           {props.title} · Episode {episode}
           {currentEpisode?.title ? " · " + currentEpisode.title : ""}
         </span>
+        <div className="apex-player-signsync">
+          <SignSync
+            key={id + ":" + episode}
+            animeId={id}
+            episode={episode}
+            language={audio}
+            root={dialog}
+            position={() => video.current?.currentTime || 0}
+          />
+        </div>
       </header>
       {error ? (
         <p role="alert" className="apex-player-status">
@@ -530,7 +558,7 @@ export default function NativeVideoPlayer(props: PlayerProps) {
           </div>
         </div>
       )}
-      {pauseOverlay && !menu && (
+      {pauseOverlay && (
         <div className="apex-player-pause">
           <div>
             {logo ? (
@@ -555,7 +583,7 @@ export default function NativeVideoPlayer(props: PlayerProps) {
         >
           <header>
             <h2>Episodes</h2>
-            <button onClick={() => setMenu(undefined)}>Close</button>
+            <button type="button" className="apex-player-close" aria-label="Close panel" onClick={() => setMenu(undefined)}><X size={17} /></button>
           </header>
           <div
             className="apex-episode-strip"
@@ -608,7 +636,7 @@ export default function NativeVideoPlayer(props: PlayerProps) {
                     ? "Audio"
                     : "Settings"}
             </h2>
-            <button onClick={() => setMenu(undefined)}>Close</button>
+            <button type="button" className="apex-player-close" aria-label="Close panel" onClick={() => setMenu(undefined)}><X size={17} /></button>
           </header>
           {menu === "captions" && (
             <>
@@ -639,7 +667,8 @@ export default function NativeVideoPlayer(props: PlayerProps) {
               ))}
               <label>
                 On English dub
-                <select
+                <StyledSelect
+                  aria-label="On English dub"
                   value={captionMode}
                   onChange={(event) => {
                     const mode = event.target.value as CaptionMode;
@@ -650,7 +679,7 @@ export default function NativeVideoPlayer(props: PlayerProps) {
                   <option value="signs">Prefer Signs & Songs</option>
                   <option value="full">Prefer full English CC</option>
                   <option value="off">Off</option>
-                </select>
+                </StyledSelect>
               </label>
               <label>
                 Dialogue size
@@ -753,7 +782,8 @@ export default function NativeVideoPlayer(props: PlayerProps) {
             <>
               <label>
                 Quality
-                <select
+                <StyledSelect
+                  aria-label="Quality"
                   value={quality}
                   onChange={(e) => {
                     const value = Number(e.target.value);
@@ -767,11 +797,12 @@ export default function NativeVideoPlayer(props: PlayerProps) {
                       {height}p
                     </option>
                   ))}
-                </select>
+                </StyledSelect>
               </label>
               <label>
                 Speed
-                <select
+                <StyledSelect
+                  aria-label="Speed"
                   value={speed}
                   onChange={(e) => {
                     const value = Number(e.target.value);
@@ -784,22 +815,24 @@ export default function NativeVideoPlayer(props: PlayerProps) {
                       {rate}×
                     </option>
                   ))}
-                </select>
+                </StyledSelect>
               </label>
               <label>
                 Video fit
-                <select
+                <StyledSelect
+                  aria-label="Video fit"
                   value={fit}
                   onChange={(e) => setFit(e.target.value as typeof fit)}
                 >
                   <option value="contain">Contain</option>
                   <option value="cover">Cover</option>
                   <option value="fill">Fill</option>
-                </select>
+                </StyledSelect>
               </label>
               <label>
                 Skip interval
-                <select
+                <StyledSelect
+                  aria-label="Skip interval"
                   value={jump}
                   onChange={(e) => {
                     setJump(Number(e.target.value));
@@ -811,11 +844,12 @@ export default function NativeVideoPlayer(props: PlayerProps) {
                       {value}s
                     </option>
                   ))}
-                </select>
+                </StyledSelect>
               </label>
               <label>
                 Episode panel
-                <select
+                <StyledSelect
+                  aria-label="Episode panel"
                   value={side ? "side" : "bottom"}
                   onChange={(e) => {
                     setSide(e.target.value === "side");
@@ -824,18 +858,19 @@ export default function NativeVideoPlayer(props: PlayerProps) {
                 >
                   <option value="bottom">Bottom</option>
                   <option value="side">Right</option>
-                </select>
+                </StyledSelect>
               </label>
               <label>
                 Video filter
-                <select
+                <StyledSelect
+                  aria-label="Video filter"
                   value={filter}
                   onChange={(e) => setFilter(e.target.value)}
                 >
                   <option value="none">Off</option>
                   <option value="brightness(1.15)">Brighter</option>
                   <option value="contrast(1.12)">More contrast</option>
-                </select>
+                </StyledSelect>
               </label>
               <label>
                 Auto next
@@ -853,7 +888,7 @@ export default function NativeVideoPlayer(props: PlayerProps) {
         </section>
       )}
       {start !== null && (
-        <footer className="apex-player-bottom" hidden={!controls}>
+        <footer className="apex-player-bottom" hidden={!controls || menu === "episodes"}>
           <div className="apex-player-timeline">
             {scrub !== undefined && (
               <output
@@ -936,7 +971,7 @@ export default function NativeVideoPlayer(props: PlayerProps) {
                 <MessageSquare />,
                 () => showMenu("captions"),
                 false,
-                menu === "captions" || !!track,
+                menu === "captions",
               )}
               {icon(
                 "Audio",
@@ -982,14 +1017,6 @@ export default function NativeVideoPlayer(props: PlayerProps) {
               )}
             </div>
           </div>
-          <SignSync
-            key={id + ":" + episode}
-            animeId={id}
-            episode={episode}
-            language={audio}
-            root={dialog}
-            position={() => video.current?.currentTime || 0}
-          />
         </footer>
       )}
     </div>

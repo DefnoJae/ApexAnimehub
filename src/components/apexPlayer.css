@@ -286,3 +286,107 @@
   background: #eee;
   color: #111;
 }
+
+.apex-player-fullscreen-host:fullscreen {
+  background: #000;
+}
+.apex-player-top > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.apex-player-signsync {
+  flex: none;
+  margin-left: auto;
+}
+.apex-player-top > button {
+  flex: none;
+}
+.apex-player-bottom {
+  padding-bottom: max(8px, env(safe-area-inset-bottom));
+}
+.apex-player-pause {
+  padding-inline: 4vw;
+}
+.apex-player-pause > div {
+  transform: translateY(clamp(12px, 5vh, 44px));
+}
+.apex-player-pause img {
+  max-width: 100%;
+  max-height: min(175px, 25vh);
+}
+.apex-player-menu {
+  bottom: 72px;
+  padding: 16px;
+}
+.apex-player-menu,
+.apex-player-episodes {
+  background: #17191dde;
+  backdrop-filter: blur(24px);
+  box-shadow: 0 12px 36px #0008, inset 0 1px #ffffff0d;
+}
+.apex-player-menu header,
+.apex-player-episodes header {
+  padding-bottom: 8px;
+  border-bottom: 1px solid #ffffff17;
+}
+.apex-player-menu h2,
+.apex-player-episodes h2 {
+  font-weight: 650;
+}
+.apex-player-menu label {
+  min-height: 36px;
+  margin-bottom: 4px;
+}
+.apex-player-menu .styled-select-trigger {
+  padding: 7px 10px;
+  font-size: 13px;
+}
+.apex-cinema :is(.styled-select-trigger, .styled-select-menu) {
+  border-color: #ffffff29;
+  background: #202126f5;
+  color: white;
+}
+.apex-cinema .styled-select-option[aria-selected="true"] {
+  color: white;
+}
+.apex-cinema :is(.styled-select-option.is-active, .styled-select-trigger[aria-expanded="true"]) {
+  background: #3a3b41;
+}
+.apex-player-episodes:not(.is-side) {
+  inset: auto 0 0;
+  border-radius: 18px 18px 0 0;
+  padding: 16px 20px max(18px, env(safe-area-inset-bottom));
+}
+.apex-player-close {
+  display: inline-grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid #ffffff24;
+  border-radius: 50%;
+  background: #ffffff14;
+}
+.apex-cinema button:not(:disabled) {
+  cursor: pointer;
+}
+.apex-cinema :is(.apex-player-top, .apex-player-tray, .apex-player-menu, .apex-player-episodes, .apex-player-pause) button:hover:not(:disabled) {
+  border-color: #ffffff68;
+  background: #ffffff35;
+  color: #fff;
+}
+.apex-episode-strip button:hover {
+  box-shadow: inset 0 0 0 2px #ffffffa0;
+}
+.apex-cinema .signsync-panel header button {
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #ffffff14;
+}
+.apex-cinema .signsync-panel header button:hover {
+  background: #ffffff35;
+}

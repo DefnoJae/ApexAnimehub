@@ -25,6 +25,8 @@ test("native shortcuts navigate episodes and playback syncs once at 80%", async 
   } as unknown as PlayerProps;
   try {
     await act(async () => root.render(<NativeVideoPlayer {...props} />));
+    const host = node.firstElementChild as HTMLElement;
+    host.requestFullscreen = jest.fn().mockResolvedValue(undefined);
     const video = node.querySelector("video")!;
     video.play = jest.fn().mockResolvedValue(undefined);
     Object.defineProperty(video, "duration", { value: 100 });
@@ -37,6 +39,8 @@ test("native shortcuts navigate episodes and playback syncs once at 80%", async 
     expect(video.currentTime).toBe(50);
     key("ArrowLeft");
     expect(video.currentTime).toBe(40);
+    key("f");
+    expect(host.requestFullscreen).toHaveBeenCalledTimes(1);
     key("n");
     key("b");
     expect(props.onEpisodeChange).toHaveBeenCalledTimes(2);
@@ -53,6 +57,10 @@ test("native shortcuts navigate episodes and playback syncs once at 80%", async 
     expect(props.onWatched).toHaveBeenCalledTimes(1);
     act(() => video.dispatchEvent(new Event("ended")));
     expect(props.onEpisodeChange).toHaveBeenCalledTimes(2);
+    await act(async () => root.render(<NativeVideoPlayer {...props} episode={3}
+      stream={{ ...props.stream, url: "/api/playback?id=1&episode=3" }} />));
+    expect(node.firstElementChild).toBe(host);
+    expect(node.querySelector("video")).not.toBe(video);
   } finally {
     act(() => root.unmount());
     fetchMock.mockRestore();
