@@ -2193,3 +2193,14 @@ input:focus-visible {
     transform: none;
   }
 }
+
+.notification-presence {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 7px;
+  color: #c7a6ff;
+  vertical-align: middle;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}

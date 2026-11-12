@@ -1,6 +1,14 @@
 import { FollowingStories } from "./FollowingStories";
 import React, { useEffect, useRef, useState } from "react";
-import { Bell, CheckCircle2, AlertCircle, RefreshCw, X } from "lucide-react";
+import {
+  Bell,
+  CheckCircle2,
+  AlertCircle,
+  RefreshCw,
+  User,
+  X,
+} from "lucide-react";
+import { usePresence } from "../hooks/usePresence";
 import { notificationPoster } from "../hooks/useNotifications";
 import type { useNotifications } from "../hooks/useNotifications";
 export function NotificationBell({
@@ -10,6 +18,7 @@ export function NotificationBell({
   feed: ReturnType<typeof useNotifications>;
   stories?: React.ComponentProps<typeof FollowingStories>;
 }) {
+  const activeVisitors = usePresence();
   const [open, setOpen] = useState(false),
     [unread, setUnread] = useState(false);
   const [storyHost, setStoryHost] = useState<HTMLSpanElement | null>(null);
@@ -70,6 +79,21 @@ export function NotificationBell({
           <header>
             <h2>
               Notifications{" "}
+              {activeVisitors !== null && (
+                <span
+                  className="notification-presence"
+                  role="img"
+                  aria-label={
+                    activeVisitors +
+                    " active " +
+                    (activeVisitors === 1 ? "visitor" : "visitors")
+                  }
+                  title="Visitors with ApexAnimehub visible"
+                >
+                  <User size={14} aria-hidden="true" />
+                  {activeVisitors}
+                </span>
+              )}
               <small>{feed.unreadCount ? feed.unreadCount + " new" : ""}</small>
             </h2>
             <button

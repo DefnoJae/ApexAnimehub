@@ -110,6 +110,8 @@ function createServer() {
   return http.createServer(async (req, res) => {
     res.setHeader("Cache-Control", "no-store");
     const url = new URL(req.url, origin);
+    if (url.pathname === "/api/presence")
+      return require("./presence.cjs").handler(req, res);
     if (url.pathname === "/api/signsync")
       return require("./signsync.cjs").handler(req, res);
     if (url.pathname === "/api/playback")

@@ -16,5 +16,7 @@ module.exports = (req, res) => {
     return require("../server/episodes.cjs").handler(req, res);
   if (new URL(req.url, "https://localhost").pathname === "/api/studio-logo")
     return require("../server/studios.cjs").handler(req, res);
+  if (new URL(req.url, "https://localhost").pathname === "/api/presence")
+    return require("../server/presence.cjs").handler(req, res);
   return handler(req, res);
 };
