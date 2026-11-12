@@ -80,3 +80,50 @@ test("navigation adds real history entries, ignores duplicate events and restore
     window.history.replaceState({}, "", "/");
   }
 });
+
+test("closing playback returns to its detail entry and Back reaches the original page", async () => {
+  window.history.replaceState({}, "", "/discover?studio=14");
+  const node = document.createElement("div");
+  const root = createRoot(node);
+  let router!: ReturnType<typeof usePageRoute>;
+  function Harness() {
+    router = usePageRoute();
+    return null;
+  }
+  const traverse = async (action: () => void) => {
+    await act(async () => {
+      const popped = new Promise<void>((resolve) =>
+        window.addEventListener("popstate", () => resolve(), { once: true }),
+      );
+      action();
+      await popped;
+    });
+  };
+  try {
+    act(() => root.render(<Harness />));
+    act(() => router.navigate("/anime/1"));
+    act(() => router.navigate(episodePage(1, 2)));
+    const length = window.history.length;
+    act(() => router.navigate(episodePage(1, 3, "dub")));
+    expect(window.history.length).toBe(length);
+    await traverse(() => router.closePlayer("/anime/1?episode=3"));
+    expect(window.location.pathname).toBe("/anime/1");
+    expect(router.route.play).toBe(false);
+    await traverse(() => window.history.back());
+    expect(window.location.pathname + window.location.search).toBe(
+      "/discover?studio=14",
+    );
+
+    // Direct play from a list has no detail entry to return to.
+    act(() => router.navigate(episodePage(1, 4)));
+    act(() => router.closePlayer("/anime/1?episode=4"));
+    expect(window.location.pathname + window.location.search).toBe(
+      "/anime/1?episode=4",
+    );
+    await traverse(() => window.history.back());
+    expect(window.location.pathname).toBe("/discover");
+  } finally {
+    act(() => root.unmount());
+    window.history.replaceState({}, "", "/");
+  }
+});

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 export type AudioLanguage = "sub" | "dub";
 export type PlaybackSource = "anipm" | "apex" | "megaplay";
@@ -87,6 +87,7 @@ const readRoute = () =>
   parsePageRoute(window.location.pathname, window.location.search);
 export function usePageRoute() {
   const [route, setRoute] = useState(readRoute);
+  const closingPlayer = useRef(false);
   useEffect(() => {
     if (typeof window.history.state?.apexIndex !== "number")
       window.history.replaceState(
@@ -95,6 +96,7 @@ export function usePageRoute() {
         window.location.href,
       );
     const pop = () => {
+      closingPlayer.current = false;
       setRoute(readRoute());
       window.scrollTo({ top: 0 });
     };
@@ -109,9 +111,26 @@ export function usePageRoute() {
       window.location.pathname + window.location.search
     )
       return;
-    const index = Number(window.history.state?.apexIndex) || 0;
-    window.history[replace ? "replaceState" : "pushState"](
-      { apexIndex: replace ? index : index + 1 },
+    const current = readRoute();
+    const next = parsePageRoute(url.pathname, url.search);
+    const state = window.history.state;
+    const index = Number(state?.apexIndex) || 0;
+    const samePlayer =
+      current.play && next.play && current.animeId === next.animeId;
+    const replaceEntry = replace || samePlayer;
+    const fromDetails =
+      next.play &&
+      (samePlayer
+        ? state?.apexPlayerFromDetails === true
+        : !replaceEntry &&
+          current.view === "details" &&
+          !current.play &&
+          current.animeId === next.animeId);
+    window.history[replaceEntry ? "replaceState" : "pushState"](
+      {
+        apexIndex: replaceEntry ? index : index + 1,
+        apexPlayerFromDetails: fromDetails,
+      },
       "",
       url.pathname + url.search,
     );
@@ -125,5 +144,20 @@ export function usePageRoute() {
     },
     [navigate],
   );
-  return { route, navigate, back };
+  const closePlayer = useCallback(
+    (detailsHref: string) => {
+      if (closingPlayer.current || !readRoute().play) return;
+      if (
+        window.history.state?.apexPlayerFromDetails === true &&
+        window.history.state.apexIndex > 0
+      ) {
+        closingPlayer.current = true;
+        window.history.back();
+      } else {
+        navigate(detailsHref, true);
+      }
+    },
+    [navigate],
+  );
+  return { route, navigate, back, closePlayer };
 }

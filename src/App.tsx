@@ -36,7 +36,7 @@ const THEME_COLOR = "8B5CF6";
 export default function App() {
   const accounts = useAccounts();
   const [showAccounts, setShowAccounts] = useState(false);
-  const { route, navigate, back } = usePageRoute();
+  const { route, navigate, back, closePlayer } = usePageRoute();
   const view = route.view;
   const [loading, setLoading] = useState(true);
   const [contentError, setContentError] = useState<string | null>(null);
@@ -514,7 +514,7 @@ export default function App() {
               return;
             navigate(episodePage(selectedAnime.id, episode, lang, "anipm"));
           }}
-          onClose={() => navigate(animePage(selectedAnime.id, activeEpisode))}
+          onClose={() => closePlayer(animePage(selectedAnime.id, activeEpisode))}
           resume={watchHistory.find(
             (item) =>
               item.anime.id === selectedAnime.id &&
@@ -666,7 +666,7 @@ export default function App() {
           {invalidEpisode && (
             <p role="alert" className="row-loading">
               This episode is outside this anime’s episode count.{" "}
-              <button onClick={() => navigate(animePage(selectedAnime.id))}>
+              <button onClick={() => closePlayer(animePage(selectedAnime.id))}>
                 Open anime details
               </button>
             </p>
@@ -716,7 +716,7 @@ export default function App() {
                 onSelect={onSelectMedia}
                 onConnect={() => setShowAccounts(true)}
                 onEpisode={(episode) =>
-                  navigate(animePage(selectedAnime.id, episode))
+                  navigate(animePage(selectedAnime.id, episode), true)
                 }
                 onPlay={playEpisode}
               />
