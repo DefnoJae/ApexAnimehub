@@ -72,84 +72,100 @@ test("mapped movie uses movie images; concurrent calls deduplicate", async () =>
   }
 });
 
-test("sequels reuse original artwork and exact title search fills missing mappings", async () => {
-  const originalFetch = global.fetch,
-    originalKey = process.env.TMDB_API_KEY;
-  process.env.TMDB_API_KEY = "test";
-  const calls = [];
-  global.fetch = async (url, options = {}) => {
-    calls.push(url);
-    let data;
-    if (url.includes("graphql.anilist")) {
-      const id = JSON.parse(options.body).variables.id;
-      data = {
-        data: {
-          Media: {
-            id,
-            format: "TV",
-            seasonYear: 2026,
-            title: {
-              english: id === 501 ? "Exact Show Season 2" : "Exact Show",
+for (const relationType of ["PREQUEL", "OTHER"]) {
+  test(`sequels with a ${relationType} relation reuse the matching original logo`, async () => {
+    const baseId = relationType === "PREQUEL" ? 500 : 510;
+    const sequelId = baseId + 1;
+    const originalFetch = global.fetch,
+      originalKey = process.env.TMDB_API_KEY;
+    process.env.TMDB_API_KEY = "test";
+    const calls = [];
+    global.fetch = async (url, options = {}) => {
+      calls.push(url);
+      let data;
+      if (url.includes("graphql.anilist")) {
+        const id = JSON.parse(options.body).variables.id;
+        data = {
+          data: {
+            Media: {
+              id,
+              format: "TV",
+              seasonYear: 2026,
+              title: {
+                english: id === sequelId ? "Exact Show Season 2" : "Exact Show",
+              },
+              relations: {
+                edges:
+                  id === sequelId
+                    ? [
+                        {
+                          relationType,
+                          node: { id: baseId, type: "ANIME", format: "TV" },
+                        },
+                      ]
+                    : [],
+              },
             },
-            relations: {
-              edges:
-                id === 501
-                  ? [
-                      {
-                        relationType: "PREQUEL",
-                        node: { id: 500, type: "ANIME", format: "TV" },
-                      },
-                    ]
-                  : [],
+          },
+        };
+      } else if (url.includes("ani.zip"))
+        data = { mappings: { anilist_id: baseId } };
+      else if (url.includes("search/tv"))
+        data = {
+          results: [
+            {
+              id: 7,
+              name: "Exact Show",
+              genre_ids: [16],
+              first_air_date: "2026-01-01",
             },
-          },
-        },
-      };
-    } else if (url.includes("ani.zip"))
-      data = { mappings: { anilist_id: 500 } };
-    else if (url.includes("search/tv"))
-      data = {
-        results: [
-          {
-            id: 7,
-            name: "Exact Show",
-            genre_ids: [16],
-            first_air_date: "2026-01-01",
-          },
-          {
-            id: 8,
-            name: "Exact Show Extra",
-            genre_ids: [16],
-            first_air_date: "2026-01-01",
-          },
-        ],
-      };
-    else
-      data = {
-        logos: [
-          { file_path: "/logo.png", iso_639_1: "en", width: 600, height: 200 },
-        ],
-        backdrops: [
-          { file_path: "/hd.jpg", iso_639_1: null, width: 1918, height: 1078 },
-        ],
-      };
-    return { ok: true, json: async () => data };
-  };
-  try {
-    const sequel = await artwork(501),
-      base = await artwork(500);
-    assert.equal(sequel.anilistId, 501);
-    assert.deepEqual(sequel.logos, base.logos);
-    assert.deepEqual(sequel.backdrops, base.backdrops);
-    assert.equal(sequel.backdrops.length, 1);
-    assert.equal(calls.filter((url) => url.includes("/images?")).length, 1);
-    assert.ok(calls.some((url) => url.includes("tv/7/images")));
-  } finally {
-    global.fetch = originalFetch;
-    if (originalKey === undefined) delete process.env.TMDB_API_KEY;
-    else process.env.TMDB_API_KEY = originalKey;
-  }
-});
+            {
+              id: 8,
+              name: "Exact Show Extra",
+              genre_ids: [16],
+              first_air_date: "2026-01-01",
+            },
+          ],
+        };
+      else
+        data = {
+          logos: [
+            {
+              file_path: "/logo.png",
+              iso_639_1: "en",
+              width: 600,
+              height: 200,
+            },
+          ],
+          backdrops: [
+            {
+              file_path: "/hd.jpg",
+              iso_639_1: null,
+              width: 1918,
+              height: 1078,
+            },
+          ],
+        };
+      return { ok: true, json: async () => data };
+    };
+    try {
+      const sequel = await artwork(sequelId),
+        base = await artwork(baseId);
+      assert.equal(sequel.anilistId, sequelId);
+      assert.deepEqual(sequel.logos, base.logos);
+      assert.deepEqual(
+        sequel.backdrops,
+        relationType === "PREQUEL" ? base.backdrops : [],
+      );
+      assert.equal(calls.filter((url) => url.includes("/images?")).length, 1);
+      assert.ok(calls.some((url) => url.includes("tv/7/images")));
+    } finally {
+      global.fetch = originalFetch;
+      if (originalKey === undefined) delete process.env.TMDB_API_KEY;
+      else process.env.TMDB_API_KEY = originalKey;
+    }
+  });
+}
 
 test("small English TMDB logos such as 18if are retained", () => {
   const result = selectImages({
@@ -423,5 +439,19 @@ test("release-year suffixes and multiplication signs match the correct remake, n
     global.fetch = oldFetch;
     if (oldKey === undefined) delete process.env.TMDB_API_KEY;
     else process.env.TMDB_API_KEY = oldKey;
+  }
+});
+
+test("Steel Ball Run retains official title art when the artwork provider is unavailable", async () => {
+  const originalFetch = global.fetch;
+  global.fetch = async () => {
+    throw new Error("unavailable");
+  };
+  try {
+    const result = await artwork(210482);
+    assert.deepEqual(result.logos, ["/title-logos/steel-ball-run.png"]);
+    assert.deepEqual(result.backdrops, []);
+  } finally {
+    global.fetch = originalFetch;
   }
 });

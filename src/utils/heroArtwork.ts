@@ -24,9 +24,12 @@ function safeImage(value: unknown): value is string {
     )
   );
 }
+function safeLogo(value: unknown): value is string {
+  return safeImage(value) || value === "/title-logos/steel-ball-run.png";
+}
 export function artworkLogos(data: ArtworkPayload, id: number): string[] {
   return data.anilistId === id && Array.isArray(data.logos)
-    ? data.logos.filter(safeImage)
+    ? data.logos.filter(safeLogo)
     : [];
 }
 export function artworkBackdrops(data: ArtworkPayload, id: number): string[] {
@@ -55,7 +58,7 @@ export function isHeroBanner(width: number, height: number): boolean {
 async function fetchHeroMedia(anilistId: number): Promise<CachedArtwork> {
   const empty = { logos: [], backdrops: [], updatedAt: 0 };
   if (!Number.isSafeInteger(anilistId) || anilistId <= 0) return empty;
-  const key = "apex_tmdb_artwork_v7_" + anilistId;
+  const key = "apex_tmdb_artwork_v8_" + anilistId;
   let freshCache = false;
   let cached: CachedArtwork | null = null;
   try {
@@ -65,14 +68,14 @@ async function fetchHeroMedia(anilistId: number): Promise<CachedArtwork> {
     // if the provider is temporarily unavailable during migration.
     const value = JSON.parse(
       current ||
-        localStorage.getItem("apex_tmdb_artwork_v6_" + anilistId) ||
+        localStorage.getItem("apex_tmdb_artwork_v7_" + anilistId) ||
         "null",
     );
     if (
       value &&
       (freshCache || (value.match === "exact" && value.logos?.length)) &&
       Array.isArray(value.logos) &&
-      value.logos.every(safeImage) &&
+      value.logos.every(safeLogo) &&
       Array.isArray(value.backdrops) &&
       value.backdrops.every(safeImage) &&
       Number.isFinite(value.updatedAt)
@@ -97,7 +100,7 @@ async function fetchHeroMedia(anilistId: number): Promise<CachedArtwork> {
       timer = setTimeout(() => controller.abort(), 45000);
     try {
       const response = await fetch(
-        "/api/artwork?anilist_id=" + anilistId + "&v=7",
+        "/api/artwork?anilist_id=" + anilistId + "&v=8",
         {
           signal: controller.signal,
           credentials: "omit",

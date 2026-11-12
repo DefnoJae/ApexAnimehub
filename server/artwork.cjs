@@ -122,20 +122,29 @@ function exactCandidate(candidate, media) {
     (!media.seasonYear || (year > 0 && Math.abs(year - media.seasonYear) <= 1))
   );
 }
+function seriesTitle(title) {
+  return title
+    .replace(
+      /\s*[-–:]?\s+\d+(?:st|nd|rd|th)\s*(?:[-–&＆]\s*\d+(?:st|nd|rd|th)\s*)?stage\s*$/i,
+      "",
+    )
+    .replace(/\b(?:\d+(?:st|nd|rd|th)?\s+)?(?:season|cour|part)\s*\d*\b/gi, "")
+    .replace(/\s+(?:\d+|II|III|IV)\s*$/i, "");
+}
 function sameSeries(a, b) {
-  const base = (title) =>
-    normalize(
-      title
-        .replace(
-          /\b(?:\d+(?:st|nd|rd|th)?\s+)?(?:season|cour|part)\s*\d*\b/gi,
-          "",
-        )
-        .replace(/\s+(?:\d+|II|III|IV)\s*$/i, ""),
-    );
   return titles(a).some((left) =>
-    titles(b).some((right) => base(left) && base(left) === base(right)),
+    titles(b).some((right) => {
+      const base = normalize(seriesTitle(left));
+      return base && base === normalize(seriesTitle(right));
+    }),
   );
 }
+// Netflix publishes one English title treatment for both Steel Ball Run stages.
+// Source: https://www.netflix.com/title/82116553
+const officialLogos = {
+  190327: "/title-logos/steel-ball-run.png",
+  210482: "/title-logos/steel-ball-run.png",
+};
 async function ownArtwork(media, tmdb) {
   const type = media.format === "MOVIE" ? "movie" : "tv";
   let tmdbId;
@@ -257,13 +266,20 @@ async function artwork(id, ancestors = new Set()) {
       );
     const media = await mediaIdentity(id);
     const data = { anilistId: id, ...(await ownArtwork(media, tmdb)) };
+    if (!data.logos.length && officialLogos[id]) {
+      data.logos = [officialLogos[id]];
+      if (data.match === "none") data.match = "official";
+    }
     if (
       (!data.logos.length || !data.backdrops.length) &&
       media.format !== "MOVIE"
     ) {
       const relations = (media.relations?.edges || []).filter(
         (edge) =>
-          ["PREQUEL", "PARENT"].includes(edge.relationType) &&
+          (["PREQUEL", "PARENT"].includes(edge.relationType) ||
+            (edge.relationType === "OTHER" &&
+              !data.logos.length &&
+              titles(media).some((title) => seriesTitle(title) !== title))) &&
           edge.node?.type === "ANIME" &&
           ["TV", "TV_SHORT", "ONA"].includes(edge.node.format) &&
           !visited.has(edge.node.id),
@@ -277,7 +293,11 @@ async function artwork(id, ancestors = new Set()) {
             data.logos = fallback.logos;
             data.match = "related";
           }
-          if (!data.backdrops.length && fallback.backdrops.length) {
+          if (
+            edge.relationType !== "OTHER" &&
+            !data.backdrops.length &&
+            fallback.backdrops.length
+          ) {
             data.backdrops = fallback.backdrops;
             data.match = "related";
           }
@@ -298,6 +318,13 @@ async function artwork(id, ancestors = new Set()) {
   })()
     .catch((error) => {
       if (old) return old.data;
+      if (officialLogos[id])
+        return {
+          anilistId: id,
+          logos: [officialLogos[id]],
+          backdrops: [],
+          match: "official",
+        };
       throw error;
     })
     .finally(() => {
