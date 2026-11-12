@@ -228,6 +228,9 @@ export function StoryViewer({
         group.activities.some((activity) => !seen.includes(activity.id)),
       ),
   );
+  const replayStart = useRef(initial.userIndex);
+  const history = useRef<Array<{ userIndex: number; index: number }>>([]);
+  const forward = useRef<Array<{ userIndex: number; index: number }>>([]);
   const group = groups[userIndex],
     activity = initialized ? group?.activities[index] : undefined;
   useEffect(() => {
@@ -238,39 +241,42 @@ export function StoryViewer({
       replay.current = !groups.some((group) =>
         group.activities.some((activity) => !seen.includes(activity.id)),
       );
+      replayStart.current = start.userIndex;
       setInitialized(true);
     }
   }, [groups, seen, initialized]);
   const advance = (direction: number) => {
-    const timeline = groups
-      .flatMap((group, userIndex) =>
-        group.activities.map((activity, index) => ({
-          activity,
-          userIndex,
-          index,
-        })),
-      )
-      .sort(
-        (a, b) =>
-          a.activity.createdAt - b.activity.createdAt ||
-          a.activity.id - b.activity.id,
-      );
-    const current = timeline.findIndex(
-      (item) => item.activity.id === activity?.id,
-    );
-    const unread = timeline.filter(
-      (item) =>
-        item.activity.id !== activity?.id && !seen.includes(item.activity.id),
-    );
-    const next =
-      direction < 0
-        ? timeline[current - 1]
-        : replay.current
-          ? timeline[current + 1]
-          : timeline.slice(current + 1).find((item) => unread.includes(item)) ||
-            unread[0];
-    setEnded(false);
+    if (!activity || !group) return;
+    let next: { userIndex: number; index: number } | undefined;
+    if (direction < 0) {
+      next = history.current.pop();
+      if (!next && index > 0) next = { userIndex, index: index - 1 };
+    } else {
+      next = forward.current.pop();
+    }
+    if (!next && direction > 0) {
+      if (index + 1 < group.activities.length) {
+        next = { userIndex, index: index + 1 };
+      } else if (replay.current) {
+        const following = (userIndex + 1) % groups.length;
+        if (following !== replayStart.current)
+          next = { userIndex: following, index: 0 };
+      } else {
+        const seenInGroup = [
+          ...seen,
+          ...group.activities.map((item) => item.id),
+        ];
+        const following = oldestUnseen(groups, seenInGroup);
+        const candidate =
+          groups[following.userIndex]?.activities[following.index];
+        if (candidate && !seenInGroup.includes(candidate.id)) next = following;
+      }
+    }
     if (next) {
+      if (direction > 0) history.current.push({ userIndex, index });
+      else forward.current.push({ userIndex, index });
+      setElapsed(0);
+      setEnded(false);
       setUserIndex(next.userIndex);
       setIndex(next.index);
     } else if (direction > 0) {
@@ -362,6 +368,9 @@ export function StoryViewer({
     return () => document.removeEventListener("keydown", keyboard, true);
   }, []);
   const choose = (next: number) => {
+    if (activity) history.current.push({ userIndex, index });
+    forward.current = [];
+    replayStart.current = next;
     setUserIndex(next);
     setIndex(oldestUnseen(groups, seen, next).index);
     setElapsed(0);
@@ -473,16 +482,7 @@ export function StoryViewer({
             <button
               className="story-arrow story-previous"
               aria-label="Previous activity"
-              disabled={
-                !groups.some((item) =>
-                  item.activities.some(
-                    (previous) =>
-                      previous.createdAt < activity.createdAt ||
-                      (previous.createdAt === activity.createdAt &&
-                        previous.id < activity.id),
-                  ),
-                )
-              }
+              disabled={index === 0 && history.current.length === 0}
               onClick={() => advance(-1)}
             >
               <ChevronLeft />

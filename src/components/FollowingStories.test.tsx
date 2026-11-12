@@ -187,7 +187,13 @@ test("anime title closes the viewer and remembers the opened entry immediately",
 
 test("reopening starts at the oldest remaining unseen entry without waiting for the timer", async () => {
   (fetchFollowingStories as jest.Mock).mockResolvedValue({
-    groups,
+    groups: [
+      groups[0],
+      {
+        ...groups[1],
+        activities: [{ ...groups[1].activities[0], createdAt: 105 }],
+      },
+    ],
     at: Date.now(),
   });
   await act(async () =>
@@ -204,23 +210,21 @@ test("reopening starts at the oldest remaining unseen entry without waiting for 
   ).toEqual([1]);
   act(() =>
     document
+      .querySelector<HTMLButtonElement>('[aria-label="Next activity"]')!
+      .click(),
+  );
+  expect(
+    document.querySelector(".following-story-card")?.textContent,
+  ).toContain("Completed");
+
+  act(() =>
+    document
       .querySelector<HTMLButtonElement>(
         '[aria-label="Close following activity"]',
       )!
       .click(),
   );
   act(() => trigger.click());
-  expect(
-    document.querySelector(".following-story-card")?.textContent,
-  ).toContain("Completed");
-  expect(
-    JSON.parse(localStorage.getItem("apex_stories_seen_v1_resume")!),
-  ).toEqual([1, 2]);
-  act(() =>
-    document
-      .querySelector<HTMLButtonElement>('[aria-label="Next activity"]')!
-      .click(),
-  );
   expect(
     document.querySelector(".following-story-card")?.textContent,
   ).toContain("Next anime");

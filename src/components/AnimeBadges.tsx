@@ -8,12 +8,14 @@ export function AnimeBadges({
   id,
   averageScore,
   showRatingBrand = false,
+  showRating = providedScore !== null,
 }: {
   idMal?: number | null;
   id?: number;
   averageScore?: number | null;
   providedScore?: number | null;
   showRatingBrand?: boolean;
+  showRating?: boolean;
 }) {
   const element = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(false);
@@ -61,7 +63,7 @@ export function AnimeBadges({
   }, [idMal, visible, providedScore]);
   return (
     <div ref={element} className="anime-badges">
-      {providedScore !== null && (
+      {showRating && (
         <RatingPills
           id={id}
           idMal={idMal}

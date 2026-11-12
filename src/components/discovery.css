@@ -228,3 +228,13 @@
     max-width: 240px;
   }
 }
+
+.discovery-grid .anime-badges {
+  align-items: center;
+}
+.discovery-grid .poster-rating-number.rating-anilist {
+  color: #63c8ff;
+}
+.discovery-grid .poster-rating-number.rating-mal {
+  color: #b9a9ff;
+}

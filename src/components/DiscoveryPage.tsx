@@ -427,6 +427,7 @@ export function DiscoveryPage({
               </div>
             </div>
             <AnimeBadges
+              showRating
               id={anime.id}
               idMal={anime.idMal}
               averageScore={
