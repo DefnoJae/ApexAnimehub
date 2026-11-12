@@ -16,8 +16,11 @@ function mediaUrl(value) {
 }
 
 async function read(url, signal, headers = {}) {
-  const response = await fetch(url, { signal, redirect: "error", headers });
-  if (!response.ok) throw new Error("Re:Anime request failed");
+  const response = await fetch(url, {
+    signal, redirect: "error",
+    headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36", ...headers },
+  });
+  if (!response.ok) throw new Error("Re:Anime upstream " + new URL(url).hostname + " returned " + response.status);
   return response;
 }
 
