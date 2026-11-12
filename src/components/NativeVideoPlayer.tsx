@@ -1,310 +1,997 @@
 import React, { useEffect, useRef, useState } from "react";
-import Artplayer from "artplayer";
 import Hls from "hls.js";
+import {
+  ArrowLeft,
+  AudioLines,
+  Layers,
+  ListVideo,
+  Maximize,
+  MessageSquare,
+  Pause,
+  PictureInPicture2,
+  Play,
+  RotateCcw,
+  RotateCw,
+  Settings,
+  SkipBack,
+  SkipForward,
+  Volume2,
+  VolumeX,
+} from "lucide-react";
 import type { PlayerProps } from "./VideoPlayer";
-import "./nativeVideoPlayer.css";
-import { Maximize, X } from "lucide-react";
-import { SignSync } from "./SignSync";
 import { usePlayerKeyboard } from "../hooks/usePlayerKeyboard";
-function controlButton(label: string, path: string, disabled = false) {
-  return `<button type="button" aria-label="${label}" ${disabled ? "disabled" : ""} style="display:flex;align-items:center;background:none;border:0;color:inherit;padding:4px;cursor:pointer;opacity:${disabled ? ".35" : "1"}"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">${path}</svg></button>`;
+import { fetchHeroArtwork } from "../utils/heroArtwork";
+import {
+  fetchEpisodeMetadata,
+  type EpisodeMetadata,
+} from "../utils/episodeMetadata";
+import {
+  playbackTime,
+  readEpisodeProgress,
+  resumeSeconds,
+  saveEpisodeProgress,
+} from "../utils/playbackResume";
+import { StyledSigns } from "./StyledSigns";
+import { SignSync } from "./SignSync";
+import "./nativeVideoPlayer.css";
+import "./apexPlayer.css";
+
+type Track = { url: string; label: string; language?: string; format: string };
+type MediaSource = {
+  url: string;
+  subtitles: Track[];
+  provider: string;
+  quality: string;
+};
+type Menu = "episodes" | "captions" | "audio" | "sources" | "settings";
+type CaptionMode = "signs" | "full" | "off";
+
+function read(key: string) {
+  try {
+    return localStorage.getItem("apex_native_" + key);
+  } catch {
+    return null;
+  }
+}
+function remember(key: string, value: string) {
+  try {
+    localStorage.setItem("apex_native_" + key, value);
+  } catch {}
+}
+function trackKind(track: Track) {
+  if (/signs|songs|forced/i.test(track.label)) return "signs";
+  if (/\bcc\b|closed captions/i.test(track.label)) return "cc";
+  return "full";
 }
 
-export default function NativeVideoPlayer(
-  props: PlayerProps & { onFallback: () => void },
-) {
-  const host = useRef<HTMLDivElement>(null);
+export default function NativeVideoPlayer(props: PlayerProps) {
+  const url = new URL(props.stream.url, window.location.origin);
+  const id = Number(url.searchParams.get("id"));
+  const { episode } = props;
+  const audio = props.audio || "sub";
   const dialog = useRef<HTMLDivElement>(null);
-  const clock = useRef(0);
-  const instance = useRef<Artplayer>();
-  const animeId = Number(
-    new URL(props.stream.url, window.location.origin).searchParams.get("id"),
-  );
+  const video = useRef<HTMLVideoElement>(null);
+  const hls = useRef<Hls>();
   const callbacks = useRef(props);
   callbacks.current = props;
-  const [error, setError] = useState(""),
-    [loading, setLoading] = useState(true);
+  const [source, setSource] = useState<MediaSource>();
+  const [error, setError] = useState("");
+  const [menu, setMenu] = useState<Menu>();
+  const [paused, setPaused] = useState(true);
+  const [pauseOverlay, setPauseOverlay] = useState(false);
+  const [controls, setControls] = useState(true);
+  const [duration, setDuration] = useState(0);
+  const [position, setPosition] = useState(0);
+  const [muted, setMuted] = useState(false);
+  const [logo, setLogo] = useState("");
+  const [episodes, setEpisodes] = useState<Record<string, EpisodeMetadata>>({});
+  const [track, setTrack] = useState("");
+  const [ass, setAss] = useState("");
+  const [captionColor, setCaptionColor] = useState("#ffffff");
+  const [captionOutline, setCaptionOutline] = useState(true);
+  const [volume, setVolume] = useState(1);
+  const [captionMode, setCaptionMode] = useState<CaptionMode>(() =>
+    read("dub_captions") === "full"
+      ? "full"
+      : read("dub_captions") === "off"
+        ? "off"
+        : "signs",
+  );
+  const [autoNext, setAutoNext] = useState(() => read("auto_next") === "true");
+  const [jump, setJump] = useState(() => Number(read("jump")) || 10);
+  const [side, setSide] = useState(() => read("episode_panel") === "side");
+  const [fit, setFit] = useState<"contain" | "cover" | "fill">("contain");
+  const [speed, setSpeed] = useState(1);
+  const [quality, setQuality] = useState(-1);
+  const [levels, setLevels] = useState<number[]>([]);
+  const [captionSize, setCaptionSize] = useState(20);
+  const [captionBackground, setCaptionBackground] = useState(true);
+  const [filter, setFilter] = useState("none");
+  const [scrub, setScrub] = useState<number>();
+  const [saved] = useState(() =>
+    resumeSeconds(readEpisodeProgress(id, episode) || props.resume),
+  );
+  const [start, setStart] = useState<number | null>(saved ? null : 0);
+  const hideTimer = useRef<number>();
+  const watched = useRef(false);
+  const lastSaved = useRef(0);
+  const selectedTrack = useRef("");
+  const currentEpisode = episodes[episode];
+  const noFonts = useRef<string[]>([]);
+  const eligibleTracks = source?.subtitles || [];
+
+  const persist = (force = false) => {
+    const media = video.current;
+    if (!media || !Number.isFinite(media.duration) || media.duration <= 0)
+      return;
+    if (!force && Date.now() - lastSaved.current < 5000) return;
+    lastSaved.current = Date.now();
+    saveEpisodeProgress(id, episode, media.currentTime, media.duration);
+    callbacks.current.onProgress?.(media.currentTime, media.duration, episode);
+  };
+
+  useEffect(() => {
+    let active = true;
+    void fetchHeroArtwork(id).then((items) => {
+      if (active) setLogo(items[0] || "");
+    });
+    void fetchEpisodeMetadata(id, props.episodeCount).then((items) => {
+      if (active) setEpisodes(items);
+    });
+    return () => {
+      active = false;
+    };
+  }, [id, props.episodeCount]);
+
   useEffect(() => {
     const controller = new AbortController();
-    let player: Artplayer | undefined,
-      hls: Hls | undefined,
-      recorded = false,
-      advanced = false,
-      last = 0;
-    let autoNext = true;
-    try {
-      autoNext = localStorage.getItem("apex_player_auto_next") !== "false";
-    } catch {}
-    setError("");
-    setLoading(true);
-    const load = async () => {
-      try {
-        const response = await fetch(props.stream.url, {
-          signal: controller.signal,
-        });
+    const timeout = window.setTimeout(() => controller.abort(), 28000);
+    const fail = (message: string) => {
+      setError(message);
+      callbacks.current.onPlaybackSource?.("anipm", audio);
+    };
+    void fetch(props.stream.url, { signal: controller.signal })
+      .then(async (response) => {
         const data = await response.json();
-        if (!response.ok) throw new Error(data.error || "Source unavailable");
-        if (controller.signal.aborted || !host.current) return;
-        const captions = (data.subtitles || []).filter(
-          (track: { format?: string }) => track.format === "vtt",
-        );
-        player = new Artplayer({
-          container: host.current,
-          url: data.url,
-          type: "m3u8",
-          theme: "#b58aff",
-          autoplay: true,
-          fullscreen: false,
-          fullscreenWeb: false,
-          pip: true,
-          setting: true,
-          playbackRate: true,
-          aspectRatio: true,
-          subtitle: captions.length
-            ? { url: captions[0].url, type: "vtt" }
-            : undefined,
-          settings: [
-            {
-              name: "auto-next",
-              html: "Auto Next",
-              switch: autoNext,
-              onSwitch: (item) => {
-                autoNext = !item.switch;
-                try {
-                  localStorage.setItem(
-                    "apex_player_auto_next",
-                    String(autoNext),
-                  );
-                } catch {}
-                return autoNext;
-              },
-            },
-            ...(captions.length
-              ? [
-                  {
-                    name: "captions",
-                    html: "Subtitles",
-                    selector: [
-                      { html: "Off", url: "" },
-                      ...captions.map(
-                        (
-                          track: { label: string; url: string },
-                          index: number,
-                        ) => ({
-                          html: track.label,
-                          url: track.url,
-                          default: index === 0,
-                        }),
-                      ),
-                    ],
-                    onSelect: (item: { url?: unknown; html: string }) => {
-                      if (player) {
-                        player.subtitle.show = !!item.url;
-                        if (typeof item.url === "string" && item.url)
-                          player.subtitle.switch(item.url);
-                      }
-                      return item.html;
-                    },
-                  },
-                ]
-              : []),
-          ],
-          controls: [
-            {
-              name: "screen-fullscreen",
-              position: "right",
-              index: 90,
-              html: controlButton(
-                "Fullscreen player",
-                '<path d="M3 3h6v2H5v4H3zm12 0h6v6h-2V5h-4zM3 15h2v4h4v2H3zm16 0h2v6h-6v-2h4z"/>',
-              ),
-              tooltip: "Fullscreen",
-              click: () => {
-                if (document.fullscreenElement) void document.exitFullscreen();
-                else
-                  void dialog.current
-                    ?.requestFullscreen()
-                    .catch(() =>
-                      setError("Fullscreen is unavailable in this browser."),
-                    );
-              },
-            },
-            {
-              name: "previous-episode",
-              position: "left",
-              index: 21,
-              html: controlButton(
-                "Previous episode",
-                '<path d="M5 5h2v14H5zm14 0v14L8 12z"/>',
-                props.episode <= 1,
-              ),
-              tooltip: "Previous episode (B)",
-              click: () => {
-                if (callbacks.current.episode > 1)
-                  callbacks.current.onPrevious();
-              },
-            },
-            {
-              name: "next-episode",
-              position: "left",
-              index: 22,
-              html: controlButton(
-                "Next episode",
-                '<path d="M17 5h2v14h-2zM5 5l11 7-11 7z"/>',
-                !props.canNext,
-              ),
-              tooltip: "Next episode (N)",
-              click: () => {
-                if (callbacks.current.canNext) callbacks.current.onNext();
-              },
-            },
-          ],
-          customType: {
-            m3u8: (video: HTMLVideoElement, url: string) => {
-              if (Hls.isSupported()) {
-                hls = new Hls();
-                hls.loadSource(url);
-                hls.attachMedia(video);
-                hls.on(Hls.Events.ERROR, (_event, detail) => {
-                  if (detail.fatal)
-                    setError("This stream failed. Try MegaPlay below.");
-                });
-              } else if (video.canPlayType("application/vnd.apple.mpegurl"))
-                video.src = url;
-              else setError("HLS playback is unavailable in this browser.");
-            },
-          },
-        });
-        instance.current = player;
-        player.on("video:timeupdate", () => {
-          if (!player || controller.signal.aborted) return;
-          clock.current = player.currentTime;
-          const position = player.currentTime,
-            duration = player.duration;
-          if (!Number.isFinite(duration) || duration <= 0) return;
-          if (Date.now() - last > 5000) {
-            callbacks.current.onProgress?.(position, duration);
-            last = Date.now();
-          }
-          if (
-            !recorded &&
-            callbacks.current.accounts.autoSync &&
-            position >= duration * 0.8
-          ) {
-            recorded = true;
-            callbacks.current.onWatched();
-          }
-        });
-        player.on("video:error", () =>
-          setError("Video could not load. Try MegaPlay below."),
-        );
-        player.on("video:ended", () => {
-          if (
-            !controller.signal.aborted &&
-            !advanced &&
-            autoNext &&
-            callbacks.current.canNext
-          ) {
-            advanced = true;
-            callbacks.current.onNext();
-          }
-        });
-        player.on("ready", () => setLoading(false));
-        setLoading(false);
-      } catch (reason) {
-        if (!controller.signal.aborted) {
-          setError(
-            reason instanceof Error ? reason.message : "Source unavailable",
+        if (
+          !response.ok ||
+          typeof data.url !== "string" ||
+          data.audio !== audio
+        )
+          throw new Error(data.error || "No compatible stream is available.");
+        if (!controller.signal.aborted)
+          setSource({
+            ...data,
+            subtitles: Array.isArray(data.subtitles)
+              ? data.subtitles.filter(
+                  (item: Track) =>
+                    item.format === "vtt" || item.format === "ass",
+                )
+              : [],
+          });
+      })
+      .catch((reason) => {
+        if (!controller.signal.aborted)
+          fail(
+            reason instanceof Error ? reason.message : "Playback unavailable.",
           );
-          setLoading(false);
-        }
-      }
-    };
-    void load();
+        else if (!disposed) fail("The source took too long to respond.");
+      })
+      .finally(() => window.clearTimeout(timeout));
+    let disposed = false;
     return () => {
+      disposed = true;
+      window.clearTimeout(timeout);
       controller.abort();
-      instance.current = undefined;
-      hls?.destroy();
-      player?.destroy(true);
     };
-  }, [props.stream.url]);
-  usePlayerKeyboard(dialog, {
-    toggle: () => instance.current?.toggle(),
-    seek: (seconds) => {
-      const player = instance.current;
-      if (player)
-        player.currentTime = Math.max(
-          0,
-          Math.min(player.duration || Infinity, player.currentTime + seconds),
+  }, [props.stream.url, audio]);
+
+  useEffect(() => {
+    if (!source || start === null || !video.current) return;
+    const media = video.current;
+    let engine: Hls | undefined;
+    let failed = false;
+    let started = false;
+    const fallback = () => {
+      if (failed) return;
+      failed = true;
+      if (started && Number.isFinite(media.duration) && media.duration > 0) {
+        saveEpisodeProgress(id, episode, media.currentTime, media.duration);
+        callbacks.current.onProgress?.(
+          media.currentTime,
+          media.duration,
+          episode,
         );
-    },
-    fullscreen: () =>
-      document.fullscreenElement
-        ? document.exitFullscreen()
-        : dialog.current?.requestFullscreen(),
+      }
+      setError("The stream stopped. Opening Ani.pm…");
+      callbacks.current.onPlaybackSource?.("anipm", audio);
+    };
+    const load = () => {
+      if (start > 0 && start < media.duration) media.currentTime = start;
+      started = true;
+      void media.play().catch(() => {});
+    };
+    const startup = window.setTimeout(fallback, 22000);
+    const clearStartup = () => window.clearTimeout(startup);
+    media.addEventListener("loadedmetadata", load, { once: true });
+    media.addEventListener("canplay", clearStartup, { once: true });
+    media.addEventListener("error", fallback);
+    if (Hls.isSupported()) {
+      engine = new Hls({ startPosition: start });
+      hls.current = engine;
+      engine.on(Hls.Events.MANIFEST_PARSED, () => {
+        if (!engine) return;
+        const heights = engine.levels.map((level) => level.height);
+        setLevels(heights);
+        const preferred = heights.lastIndexOf(1080);
+        const best =
+          preferred >= 0 ? preferred : heights.indexOf(Math.max(...heights));
+        if (best >= 0) {
+          engine.startLevel = best;
+          engine.autoLevelCapping = best;
+        }
+      });
+      engine.on(Hls.Events.ERROR, (_event, detail) => {
+        if (detail.fatal) fallback();
+      });
+      engine.attachMedia(media);
+      engine.loadSource(source.url);
+    } else if (media.canPlayType("application/vnd.apple.mpegurl")) {
+      media.src = source.url;
+    } else fallback();
+    return () => {
+      clearStartup();
+      media.removeEventListener("loadedmetadata", load);
+      media.removeEventListener("canplay", clearStartup);
+      media.removeEventListener("error", fallback);
+      engine?.destroy();
+      hls.current = undefined;
+    };
+  }, [source, start, id, episode, audio]);
+
+  useEffect(() => {
+    if (!source) return;
+    const english = source.subtitles.filter(
+      (item) =>
+        /^(en|eng)(-|$)|english/i.test(item.language || item.label) ||
+        /english/i.test(item.label),
+    );
+    const preference = audio === "sub" ? "full" : captionMode;
+    const match =
+      preference === "full"
+        ? english.find((item) => trackKind(item) === "cc") ||
+          english.find((item) => trackKind(item) === "full")
+        : preference === "signs"
+          ? english.find((item) => trackKind(item) === "signs")
+          : undefined;
+    setTrack(match?.url || "");
+  }, [source, audio, captionMode]);
+
+  useEffect(() => {
+    setAss("");
+    const selected = source?.subtitles.find((item) => item.url === track);
+    if (selected?.format !== "ass") return;
+    const controller = new AbortController();
+    void fetch(selected.url, { signal: controller.signal, credentials: "omit" })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Subtitle unavailable");
+        const text = await response.text();
+        if (text.length > 1000000 || !text.includes("[Script Info]"))
+          throw new Error("Invalid subtitle track");
+        if (!controller.signal.aborted) setAss(text);
+      })
+      .catch(() => {
+        if (!controller.signal.aborted)
+          setError("Styled subtitles could not load. Try another track.");
+      });
+    return () => controller.abort();
+  }, [track, source]);
+
+  useEffect(() => {
+    const media = video.current;
+    if (!media) return;
+    const sync = () => {
+      Array.from(media.querySelectorAll("track")).forEach((item) => {
+        item.track.mode =
+          item.getAttribute("src") === track ? "showing" : "disabled";
+      });
+    };
+    sync();
+    media.textTracks.addEventListener?.("addtrack", sync);
+    return () => media.textTracks.removeEventListener?.("addtrack", sync);
+  }, [track, source]);
+
+  useEffect(() => {
+    if (!paused || start === null || !duration) {
+      setPauseOverlay(false);
+      return;
+    }
+    const timer = window.setTimeout(() => setPauseOverlay(true), 550);
+    return () => window.clearTimeout(timer);
+  }, [paused, start, duration]);
+
+  useEffect(() => {
+    if (paused || menu) {
+      setControls(true);
+      return;
+    }
+    hideTimer.current = window.setTimeout(() => setControls(false), 3000);
+    return () => window.clearTimeout(hideTimer.current);
+  }, [paused, menu]);
+
+  const reveal = () => {
+    setControls(true);
+    window.clearTimeout(hideTimer.current);
+    if (!paused && !menu)
+      hideTimer.current = window.setTimeout(() => setControls(false), 3000);
+  };
+  const toggle = () => {
+    if (start === null) return;
+    const media = video.current;
+    if (media?.paused) void media.play().catch(() => {});
+    else media?.pause();
+  };
+  const seek = (seconds: number) => {
+    if (video.current && duration > 0)
+      video.current.currentTime = Math.max(0, Math.min(duration, seconds));
+  };
+  const fullscreen = () =>
+    document.fullscreenElement
+      ? document.exitFullscreen()
+      : dialog.current?.requestFullscreen();
+  const chooseEpisode = (number: number) => {
+    persist(true);
+    setMenu(undefined);
+    callbacks.current.onEpisodeChange?.(number, audio);
+  };
+  const switchAudio = (language: "sub" | "dub") => {
+    persist(true);
+    props.onPlaybackSource?.("apex", language);
+  };
+  const toggleCaptions = () => {
+    if (track) {
+      selectedTrack.current = track;
+      setTrack("");
+    } else if (selectedTrack.current) setTrack(selectedTrack.current);
+    else setMenu("captions");
+  };
+  usePlayerKeyboard(dialog, {
+    toggle,
+    seek: (seconds) =>
+      seek((video.current?.currentTime || 0) + Math.sign(seconds) * jump),
+    fullscreen,
+    captions: toggleCaptions,
     next: () => {
-      if (callbacks.current.canNext) callbacks.current.onNext();
+      if (props.canNext) chooseEpisode(episode + 1);
     },
     previous: () => {
-      if (callbacks.current.episode > 1) callbacks.current.onPrevious();
+      if (episode > 1) chooseEpisode(episode - 1);
     },
-    error: (reason) =>
-      setError(
-        reason instanceof Error ? reason.message : "Player command failed.",
-      ),
+    error: () => setError("This playback action is unavailable."),
   });
+  const showMenu = (name: Menu) =>
+    setMenu((current) => (current === name ? undefined : name));
+  const icon = (
+    label: string,
+    content: React.ReactNode,
+    action: () => void,
+    disabled = false,
+    active = false,
+  ) => (
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      onClick={action}
+      disabled={disabled}
+      className={active ? "is-active" : ""}
+    >
+      {content}
+    </button>
+  );
+  const episodeNumbers = Array.from(
+    {
+      length: Math.min(
+        props.episodeCount ||
+          Math.max(episode, ...Object.keys(episodes).map(Number)),
+        2000,
+      ),
+    },
+    (_, i) => i + 1,
+  );
+
   return (
     <div
       ref={dialog}
       tabIndex={-1}
       role="dialog"
       aria-modal="true"
-      aria-label="Anime video player"
-      className="apex-native-player fixed inset-0 z-[500] bg-black text-white flex flex-col"
+      aria-label="Apex Player"
+      className="apex-native-player apex-cinema"
+      onPointerMove={reveal}
+      onKeyDown={(event) => {
+        if (event.key === "Escape" && menu) {
+          event.stopPropagation();
+          setMenu(undefined);
+        }
+      }}
+      style={
+        {
+          "--apex-caption-size": captionSize + "px",
+          "--apex-caption-bg": captionBackground ? "#000c" : "transparent",
+          "--apex-caption-color": captionColor,
+          "--apex-caption-outline": captionOutline
+            ? "1px 1px 2px #000, -1px -1px 2px #000"
+            : "none",
+        } as React.CSSProperties
+      }
     >
-      <div className="native-player-header shrink-0 flex gap-4 px-4 py-2 text-sm">
-        <span className="flex-1">
-          {props.title} · Episode {props.episode} · Apex Player (Sub)
-        </span>
-        <button onClick={props.onFallback}>Use MegaPlay</button>
-        <SignSync
-          key={`${animeId}:${props.episode}`}
-          animeId={animeId}
-          episode={props.episode}
-          language="sub"
-          root={dialog}
-          position={() => clock.current}
-        />
-        <button
-          className="player-header-icon"
-          aria-label="Fullscreen video"
-          title="Fullscreen"
-          onClick={() =>
-            void dialog.current
-              ?.requestFullscreen()
-              .catch(() =>
-                setError("Fullscreen is unavailable in this browser."),
-              )
+      <video
+        ref={video}
+        playsInline
+        preload="metadata"
+        poster={currentEpisode?.image}
+        style={{ objectFit: fit, filter }}
+        muted={muted}
+        onClick={(event) => {
+          if (window.matchMedia("(pointer: coarse)").matches) reveal();
+          else toggle();
+        }}
+        onDoubleClick={(event) => {
+          if (!window.matchMedia("(pointer: coarse)").matches) return;
+          seek(
+            position + (event.clientX < window.innerWidth / 2 ? -jump : jump),
+          );
+        }}
+        onLoadedMetadata={(event) => setDuration(event.currentTarget.duration)}
+        onPlay={() => setPaused(false)}
+        onPause={() => {
+          setPaused(true);
+          persist(true);
+        }}
+        onTimeUpdate={(event) => {
+          const media = event.currentTarget;
+          setPosition(media.currentTime);
+          persist();
+          if (
+            !watched.current &&
+            props.accounts.autoSync &&
+            Number.isFinite(media.duration) &&
+            media.duration > 0 &&
+            media.currentTime >= media.duration * 0.8
+          ) {
+            watched.current = true;
+            props.onWatched(episode);
           }
-        >
-          <Maximize size={18} />
-        </button>
-        <button
-          className="player-header-icon"
-          onClick={props.onClose}
-          aria-label="Close video player"
-          title="Close player"
-        >
-          <X size={20} />
-        </button>
-      </div>
-      {loading && <p role="status">Loading episode source…</p>}
-      {error && (
-        <p role="alert" className="px-4 text-amber-300">
+        }}
+        onEnded={() => {
+          persist(true);
+          if (autoNext && props.canNext) chooseEpisode(episode + 1);
+        }}
+      >
+        {eligibleTracks
+          .filter((item) => item.format === "vtt")
+          .map((item) => (
+            <track
+              key={item.url}
+              src={item.url}
+              label={item.label}
+              kind="subtitles"
+              srcLang={item.language || "en"}
+            />
+          ))}
+      </video>
+      {ass && (
+        <StyledSigns
+          ass={ass}
+          fonts={noFonts.current}
+          root={dialog}
+          position={() => video.current?.currentTime || 0}
+          delay={0}
+          onFailure={() => {
+            setAss("");
+            setError("Styled subtitles could not render. Try another track.");
+          }}
+        />
+      )}
+
+      <header className="apex-player-top" hidden={!controls && start !== null}>
+        {icon("Back to anime details", <ArrowLeft />, () => {
+          persist(true);
+          props.onClose();
+        })}
+        <span>
+          {props.title} · Episode {episode}
+          {currentEpisode?.title ? " · " + currentEpisode.title : ""}
+        </span>
+      </header>
+      {error ? (
+        <p role="alert" className="apex-player-status">
           {error}
         </p>
+      ) : !source && start !== null ? (
+        <p role="status" className="apex-player-status">
+          Finding a stream…
+        </p>
+      ) : null}
+      {start === null && (
+        <div className="anipm-resume-prompt">
+          <h2>Continue watching?</h2>
+          <p>
+            {props.title} · Episode {episode}
+          </p>
+          <div>
+            <button onClick={() => setStart(saved)}>
+              Continue from {playbackTime(saved)}
+            </button>
+            <button onClick={() => setStart(0)}>
+              Start from the beginning
+            </button>
+          </div>
+        </div>
       )}
-      <div ref={host} className="flex-1 min-h-0" />
+      {pauseOverlay && !menu && (
+        <div className="apex-player-pause">
+          <div>
+            {logo ? (
+              <img src={logo} alt={props.title} onError={() => setLogo("")} />
+            ) : (
+              <h2>{props.title}</h2>
+            )}
+            <strong>
+              Episode {episode}
+              {currentEpisode?.title ? " · " + currentEpisode.title : ""}
+            </strong>
+            {currentEpisode?.overview && <p>{currentEpisode.overview}</p>}
+            <small>{playbackTime(Math.max(0, duration - position))} left</small>
+          </div>
+          {icon("Play", <Play fill="currentColor" />, toggle)}
+        </div>
+      )}
+      {menu === "episodes" && (
+        <section
+          className={"apex-player-episodes" + (side ? " is-side" : "")}
+          aria-label="Episodes"
+        >
+          <header>
+            <h2>Episodes</h2>
+            <button onClick={() => setMenu(undefined)}>Close</button>
+          </header>
+          <div
+            className="apex-episode-strip"
+            onKeyDown={(event) => {
+              if (
+                !["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(
+                  event.key,
+                )
+              )
+                return;
+              const target = event.target as HTMLElement;
+              const next = ["ArrowRight", "ArrowDown"].includes(event.key)
+                ? target.nextElementSibling
+                : target.previousElementSibling;
+              if (next instanceof HTMLElement) {
+                event.preventDefault();
+                next.focus();
+                next.scrollIntoView({ block: "nearest", inline: "nearest" });
+              }
+            }}
+          >
+            {episodeNumbers.map((number) => (
+              <button
+                key={number}
+                type="button"
+                autoFocus={number === episode}
+                aria-current={number === episode ? "true" : undefined}
+                onClick={() => chooseEpisode(number)}
+              >
+                {episodes[number]?.image && (
+                  <img src={episodes[number].image} alt="" loading="lazy" />
+                )}
+                <span>
+                  Ep {number} · {episodes[number]?.title || "Episode " + number}
+                </span>
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
+      {menu && menu !== "episodes" && (
+        <section className="apex-player-menu" aria-label={menu}>
+          <header>
+            <h2>
+              {menu === "captions"
+                ? "Subtitles"
+                : menu === "sources"
+                  ? "Sources"
+                  : menu === "audio"
+                    ? "Audio"
+                    : "Settings"}
+            </h2>
+            <button onClick={() => setMenu(undefined)}>Close</button>
+          </header>
+          {menu === "captions" && (
+            <>
+              <button aria-pressed={!track} onClick={() => setTrack("")}>
+                Off
+              </button>
+              {(
+                [
+                  ["signs", "Signs & Songs"],
+                  ["full", "Full subtitles"],
+                  ["cc", "Closed captions"],
+                ] as const
+              ).map(([kind, label]) => (
+                <div key={kind}>
+                  <strong>{label}</strong>
+                  {eligibleTracks
+                    .filter((item) => trackKind(item) === kind)
+                    .map((item) => (
+                      <button
+                        key={item.url}
+                        aria-pressed={track === item.url}
+                        onClick={() => setTrack(item.url)}
+                      >
+                        {item.label}
+                      </button>
+                    ))}
+                </div>
+              ))}
+              <label>
+                On English dub
+                <select
+                  value={captionMode}
+                  onChange={(event) => {
+                    const mode = event.target.value as CaptionMode;
+                    setCaptionMode(mode);
+                    remember("dub_captions", mode);
+                  }}
+                >
+                  <option value="signs">Prefer Signs & Songs</option>
+                  <option value="full">Prefer full English CC</option>
+                  <option value="off">Off</option>
+                </select>
+              </label>
+              <label>
+                Dialogue size
+                <input
+                  type="range"
+                  min="14"
+                  max="38"
+                  value={captionSize}
+                  onChange={(e) => setCaptionSize(Number(e.target.value))}
+                />
+              </label>
+              <label>
+                Dialogue color
+                <input
+                  type="color"
+                  value={captionColor}
+                  onChange={(e) => setCaptionColor(e.target.value)}
+                />
+              </label>
+              <label>
+                Dialogue outline
+                <input
+                  type="checkbox"
+                  checked={captionOutline}
+                  onChange={(e) => setCaptionOutline(e.target.checked)}
+                />
+              </label>
+              <label>
+                Dialogue background
+                <input
+                  type="checkbox"
+                  checked={captionBackground}
+                  onChange={(e) => setCaptionBackground(e.target.checked)}
+                />
+              </label>
+            </>
+          )}
+          {menu === "audio" && (
+            <>
+              <button
+                aria-pressed={audio === "sub"}
+                onClick={() => switchAudio("sub")}
+              >
+                Japanese · English subtitles
+              </button>
+              <button
+                aria-pressed={audio === "dub"}
+                onClick={() => switchAudio("dub")}
+              >
+                English dub · Ani.pm fallback
+              </button>
+              <label>
+                Volume
+                <input
+                  type="range"
+                  min="0"
+                  max="1"
+                  step=".05"
+                  value={volume}
+                  onChange={(e) => {
+                    const value = Number(e.target.value);
+                    setVolume(value);
+                    if (video.current) video.current.volume = value;
+                  }}
+                />
+              </label>
+            </>
+          )}
+          {menu === "sources" && (
+            <>
+              <button aria-pressed="true" onClick={() => setMenu(undefined)}>
+                {source?.provider || "Auto"} ·{" "}
+                {source?.quality === "auto"
+                  ? "Auto quality"
+                  : source?.quality || "Checking"}
+                <small>
+                  {audio === "sub" ? "Japanese" : "English"} ·{" "}
+                  {eligibleTracks.length} subtitle tracks
+                </small>
+              </button>
+              <button
+                onClick={() => {
+                  persist(true);
+                  props.onPlaybackSource?.("anipm", audio);
+                }}
+              >
+                Ani.pm
+              </button>
+              <button
+                onClick={() => {
+                  persist(true);
+                  props.onPlaybackSource?.("megaplay", audio);
+                }}
+              >
+                MegaPlay
+              </button>
+            </>
+          )}
+          {menu === "settings" && (
+            <>
+              <label>
+                Quality
+                <select
+                  value={quality}
+                  onChange={(e) => {
+                    const value = Number(e.target.value);
+                    setQuality(value);
+                    if (hls.current) hls.current.currentLevel = value;
+                  }}
+                >
+                  <option value={-1}>Auto · prefer 1080p</option>
+                  {levels.map((height, index) => (
+                    <option key={index} value={index}>
+                      {height}p
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Speed
+                <select
+                  value={speed}
+                  onChange={(e) => {
+                    const value = Number(e.target.value);
+                    setSpeed(value);
+                    if (video.current) video.current.playbackRate = value;
+                  }}
+                >
+                  {[0.5, 0.75, 1, 1.25, 1.5, 2].map((rate) => (
+                    <option key={rate} value={rate}>
+                      {rate}×
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Video fit
+                <select
+                  value={fit}
+                  onChange={(e) => setFit(e.target.value as typeof fit)}
+                >
+                  <option value="contain">Contain</option>
+                  <option value="cover">Cover</option>
+                  <option value="fill">Fill</option>
+                </select>
+              </label>
+              <label>
+                Skip interval
+                <select
+                  value={jump}
+                  onChange={(e) => {
+                    setJump(Number(e.target.value));
+                    remember("jump", e.target.value);
+                  }}
+                >
+                  {[5, 10, 15, 30].map((value) => (
+                    <option key={value} value={value}>
+                      {value}s
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Episode panel
+                <select
+                  value={side ? "side" : "bottom"}
+                  onChange={(e) => {
+                    setSide(e.target.value === "side");
+                    remember("episode_panel", e.target.value);
+                  }}
+                >
+                  <option value="bottom">Bottom</option>
+                  <option value="side">Right</option>
+                </select>
+              </label>
+              <label>
+                Video filter
+                <select
+                  value={filter}
+                  onChange={(e) => setFilter(e.target.value)}
+                >
+                  <option value="none">Off</option>
+                  <option value="brightness(1.15)">Brighter</option>
+                  <option value="contrast(1.12)">More contrast</option>
+                </select>
+              </label>
+              <label>
+                Auto next
+                <input
+                  type="checkbox"
+                  checked={autoNext}
+                  onChange={(e) => {
+                    setAutoNext(e.target.checked);
+                    remember("auto_next", String(e.target.checked));
+                  }}
+                />
+              </label>
+            </>
+          )}
+        </section>
+      )}
+      {start !== null && (
+        <footer className="apex-player-bottom" hidden={!controls}>
+          <div className="apex-player-timeline">
+            {scrub !== undefined && (
+              <output
+                style={{
+                  left: `${Math.max(8, Math.min(92, (scrub / (duration || 1)) * 100))}%`,
+                }}
+              >
+                {playbackTime(scrub)}
+              </output>
+            )}
+            <input
+              aria-label="Playback position"
+              type="range"
+              min="0"
+              max={duration || 0}
+              step=".1"
+              value={position}
+              onChange={(e) => seek(Number(e.target.value))}
+              onPointerMove={(e) => {
+                const box = e.currentTarget.getBoundingClientRect();
+                setScrub(
+                  Math.max(
+                    0,
+                    Math.min(
+                      duration,
+                      ((e.clientX - box.left) / box.width) * duration,
+                    ),
+                  ),
+                );
+              }}
+              onPointerLeave={() => setScrub(undefined)}
+            />
+          </div>
+          <div className="apex-player-tray">
+            <div>
+              {icon(
+                paused ? "Play" : "Pause",
+                paused ? <Play /> : <Pause />,
+                toggle,
+              )}
+              <span className="apex-player-pill">
+                {icon("Back " + jump + " seconds", <RotateCcw />, () =>
+                  seek(position - jump),
+                )}
+                {icon("Forward " + jump + " seconds", <RotateCw />, () =>
+                  seek(position + jump),
+                )}
+              </span>
+              {icon(
+                muted ? "Unmute" : "Mute",
+                muted ? <VolumeX /> : <Volume2 />,
+                () => setMuted(!muted),
+              )}
+              {icon(
+                "Previous episode (B)",
+                <SkipBack />,
+                () => chooseEpisode(episode - 1),
+                episode <= 1,
+              )}
+              {icon(
+                "Next episode (N)",
+                <SkipForward />,
+                () => chooseEpisode(episode + 1),
+                !props.canNext,
+              )}
+              <span className="apex-player-time">
+                {playbackTime(position)} / {playbackTime(duration)}
+              </span>
+            </div>
+            <div>
+              {icon(
+                "Episodes",
+                <ListVideo />,
+                () => showMenu("episodes"),
+                false,
+                menu === "episodes",
+              )}
+              {icon(
+                "Subtitles (C)",
+                <MessageSquare />,
+                () => showMenu("captions"),
+                false,
+                menu === "captions" || !!track,
+              )}
+              {icon(
+                "Audio",
+                <AudioLines />,
+                () => showMenu("audio"),
+                false,
+                menu === "audio",
+              )}
+              {icon(
+                "Sources",
+                <Layers />,
+                () => showMenu("sources"),
+                false,
+                menu === "sources",
+              )}
+              {icon(
+                "Settings",
+                <Settings />,
+                () => showMenu("settings"),
+                false,
+                menu === "settings",
+              )}
+              {icon(
+                "Picture in picture",
+                <PictureInPicture2 />,
+                () => {
+                  const action = document.pictureInPictureElement
+                    ? document.exitPictureInPicture()
+                    : video.current?.requestPictureInPicture?.();
+                  void action?.catch(() =>
+                    setError("Picture in picture is unavailable."),
+                  );
+                },
+                !document.pictureInPictureEnabled,
+              )}
+              {icon(
+                "Fullscreen (F)",
+                <Maximize />,
+                () =>
+                  void fullscreen()?.catch(() =>
+                    setError("Fullscreen is unavailable."),
+                  ),
+              )}
+            </div>
+          </div>
+          <SignSync
+            key={id + ":" + episode}
+            animeId={id}
+            episode={episode}
+            language={audio}
+            root={dialog}
+            position={() => video.current?.currentTime || 0}
+          />
+        </footer>
+      )}
     </div>
   );
 }

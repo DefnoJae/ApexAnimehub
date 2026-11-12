@@ -1,6 +1,10 @@
 import React, { useEffect, useRef, useState } from "react";
 import type { useAccounts } from "../hooks/useAccounts";
+import type { AudioLanguage, PlaybackSource } from "../hooks/usePageRoute";
 export interface PlayerProps {
+  episodeCount?: number;
+  audio?: AudioLanguage;
+  onPlaybackSource?: (source: PlaybackSource, audio: AudioLanguage) => void;
   resume?: { position?: number; duration?: number };
   title: string;
   episode: number;
@@ -34,8 +38,6 @@ export function trustedPlaybackMessage(
 const NativeVideoPlayer = React.lazy(() => import("./NativeVideoPlayer"));
 const AniPmPlayer = React.lazy(() => import("./AniPmPlayer"));
 export function VideoPlayer(props: PlayerProps) {
-  const [fallback, setFallback] = useState(false);
-  useEffect(() => setFallback(false), [props.stream.url]);
   if (
     new URL(props.stream.url, window.location.origin).origin ===
     "https://ani.pm"
@@ -49,26 +51,13 @@ export function VideoPlayer(props: PlayerProps) {
       </React.Suspense>
     );
   const native = props.stream.url.startsWith("/api/playback?");
-  if (native && !fallback)
+  if (native)
     return (
       <React.Suspense fallback={<p role="status">Loading player…</p>}>
-        <NativeVideoPlayer {...props} onFallback={() => setFallback(true)} />
+        <NativeVideoPlayer key={props.stream.url} {...props} />
       </React.Suspense>
     );
-  const params = new URL(props.stream.url, window.location.origin).searchParams;
-  return (
-    <EmbedVideoPlayer
-      {...props}
-      stream={
-        native
-          ? {
-              name: "MegaPlay (Sub)",
-              url: `https://megaplay.buzz/stream/ani/${params.get("id")}/${props.episode}/sub?color=b58aff`,
-            }
-          : props.stream
-      }
-    />
-  );
+  return <EmbedVideoPlayer {...props} />;
 }
 function EmbedVideoPlayer({
   title,

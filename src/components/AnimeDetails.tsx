@@ -1,3 +1,4 @@
+import { preferredPlaybackSource } from "../hooks/usePageRoute";
 import { StyledSelect } from "./StyledSelect";
 import React, { lazy, Suspense, useState } from "react";
 import {
@@ -112,7 +113,9 @@ export function AnimeDetails({
   );
   const [expanded, setExpanded] = useState(false);
   const [orderId, setOrderId] = useState<number | null>(null);
-  const [source, setSource] = useState<"apex" | "megaplay" | "anipm">("anipm");
+  const [source, setSource] = useState<"apex" | "megaplay" | "anipm">(
+    preferredPlaybackSource,
+  );
   const [audio, setAudio] = useState<"sub" | "dub">(() => {
     try {
       return localStorage.getItem("apex_episode_language") === "dub"
@@ -255,15 +258,7 @@ export function AnimeDetails({
               <div className="detail-actions">
                 <button
                   className="detail-continue"
-                  onClick={() =>
-                    onPlay(
-                      selected,
-                      audio,
-                      audio === "dub" && source === "apex"
-                        ? "megaplay"
-                        : source,
-                    )
-                  }
+                  onClick={() => onPlay(selected, audio, source)}
                 >
                   <Play size={18} fill="currentColor" />
                   {selected !== continueEpisode
@@ -405,13 +400,7 @@ export function AnimeDetails({
                 selected={selected}
                 accounts={accounts}
                 onSelect={onEpisode}
-                onPlay={(episode) =>
-                  onPlay(
-                    episode,
-                    audio,
-                    audio === "dub" && source === "apex" ? "megaplay" : source,
-                  )
-                }
+                onPlay={(episode) => onPlay(episode, audio, source)}
                 onLanguage={changeAudio}
               />
             </div>
@@ -504,19 +493,13 @@ export function AnimeDetails({
               Source
               <StyledSelect
                 aria-label="Playback source"
-                value={
-                  audio === "dub" && source === "apex" ? "megaplay" : source
-                }
+                value={source}
                 onChange={(e) =>
                   setSource(e.target.value as "apex" | "megaplay" | "anipm")
                 }
               >
                 <option value="anipm">Ani.pm (Sub &amp; Dub)</option>
-                {audio === "sub" && (
-                  <option value="apex">
-                    Apex Player · AnimeParadise (Sub)
-                  </option>
-                )}
+                <option value="apex">Apex Player</option>
                 <option value="megaplay">MegaPlay</option>
               </StyledSelect>
             </label>

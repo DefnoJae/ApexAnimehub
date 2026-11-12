@@ -23,6 +23,7 @@ import { DiscoveryPage } from "./components/DiscoveryPage";
 import {
   animePage,
   episodePage,
+  preferredPlaybackSource,
   sectionPaths,
   usePageRoute,
   PlaybackSource,
@@ -30,6 +31,12 @@ import {
 } from "./hooks/usePageRoute";
 import { detailQuery } from "./utils/detailQuery";
 import { fetchHomeCatalog, HomeRow, pickHeroSlides } from "./utils/homeRows";
+
+function rememberPlayer(source: PlaybackSource) {
+  try {
+    localStorage.setItem("apex_playback_source", source);
+  } catch {}
+}
 
 const THEME_COLOR = "8B5CF6";
 
@@ -69,7 +76,7 @@ export default function App() {
     route.source === "anipm"
       ? `Ani.pm (${route.audio === "dub" ? "Dub" : "Sub"})`
       : route.source === "apex"
-        ? "Apex Player (Sub)"
+        ? `Apex Player (${route.audio === "dub" ? "Dub" : "Sub"})`
         : `MegaPlay (${route.audio === "dub" ? "Dub" : "Sub"})`;
   const playingStream =
     route.play &&
@@ -83,7 +90,7 @@ export default function App() {
             route.source === "anipm"
               ? aniPmUrl(route.animeId!, activeEpisode, route.audio)
               : route.source === "apex"
-                ? `/api/playback?id=${route.animeId}&episode=${activeEpisode}`
+                ? `/api/playback?id=${route.animeId}&episode=${activeEpisode}&audio=${route.audio}`
                 : `https://megaplay.buzz/stream/ani/${route.animeId}/${activeEpisode}/${route.audio}?color=${THEME_COLOR}`,
           isEmbed: route.source !== "apex",
         }
@@ -382,9 +389,10 @@ export default function App() {
     if (startStream) {
       const source: PlaybackSource = startStream.startsWith("Ani.pm")
         ? "anipm"
-        : startStream === "Apex Player (Sub)"
+        : startStream.startsWith("Apex Player")
           ? "apex"
           : "megaplay";
+      rememberPlayer(source);
       navigate(
         episodePage(
           anime.id,
@@ -407,14 +415,8 @@ export default function App() {
     source: PlaybackSource = "anipm",
   ) => {
     if (!selectedAnime || selectedAnime.id !== route.animeId) return;
-    navigate(
-      episodePage(
-        selectedAnime.id,
-        episode,
-        audio,
-        source === "apex" && audio === "dub" ? "megaplay" : source,
-      ),
-    );
+    rememberPlayer(source);
+    navigate(episodePage(selectedAnime.id, episode, audio, source));
   };
   const changeEpisode = (direction: "next" | "prev") => {
     const episode = activeEpisode + (direction === "next" ? 1 : -1);
@@ -501,6 +503,14 @@ export default function App() {
           episode={activeEpisode}
           stream={playingStream}
           canNext={canNextEpisode}
+          episodeCount={availableEpisodes}
+          audio={route.audio}
+          onPlaybackSource={(source, audio) => {
+            navigate(
+              episodePage(selectedAnime.id, activeEpisode, audio, source),
+              true,
+            );
+          }}
           onPrevious={() => changeEpisode("prev")}
           onNext={() => changeEpisode("next")}
           onWatched={(episode) => void markWatched(true, episode)}
@@ -512,9 +522,13 @@ export default function App() {
               episode < 1
             )
               return;
-            navigate(episodePage(selectedAnime.id, episode, lang, "anipm"));
+            navigate(
+              episodePage(selectedAnime.id, episode, lang, route.source),
+            );
           }}
-          onClose={() => closePlayer(animePage(selectedAnime.id, activeEpisode))}
+          onClose={() =>
+            closePlayer(animePage(selectedAnime.id, activeEpisode))
+          }
           resume={watchHistory.find(
             (item) =>
               item.anime.id === selectedAnime.id &&
@@ -743,7 +757,18 @@ export default function App() {
                 history={watchHistory}
                 accounts={accounts}
                 onSelect={onSelectMedia}
-                onWatch={(anime) => onSelectMedia(anime, 1, "Ani.pm (Sub)")}
+                onWatch={(anime) => {
+                  const source = preferredPlaybackSource();
+                  void onSelectMedia(
+                    anime,
+                    1,
+                    source === "apex"
+                      ? "Apex Player (Sub)"
+                      : source === "megaplay"
+                        ? "MegaPlay (Sub)"
+                        : "Ani.pm (Sub)",
+                  );
+                }}
                 onResume={resumePlayback}
                 onRemove={removeFromHistory}
                 onCalendar={() => navigate("/calendar")}

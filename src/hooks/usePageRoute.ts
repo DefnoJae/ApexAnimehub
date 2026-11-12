@@ -2,6 +2,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 export type AudioLanguage = "sub" | "dub";
 export type PlaybackSource = "anipm" | "apex" | "megaplay";
+export function preferredPlaybackSource(): PlaybackSource {
+  try {
+    const source = localStorage.getItem("apex_playback_source");
+    if (source === "apex" || source === "megaplay") return source;
+  } catch {}
+  return "anipm";
+}
 export interface PageRoute {
   view:
     | "all"
@@ -36,9 +43,7 @@ export function parsePageRoute(pathname: string, search = ""): PageRoute {
   const audio = params.get("audio") === "dub" ? "dub" : "sub";
   const requested = params.get("source");
   const source =
-    requested === "megaplay" || (requested === "apex" && audio === "sub")
-      ? requested
-      : "anipm";
+    requested === "megaplay" || requested === "apex" ? requested : "anipm";
   const path = pathname.replace(/\/+$/, "") || "/";
   const section = Object.entries(sectionPaths).find(([, url]) => url === path);
   if (section || path === "/home")

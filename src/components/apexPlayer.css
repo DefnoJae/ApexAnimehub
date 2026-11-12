@@ -1,0 +1,288 @@
+.apex-cinema {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  overflow: hidden;
+  background: #000;
+  color: #fff;
+  accent-color: #fff;
+}
+.apex-cinema [hidden] {
+  display: none !important;
+}
+.apex-cinema video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.apex-cinema video::cue {
+  color: var(--apex-caption-color);
+  text-shadow: var(--apex-caption-outline);
+  font-size: var(--apex-caption-size);
+  background: var(--apex-caption-bg);
+}
+.apex-player-top,
+.apex-player-bottom {
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 5;
+}
+.apex-player-top {
+  top: 0;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 14px 20px;
+  background: linear-gradient(#000b, transparent);
+}
+.apex-player-bottom {
+  bottom: 0;
+  padding: 10px 20px 16px;
+  background: linear-gradient(transparent, #000c);
+}
+.apex-player-tray,
+.apex-player-tray > div {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.apex-player-tray {
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+.apex-player-top button,
+.apex-player-tray button,
+.apex-player-pause > button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #ffffff26;
+  border-radius: 999px;
+  width: 38px;
+  height: 38px;
+  background: #17171775;
+  backdrop-filter: blur(8px);
+  color: white;
+}
+.apex-player-tray button svg,
+.apex-player-top button svg {
+  width: 19px;
+  height: 19px;
+}
+.apex-player-tray button.is-active {
+  background: #eee;
+  color: #151515;
+}
+.apex-player-tray button:disabled {
+  opacity: 0.4;
+}
+.apex-player-pill {
+  display: flex;
+  border-radius: 999px;
+  background: #17171775;
+}
+.apex-player-pill button {
+  background: none;
+  border-color: transparent;
+}
+.apex-player-time {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.apex-player-timeline {
+  position: relative;
+}
+.apex-player-timeline input {
+  display: block;
+  width: 100%;
+  height: 18px;
+  cursor: pointer;
+}
+.apex-player-timeline output {
+  transform: translateX(-50%);
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  padding: 4px 8px;
+  background: #181818;
+  border-radius: 6px;
+}
+.apex-player-status {
+  position: absolute;
+  top: 64px;
+  left: 20px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: #171717dd;
+  z-index: 5;
+}
+.apex-player-pause {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  padding: 6vw;
+  background: linear-gradient(90deg, #000e, #0005);
+  pointer-events: none;
+}
+.apex-player-pause > div {
+  width: min(38vw, 440px);
+}
+.apex-player-pause img {
+  max-width: 90%;
+  max-height: 145px;
+  object-fit: contain;
+  margin-bottom: 16px;
+}
+.apex-player-pause h2 {
+  font-size: clamp(24px, 4vw, 56px);
+  line-height: 1.05;
+  margin-bottom: 12px;
+}
+.apex-player-pause p {
+  margin: 10px 0;
+  color: #ddd;
+}
+.apex-player-pause small {
+  display: block;
+  margin-top: 12px;
+}
+.apex-player-pause > button {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  pointer-events: auto;
+  width: 64px;
+  height: 64px;
+}
+.apex-player-menu,
+.apex-player-episodes {
+  position: absolute;
+  z-index: 6;
+  bottom: 90px;
+  padding: 14px;
+  background: #171717ed;
+  border: 1px solid #ffffff23;
+  border-radius: 16px;
+  backdrop-filter: blur(12px);
+}
+.apex-player-menu {
+  right: 20px;
+  width: min(340px, calc(100% - 40px));
+  max-height: 70vh;
+  overflow: auto;
+}
+.apex-player-menu header,
+.apex-player-episodes header,
+.apex-player-menu label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.apex-player-menu > button,
+.apex-player-menu > div > button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 8px;
+  border-radius: 8px;
+}
+.apex-player-menu button[aria-pressed="true"] {
+  background: #ffffff24;
+}
+.apex-player-menu strong,
+.apex-player-menu small {
+  display: block;
+  padding: 5px;
+  color: #ccc;
+}
+.apex-player-menu select {
+  background: #252525;
+  color: white;
+  padding: 4px;
+  border-radius: 6px;
+}
+.apex-player-episodes {
+  left: 20px;
+  right: 20px;
+}
+.apex-player-episodes.is-side {
+  left: auto;
+  top: 64px;
+  width: min(330px, calc(100% - 40px));
+  display: flex;
+  flex-direction: column;
+}
+.apex-episode-strip {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+  overflow: auto;
+  scrollbar-width: none;
+  padding: 4px;
+}
+.apex-episode-strip::-webkit-scrollbar {
+  display: none;
+}
+.apex-episode-strip button {
+  position: relative;
+  flex: 0 0 clamp(140px, 19vw, 245px);
+  aspect-ratio: 16/9;
+  overflow: hidden;
+  border: 1px solid #ffffff40;
+  border-radius: 10px;
+  background: #292929;
+  transform: perspective(700px) rotateY(-5deg);
+}
+.apex-episode-strip button[aria-current="true"] {
+  border: 2px solid white;
+  transform: none;
+}
+.apex-episode-strip img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.apex-episode-strip span {
+  position: absolute;
+  inset: auto 0 0;
+  padding: 8px;
+  background: #000b;
+  text-align: left;
+  font-size: 12px;
+}
+.apex-player-episodes.is-side .apex-episode-strip {
+  flex-direction: column;
+}
+.apex-player-episodes.is-side .apex-episode-strip button {
+  flex-basis: auto;
+}
+.apex-cinema .anipm-resume-prompt {
+  z-index: 4;
+  inset: 0;
+  background: #080808d9;
+}
+.apex-cinema .signsync-sparkle {
+  color: white;
+}
+.apex-cinema .signsync-find {
+  background: #eee;
+  color: #111;
+}
+.apex-cinema :focus-visible {
+  outline: 2px solid white;
+  outline-offset: 2px;
+}
+
+.apex-cinema .signsync-panel {
+  background: #181818ed;
+  border-color: #ffffff30;
+}
+.apex-cinema .signsync-panel .signsync-find {
+  background: #eee;
+  color: #111;
+}

@@ -3,123 +3,59 @@ import { createRoot } from "react-dom/client";
 import { act } from "react-dom/test-utils";
 import NativeVideoPlayer from "./NativeVideoPlayer";
 import type { PlayerProps } from "./VideoPlayer";
-import Artplayer from "artplayer";
-let mockOptions: any;
-const mockListeners: Record<string, () => void> = {};
-const mockPlayer = {
-  toggle: jest.fn(),
-  currentTime: 0,
-  duration: 100,
-  on: jest.fn((name, cb) => {
-    mockListeners[name] = cb;
-  }),
-  destroy: jest.fn(),
-  subtitle: { show: true, switch: jest.fn() },
-};
-jest.mock("artplayer", () => ({
-  __esModule: true,
-  default: jest.fn().mockImplementation((options) => {
-    mockOptions = options;
-    return mockPlayer;
-  }),
-}));
-test("native controls route episodes and track only at 80%, once; cleanup destroys player", async () => {
-  (Artplayer as unknown as jest.Mock).mockImplementation((options) => {
-    mockOptions = options;
-    return mockPlayer;
-  });
-  mockPlayer.on.mockImplementation((name, cb) => {
-    mockListeners[name] = cb;
-  });
-  const original = global.fetch;
-  global.fetch = jest.fn().mockResolvedValue({
+
+test("native shortcuts navigate episodes and playback syncs once at 80%", async () => {
+  const fetchMock = jest.spyOn(global, "fetch").mockImplementation(async () => ({
     ok: true,
-    json: async () => ({
-      url: "https://stream.animeparadise.moe/test",
-      subtitles: [],
-    }),
-  });
-  const node = document.createElement("div");
-  document.body.append(node);
+    json: async () => ({ url: "https://stream.animeparadise.moe/test.mp4", audio: "sub", subtitles: [] }),
+  }) as Response);
+  const node = document.body.appendChild(document.createElement("div"));
   const root = createRoot(node);
-  const next = jest.fn(),
-    previous = jest.fn(),
-    watched = jest.fn();
   const props = {
     title: "Example",
     episode: 2,
     stream: { name: "Apex Player (Sub)", url: "/api/playback?id=1&episode=2" },
     canNext: true,
-    onNext: next,
-    onPrevious: previous,
-    onWatched: watched,
+    onNext: jest.fn(),
+    onPrevious: jest.fn(),
+    onEpisodeChange: jest.fn(),
+    onWatched: jest.fn(),
     onClose: jest.fn(),
-    onFallback: jest.fn(),
     accounts: { autoSync: true },
-  } as unknown as PlayerProps & { onFallback: () => void };
+  } as unknown as PlayerProps;
   try {
     await act(async () => root.render(<NativeVideoPlayer {...props} />));
-    act(() =>
-      document.body.dispatchEvent(
-        new KeyboardEvent("keydown", {
-          key: " ",
-          bubbles: true,
-          cancelable: true,
-        }),
-      ),
-    );
-    expect(mockPlayer.toggle).toHaveBeenCalled();
-    mockPlayer.currentTime = 40;
-    act(() =>
-      document.body.dispatchEvent(
-        new KeyboardEvent("keydown", {
-          key: "ArrowRight",
-          bubbles: true,
-          cancelable: true,
-        }),
-      ),
-    );
-    expect(mockPlayer.currentTime).toBe(50);
-    act(() =>
-      document.body.dispatchEvent(
-        new KeyboardEvent("keydown", {
-          key: "ArrowLeft",
-          bubbles: true,
-          cancelable: true,
-        }),
-      ),
-    );
-    expect(mockPlayer.currentTime).toBe(40);
-    mockOptions.controls.find((c: any) => c.name === "next-episode").click();
-    mockOptions.controls
-      .find((c: any) => c.name === "previous-episode")
-      .click();
-    expect(next).toHaveBeenCalledTimes(1);
-    expect(previous).toHaveBeenCalledTimes(1);
-    mockPlayer.currentTime = 79;
-    mockListeners["video:timeupdate"]();
-    expect(watched).not.toHaveBeenCalled();
-    mockPlayer.currentTime = 80;
-    mockListeners["video:timeupdate"]();
-    mockListeners["video:timeupdate"]();
-    expect(watched).toHaveBeenCalledTimes(1);
-    expect(mockOptions.autoplay).toBe(true);
-    const autoNext = mockOptions.settings.find(
-      (item: any) => item.name === "auto-next",
-    );
-    expect(autoNext.switch).toBe(true);
-    autoNext.onSwitch({ switch: true });
-    mockListeners["video:ended"]();
-    expect(next).toHaveBeenCalledTimes(1);
-    expect(localStorage.getItem("apex_player_auto_next")).toBe("false");
-    autoNext.onSwitch({ switch: false });
-    mockListeners["video:ended"]();
-    mockListeners["video:ended"]();
-    expect(next).toHaveBeenCalledTimes(2);
-    act(() => root.unmount());
-    expect(mockPlayer.destroy).toHaveBeenCalled();
+    const video = node.querySelector("video")!;
+    video.play = jest.fn().mockResolvedValue(undefined);
+    Object.defineProperty(video, "duration", { value: 100 });
+    act(() => video.dispatchEvent(new Event("loadedmetadata")));
+    const key = (value: string) => act(() => document.body.dispatchEvent(
+      new KeyboardEvent("keydown", { key: value, bubbles: true, cancelable: true }),
+    ));
+    video.currentTime = 40;
+    key("ArrowRight");
+    expect(video.currentTime).toBe(50);
+    key("ArrowLeft");
+    expect(video.currentTime).toBe(40);
+    key("n");
+    key("b");
+    expect(props.onEpisodeChange).toHaveBeenCalledTimes(2);
+    expect(props.onEpisodeChange).toHaveBeenNthCalledWith(1, 3, "sub");
+    expect(props.onEpisodeChange).toHaveBeenNthCalledWith(2, 1, "sub");
+    const tick = (time: number) => act(() => {
+      video.currentTime = time;
+      video.dispatchEvent(new Event("timeupdate"));
+    });
+    tick(79);
+    expect(props.onWatched).not.toHaveBeenCalled();
+    tick(80);
+    tick(81);
+    expect(props.onWatched).toHaveBeenCalledTimes(1);
+    act(() => video.dispatchEvent(new Event("ended")));
+    expect(props.onEpisodeChange).toHaveBeenCalledTimes(2);
   } finally {
-    global.fetch = original;
+    act(() => root.unmount());
+    fetchMock.mockRestore();
     localStorage.clear();
     node.remove();
   }

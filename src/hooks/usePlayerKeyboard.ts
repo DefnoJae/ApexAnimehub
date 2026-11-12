@@ -4,6 +4,7 @@ interface Controls {
   seek: (seconds: number) => unknown;
   fullscreen: () => unknown;
   next: () => unknown;
+  captions?: () => unknown;
   previous: () => unknown;
   error: (reason: unknown) => void;
 }
@@ -31,7 +32,7 @@ export function usePlayerKeyboard(
       if (
         target instanceof Element &&
         target.closest(
-          'input,textarea,select,[role="combobox"],[contenteditable]:not([contenteditable="false"]),[role="textbox"],[role="slider"],.signsync-panel,.anipm-resume-prompt',
+          'input,textarea,select,[role="combobox"],[contenteditable]:not([contenteditable="false"]),[role="textbox"],[role="slider"],.signsync-panel,.anipm-resume-prompt,.apex-player-menu,.apex-player-episodes',
         )
       )
         return;
@@ -44,6 +45,7 @@ export function usePlayerKeyboard(
           action = () => current.current.toggle();
         if (key === "f") action = () => current.current.fullscreen();
         if (key === "n") action = () => current.current.next();
+        if (key === "c") action = current.current.captions;
         if (key === "b") action = () => current.current.previous();
       }
       // Suppress repeated Space/F too, so they cannot click a focused button.

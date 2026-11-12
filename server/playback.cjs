@@ -10,7 +10,11 @@ function coverId(url) {
     return 0;
   }
 }
-async function resolve(id, episode) {
+async function resolve(id, episode, audio) {
+  if (audio === "dub")
+    throw new Error(
+      "No verified English dub source is available in Apex Player.",
+    );
   const { HttpClient, AnimeParadiseProvider } = await import("anime-sdk");
   const provider = new AnimeParadiseProvider(
     new HttpClient({ timeoutMs: 8000 }),
@@ -39,22 +43,33 @@ async function resolve(id, episode) {
     if (match) break;
   }
   if (!match)
-    throw new Error("No exact source match for this anime. Try MegaPlay.");
+    throw new Error("No exact source match for this anime. Try Ani.pm.");
   const units = await provider.fetchContentUnits(match.id, { signal });
   const unit = units.find((item) => item.number === episode);
   if (!unit)
     throw new Error(
-      "This episode is not available on Apex Player. Try MegaPlay.",
+      "This episode is not available on Apex Player. Try Ani.pm.",
     );
   const result = await provider.resolveStream(unit.id, "sub", { signal });
   const source =
     result.type === "video" &&
-    result.streams.find((stream) => stream.isHLS && allowed(stream.sourceUrl));
-  if (!source) throw new Error("No compatible stream available. Try MegaPlay.");
+    result.streams
+      .filter(
+        (stream) =>
+          stream.isHLS &&
+          allowed(stream.sourceUrl) &&
+          (!stream.language || stream.language === audio),
+      )
+      .sort(
+        (a, b) =>
+          (parseInt(b.quality, 10) || 0) - (parseInt(a.quality, 10) || 0),
+      )[0];
+  if (!source) throw new Error("No compatible stream available. Try Ani.pm.");
   return {
     url: source.sourceUrl,
     subtitles: (source.subtitles || []).filter((track) => allowed(track.url)),
-    audio: "sub",
+    audio,
+    quality: source.quality,
     provider: "AnimeParadise",
   };
 }
@@ -85,7 +100,8 @@ async function handler(req, res) {
     res.statusCode = 400;
     return res.end(JSON.stringify({ error: "Invalid anime or episode" }));
   }
-  const key = `${id}:${episode}`;
+  const audio = url.searchParams.get("audio") === "dub" ? "dub" : "sub";
+  const key = `${id}:${episode}:${audio}`;
   try {
     const saved = cache.get(key);
     if (saved && Date.now() - saved.at < 60000)
@@ -98,7 +114,7 @@ async function handler(req, res) {
           JSON.stringify({ error: "Player source is busy. Please retry." }),
         );
       }
-      request = resolve(id, episode);
+      request = resolve(id, episode, audio);
       pending.set(key, request);
       request
         .then((value) => {
@@ -113,7 +129,7 @@ async function handler(req, res) {
     res.statusCode = 502;
     res.end(
       JSON.stringify({
-        error: error.message || "Source unavailable. Try MegaPlay.",
+        error: error.message || "Source unavailable. Try Ani.pm.",
       }),
     );
   }
