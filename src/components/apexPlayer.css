@@ -627,3 +627,9 @@
 .apex-caption-group summary { cursor: pointer; padding: 8px; }
 .apex-caption-group button { display: block; width: 100%; text-align: left; padding: 8px; border-radius: 8px; }
 .apex-cinema video::cue { font-family: Arial, sans-serif; font-weight: 700; }
+
+/* Plain SignSync text gets its own lane when a dialogue track is selected. */
+.apex-cinema.has-plain-captions .signsync-captions {
+  top: max(64px, 12%);
+  bottom: auto;
+}

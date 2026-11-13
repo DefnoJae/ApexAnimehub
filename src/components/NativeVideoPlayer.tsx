@@ -323,7 +323,7 @@ function EpisodePlayer(props: PlayerProps & {
             (line, timing: string, settings: string) =>
               /(?:^|\s)(?:line|region|vertical):/.test(settings)
                 ? line
-                : timing + settings.trimEnd() + " line:80%",
+                : timing + settings.trimEnd() + " line:82%",
           );
           objectUrl = URL.createObjectURL(new Blob([raised], { type: "text/vtt" }));
           setLoadedCaption({ track: selected.url, url: objectUrl });
@@ -450,7 +450,7 @@ function EpisodePlayer(props: PlayerProps & {
       role="dialog"
       aria-modal="true"
       aria-label="Apex Player"
-      className={`apex-native-player apex-cinema${pauseOverlay ? " has-pause-overlay" : ""}`}
+      className={`apex-native-player apex-cinema${pauseOverlay ? " has-pause-overlay" : ""}${loadedCaption?.track === track && loadedCaption ? " has-plain-captions" : ""}`}
       onPointerMove={reveal}
       onKeyDown={(event) => {
         if (menu && (event.key === "Escape" || (menu === "episodes" && event.key.toLowerCase() === "x" && !event.ctrlKey && !event.metaKey && !event.altKey))) {
