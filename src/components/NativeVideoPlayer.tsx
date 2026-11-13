@@ -496,7 +496,7 @@ function EpisodePlayer(props: PlayerProps & {
       role="dialog"
       aria-modal="true"
       aria-label="Apex Player"
-      className={`apex-native-player apex-cinema${pauseOverlay ? " has-pause-overlay" : ""}${loadedCaption?.track === track && loadedCaption ? " has-plain-captions" : ""}`}
+      className={`apex-native-player apex-cinema${!controls && start !== null ? " is-idle" : ""}${pauseOverlay ? " has-pause-overlay" : ""}${loadedCaption?.track === track && loadedCaption ? " has-plain-captions" : ""}`}
       onPointerMove={reveal}
       onKeyDown={(event) => {
         if (menu && (event.key === "Escape" || (menu === "episodes" && event.key.toLowerCase() === "x" && !event.ctrlKey && !event.metaKey && !event.altKey))) {

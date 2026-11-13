@@ -84,6 +84,11 @@ test("native shortcuts navigate episodes and playback syncs once at 80%", async 
     tick(80);
     tick(81);
     expect(props.onWatched).toHaveBeenCalledTimes(1);
+    const player = node.querySelector(".apex-cinema")!;
+    act(() => jest.advanceTimersByTime(3000));
+    expect(player.classList.contains("is-idle")).toBe(true);
+    act(() => video.dispatchEvent(new Event("pointermove", { bubbles: true })));
+    expect(player.classList.contains("is-idle")).toBe(false);
     act(() => video.dispatchEvent(new Event("ended")));
     expect(props.onEpisodeChange).toHaveBeenCalledTimes(2);
     await act(async () => root.render(<NativeVideoPlayer {...props} episode={3}

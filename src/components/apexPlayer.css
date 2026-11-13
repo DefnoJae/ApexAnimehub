@@ -10,6 +10,10 @@
 .apex-cinema [hidden] {
   display: none !important;
 }
+.apex-cinema.is-idle,
+.apex-cinema.is-idle * {
+  cursor: none;
+}
 .apex-cinema video {
   position: absolute;
   inset: 0;
