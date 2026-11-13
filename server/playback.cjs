@@ -10,7 +10,7 @@ function coverId(url) {
     return 0;
   }
 }
-async function resolveParadise(id, episode, audio) {
+async function resolveParadise(id, episode, audio, titleHint) {
   const { HttpClient, AnimeParadiseProvider } = await import("anime-sdk");
   const provider = new AnimeParadiseProvider(
     new HttpClient({ timeoutMs: 8000 }),
@@ -26,12 +26,12 @@ async function resolveParadise(id, episode, audio) {
       variables: { id },
     }),
   });
-  if (!metadata.ok) throw new Error("Anime metadata unavailable");
-  const media = (await metadata.json()).data?.Media;
-  if (media?.id !== id) throw new Error("Anime not found");
+  const media = metadata.ok ? (await metadata.json()).data?.Media : undefined;
+  const titles = media?.id === id ? [media.title.english, media.title.romaji] : [titleHint];
+  if (!titles.some(Boolean)) throw new Error("Anime metadata unavailable");
   let match;
   for (const title of [
-    ...new Set([media.title.english, media.title.romaji].filter(Boolean)),
+    ...new Set(titles.filter(Boolean)),
   ]) {
     const hits = await provider.search(title, { signal });
     // Require the source's AniList cover ID: never select a similarly named season.
@@ -119,7 +119,8 @@ async function handler(req, res) {
           JSON.stringify({ error: "Player source is busy. Please retry." }),
         );
       }
-      request = resolveParadise(id, episode, audio);
+      const titleHint = url.searchParams.get("title")?.trim().slice(0, 250);
+      request = resolveParadise(id, episode, audio, titleHint);
       pending.set(key, request);
       request
         .then((value) => {

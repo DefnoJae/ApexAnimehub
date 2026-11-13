@@ -92,7 +92,7 @@ export default function App() {
             playbackSource === "anipm"
               ? aniPmUrl(route.animeId!, activeEpisode, route.audio)
               : playbackSource === "apex"
-                ? `/api/playback?id=${route.animeId}&episode=${activeEpisode}&audio=sub`
+                ? `/api/playback?id=${route.animeId}&episode=${activeEpisode}&audio=sub&title=${encodeURIComponent(getDisplayTitle(selectedAnime))}`
                 : `https://megaplay.buzz/stream/ani/${route.animeId}/${activeEpisode}/${route.audio}?color=${THEME_COLOR}`,
         }
       : null;
