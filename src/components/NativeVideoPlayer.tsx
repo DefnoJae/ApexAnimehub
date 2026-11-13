@@ -625,7 +625,11 @@ function EpisodePlayer(props: PlayerProps & {
       ) : null}
       {initialOpen && !hasVideoFrame && start !== null && !error && (
         <div className="apex-player-loading" role="status">
-          <strong>{props.title}</strong>
+          {logo ? (
+            <img src={logo} alt={props.title} onError={() => setLogo("")} />
+          ) : (
+            <strong>{props.title}</strong>
+          )}
           <span>Episode {episode} · {audio === "dub" ? "Dub" : "Sub"}</span>
           <span className="apex-player-loading-line" aria-hidden="true" />
           <small>{source ? "Starting playback…" : "Finding a stream…"}</small>
