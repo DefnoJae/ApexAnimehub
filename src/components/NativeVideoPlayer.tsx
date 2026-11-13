@@ -125,7 +125,7 @@ function EpisodePlayer(props: PlayerProps & {
   const [speed, setSpeed] = useState(1);
   const [quality, setQuality] = useState(-1);
   const [levels, setLevels] = useState<number[]>([]);
-  const [captionSize, setCaptionSize] = useState(30);
+  const [captionSize, setCaptionSize] = useState(34);
   const [captionBackground, setCaptionBackground] = useState(false);
   const [filter, setFilter] = useState("none");
   const [scrub, setScrub] = useState<number>();
@@ -453,7 +453,7 @@ function EpisodePlayer(props: PlayerProps & {
           "--apex-caption-bg": captionBackground ? "#000c" : "transparent",
           "--apex-caption-color": captionColor,
           "--apex-caption-outline": captionOutline
-            ? "1px 1px 2px #000, -1px -1px 2px #000"
+            ? "2px 0 #000, -2px 0 #000, 0 2px #000, 0 -2px #000, 2px 2px 2px #000, -2px -2px 2px #000"
             : "none",
         } as React.CSSProperties
       }
@@ -510,7 +510,13 @@ function EpisodePlayer(props: PlayerProps & {
             kind="subtitles"
             label={eligibleTracks.find((item) => item.url === track)?.label}
             onLoad={(event) => {
-              event.currentTarget.track.mode = pauseOverlay ? "hidden" : "showing";
+              const textTrack = event.currentTarget.track;
+              // Keep explicitly positioned cues where their authors placed them.
+              for (const cue of Array.from(textTrack.cues || [])) {
+                if (cue instanceof VTTCue && cue.line === "auto")
+                  cue.line = -4;
+              }
+              textTrack.mode = pauseOverlay ? "hidden" : "showing";
             }}
             onError={() => setCaptionError("This subtitle track could not render. Try another track.")}
           />
