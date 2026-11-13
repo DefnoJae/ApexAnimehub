@@ -1,0 +1,6 @@
+{
+  "name": "apexanime",
+  "pages_build_output_dir": "../build",
+  "compatibility_date": "2026-11-13",
+  "services": [{ "binding": "APEX_API", "service": "apexanime-backup" }]
+}
