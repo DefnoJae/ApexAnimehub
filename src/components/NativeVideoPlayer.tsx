@@ -125,7 +125,7 @@ function EpisodePlayer(props: PlayerProps & {
   const [speed, setSpeed] = useState(1);
   const [quality, setQuality] = useState(-1);
   const [levels, setLevels] = useState<number[]>([]);
-  const [captionSize, setCaptionSize] = useState(34);
+  const [captionSize, setCaptionSize] = useState(40);
   const [captionBackground, setCaptionBackground] = useState(false);
   const [filter, setFilter] = useState("none");
   const [scrub, setScrub] = useState<number>();
@@ -285,10 +285,14 @@ function EpisodePlayer(props: PlayerProps & {
     const preference = audio === "sub" ? "full" : captionMode;
     const match =
       preference === "full"
-        ? english.find((item) => trackKind(item) === "cc") ||
-          english.find((item) => trackKind(item) === "full")
+        ? english.find((item) => trackKind(item) === "cc" && !/dubtitle|\bAI\b/i.test(item.label)) ||
+          english.find((item) => trackKind(item) === "full") ||
+          english.find((item) => trackKind(item) === "cc")
         : preference === "signs"
-          ? english.find((item) => trackKind(item) === "signs")
+          ? english.find((item) => trackKind(item) === "signs" && item.format === "ass") ||
+            english.find((item) => trackKind(item) === "full") ||
+            english.find((item) => trackKind(item) === "signs") ||
+            english.find((item) => trackKind(item) === "cc")
           : undefined;
     setTrack(match?.url || "");
   }, [source, audio, captionMode]);
@@ -453,7 +457,7 @@ function EpisodePlayer(props: PlayerProps & {
           "--apex-caption-bg": captionBackground ? "#000c" : "transparent",
           "--apex-caption-color": captionColor,
           "--apex-caption-outline": captionOutline
-            ? "2px 0 #000, -2px 0 #000, 0 2px #000, 0 -2px #000, 2px 2px 2px #000, -2px -2px 2px #000"
+            ? "3px 0 #000, -3px 0 #000, 0 3px #000, 0 -3px #000, 2px 2px #000, -2px -2px #000, 2px -2px #000, -2px 2px #000"
             : "none",
         } as React.CSSProperties
       }
@@ -513,8 +517,11 @@ function EpisodePlayer(props: PlayerProps & {
               const textTrack = event.currentTarget.track;
               // Keep explicitly positioned cues where their authors placed them.
               for (const cue of Array.from(textTrack.cues || [])) {
-                if (cue instanceof VTTCue && cue.line === "auto")
-                  cue.line = -4;
+                if (typeof VTTCue !== "undefined" && cue instanceof VTTCue && cue.line === "auto") {
+                  cue.snapToLines = false;
+                  cue.line = 94;
+                  cue.lineAlign = "end";
+                }
               }
               textTrack.mode = pauseOverlay ? "hidden" : "showing";
             }}
@@ -568,7 +575,7 @@ function EpisodePlayer(props: PlayerProps & {
         <div className="apex-player-loading" role="status">
           {logo ? <img src={logo} alt={props.title} /> : <strong>{props.title}</strong>}
           <span>Episode {episode} · {audio === "dub" ? "Dub" : "Sub"}</span>
-          <span className="apex-player-spinner" aria-hidden="true" />
+          <span className="apex-player-loading-line" aria-hidden="true" />
           <small>{source ? "Starting playback…" : "Finding a stream…"}</small>
         </div>
       )}
@@ -715,7 +722,7 @@ function EpisodePlayer(props: PlayerProps & {
                 <input
                   type="range"
                   min="14"
-                  max="38"
+                  max="56"
                   value={captionSize}
                   onChange={(e) => setCaptionSize(Number(e.target.value))}
                 />
