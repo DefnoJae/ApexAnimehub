@@ -5,6 +5,9 @@
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": true,
   "keep_vars": true,
+  "vars": {
+    "APP_ORIGIN": "https://apexanime-backup.seachat-defnojae.workers.dev"
+  },
   "assets": {
     "directory": "./build",
     "binding": "ASSETS",
