@@ -16,10 +16,12 @@ test('playback rejects invalid IDs and methods before contacting a source', asyn
   }
 });
 
-test("Re:Anime media rejects unsigned relay requests", async () => {
+test("paused playback rejects relay requests and new playback sessions", async () => {
   const response = { setHeader() {}, end(body) { this.body = body; } };
   await handler({ method: "GET", url: "/api/playback?media=forged.signature" }, response);
-  assert.equal(response.statusCode, 403);
+  assert.equal(response.statusCode, 410);
+  await handler({ method: "GET", url: "/api/playback?id=1&episode=2&audio=dub" }, response);
+  assert.equal(response.statusCode, 503);
 });
 
 test("Re:Anime media allowlist rejects redirects disguised as URLs", () => {

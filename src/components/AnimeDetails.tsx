@@ -501,7 +501,6 @@ export function AnimeDetails({
                 }
               >
                 <option value="anipm">Ani.pm (Sub &amp; Dub)</option>
-                <option value="apex">Apex Player</option>
                 <option value="megaplay">MegaPlay</option>
               </StyledSelect>
             </label>

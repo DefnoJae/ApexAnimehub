@@ -1,3 +1,5 @@
+// Temporarily stop video transfer through Vercel, including previously issued URLs.
+const playbackPaused = true;
 const { resolvePlayback, serveMedia } = require("./reanime.cjs");
 const cache = new Map();
 const pending = new Map();
@@ -87,9 +89,13 @@ async function resolve(id, episode, audio) {
 }
 async function handler(req, res) {
   const relay = new URL(req.url, "https://localhost").searchParams.get("media");
-  if (relay !== null) return serveMedia(req, res, relay);
+  if (relay !== null && !playbackPaused) return serveMedia(req, res, relay);
   res.setHeader("Content-Type", "application/json");
   res.setHeader("Cache-Control", "no-store");
+  if (relay !== null) {
+    res.statusCode = 410;
+    return res.end(JSON.stringify({ error: "Apex Player is temporarily unavailable. Use Ani.pm." }));
+  }
   if (req.method !== "GET") {
     res.statusCode = 405;
     return res.end(JSON.stringify({ error: "Method not allowed" }));
@@ -106,6 +112,10 @@ async function handler(req, res) {
   ) {
     res.statusCode = 400;
     return res.end(JSON.stringify({ error: "Invalid anime or episode" }));
+  }
+  if (playbackPaused) {
+    res.statusCode = 503;
+    return res.end(JSON.stringify({ error: "Apex Player is temporarily unavailable. Use Ani.pm." }));
   }
   const audio = url.searchParams.get("audio") === "dub" ? "dub" : "sub";
   const key = `${id}:${episode}:${audio}`;
