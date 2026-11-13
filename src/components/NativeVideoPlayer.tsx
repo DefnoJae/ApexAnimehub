@@ -125,7 +125,7 @@ function EpisodePlayer(props: PlayerProps & {
   const [speed, setSpeed] = useState(1);
   const [quality, setQuality] = useState(-1);
   const [levels, setLevels] = useState<number[]>([]);
-  const [captionSize, setCaptionSize] = useState(40);
+  const [captionSize, setCaptionSize] = useState(43);
   const [captionBackground, setCaptionBackground] = useState(false);
   const [filter, setFilter] = useState("none");
   const [scrub, setScrub] = useState<number>();
@@ -317,7 +317,15 @@ function EpisodePlayer(props: PlayerProps & {
         if (selected.format === "ass" && text.includes("[Script Info]")) {
           setAss(text);
         } else if (["vtt", "srt"].includes(selected.format) && /^WEBVTT(?:\s|$)/.test(text)) {
-          objectUrl = URL.createObjectURL(new Blob([text], { type: "text/vtt" }));
+          // Set the cue position before the browser parses the track.
+          const raised = text.replace(
+            /^(\s*\d{2}:\d{2}(?::\d{2})?\.\d{3}\s+-->\s+\d{2}:\d{2}(?::\d{2})?\.\d{3})([^\r\n]*)/gm,
+            (line, timing: string, settings: string) =>
+              /(?:^|\s)(?:line|region|vertical):/.test(settings)
+                ? line
+                : timing + settings.trimEnd() + " line:94%,end",
+          );
+          objectUrl = URL.createObjectURL(new Blob([raised], { type: "text/vtt" }));
           setLoadedCaption({ track: selected.url, url: objectUrl });
         } else throw new Error("Invalid subtitle track");
       })
@@ -515,14 +523,6 @@ function EpisodePlayer(props: PlayerProps & {
             label={eligibleTracks.find((item) => item.url === track)?.label}
             onLoad={(event) => {
               const textTrack = event.currentTarget.track;
-              // Keep explicitly positioned cues where their authors placed them.
-              for (const cue of Array.from(textTrack.cues || [])) {
-                if (typeof VTTCue !== "undefined" && cue instanceof VTTCue && cue.line === "auto") {
-                  cue.snapToLines = false;
-                  cue.line = 94;
-                  cue.lineAlign = "end";
-                }
-              }
               textTrack.mode = pauseOverlay ? "hidden" : "showing";
             }}
             onError={() => setCaptionError("This subtitle track could not render. Try another track.")}
