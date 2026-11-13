@@ -173,63 +173,77 @@ export function MyList({
         <p>No anime in this view.</p>
       )}
       <div className="library-grid">
-        {unique.map((entry) => (
-          <article
-            className="poster-card"
-            key={entry.anime.id || "mal-" + entry.anime.idMal}
-          >
-            <div className="poster-art">
-              <button
-                className="poster-open"
-                onClick={() => onSelect(entry.anime)}
-                aria-label={
-                  "View details: " +
-                  (entry.anime.title?.english || entry.anime.title?.romaji)
-                }
-              >
-                <img
-                  loading="lazy"
-                  src={entry.anime.coverImage?.extraLarge}
-                  alt=""
-                />
-              </button>
-              <PersonalRating
-                score={scoreFor(entry.anime)}
-                className="my-list-score"
-              />
-              <QuickList
-                anime={{ ...entry.anime, title: entry.anime.title || {} }}
-                accounts={accounts}
-              />
-            </div>
-            <button
-              className="poster-title"
-              onClick={() => onSelect(entry.anime)}
+        {unique.map((entry) => {
+          const entries = entriesFor(entry.anime);
+          const inProgress = entries.filter((item) =>
+            (item.status === "watching" || item.status === "paused") &&
+            (status === "all" || item.status === status),
+          );
+          const watched = Math.max(0, ...inProgress.map((item) => item.progress));
+          const total = entry.anime.episodes || entries.find((item) => item.anime.episodes)?.anime.episodes;
+          return (
+            <article
+              className="poster-card"
+              key={entry.anime.id || "mal-" + entry.anime.idMal}
             >
-              {entry.anime.title?.english || entry.anime.title?.romaji}
-            </button>
-            <div className="library-card-badges">
-              <AnimeBadges
-                id={
-                  (grouped.get(keyFor(entry.anime)) || []).find(
-                    (e) => e.anime.id,
-                  )?.anime.id
-                }
-                idMal={entry.anime.idMal}
-                averageScore={
-                  (grouped.get(keyFor(entry.anime)) || []).find(
-                    (e) => e.anime.averageScore,
-                  )?.anime.averageScore
-                }
-                providedScore={
-                  (grouped.get(keyFor(entry.anime)) || []).find(
-                    (e) => e.anime.malScore,
-                  )?.anime.malScore || undefined
-                }
-              />
-            </div>
-          </article>
-        ))}
+              <div className="poster-art">
+                <button
+                  className="poster-open"
+                  onClick={() => onSelect(entry.anime)}
+                  aria-label={
+                    "View details: " +
+                    (entry.anime.title?.english || entry.anime.title?.romaji)
+                  }
+                >
+                  <img
+                    loading="lazy"
+                    src={entry.anime.coverImage?.extraLarge}
+                    alt=""
+                  />
+                </button>
+                <PersonalRating
+                  score={scoreFor(entry.anime)}
+                  className="my-list-score"
+                />
+                {inProgress.length > 0 && (
+                  <span className="my-list-progress" aria-label={total ? `${watched} of ${total} episodes watched` : `${watched} episodes watched, total unknown`}>
+                    {watched}/{total || "?"}
+                  </span>
+                )}
+                <QuickList
+                  anime={{ ...entry.anime, title: entry.anime.title || {} }}
+                  accounts={accounts}
+                />
+              </div>
+              <button
+                className="poster-title"
+                onClick={() => onSelect(entry.anime)}
+              >
+                {entry.anime.title?.english || entry.anime.title?.romaji}
+              </button>
+              <div className="library-card-badges">
+                <AnimeBadges
+                  id={
+                    (grouped.get(keyFor(entry.anime)) || []).find(
+                      (e) => e.anime.id,
+                    )?.anime.id
+                  }
+                  idMal={entry.anime.idMal}
+                  averageScore={
+                    (grouped.get(keyFor(entry.anime)) || []).find(
+                      (e) => e.anime.averageScore,
+                    )?.anime.averageScore
+                  }
+                  providedScore={
+                    (grouped.get(keyFor(entry.anime)) || []).find(
+                      (e) => e.anime.malScore,
+                    )?.anime.malScore || undefined
+                  }
+                />
+              </div>
+            </article>
+          );
+        })}
       </div>
     </section>
   );

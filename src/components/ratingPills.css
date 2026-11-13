@@ -50,12 +50,25 @@
   line-height: 1;
   white-space: nowrap;
 }
-.my-list-score {
+.my-list-score,
+.my-list-progress {
   position: absolute;
   bottom: 10px;
-  right: 10px;
   pointer-events: none;
   z-index: 3;
+}
+.my-list-score { right: 10px; }
+.my-list-progress {
+  left: 10px;
+  padding: 5px 10px;
+  border: 1px solid #ffffff40;
+  border-radius: 999px;
+  background: #161616bb;
+  backdrop-filter: blur(8px);
+  color: white;
+  font-size: 12px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
 }
 .library-card-badges {
   display: flex;
