@@ -72,19 +72,56 @@ function trackKind(track: Track) {
 
 export default function NativeVideoPlayer(props: PlayerProps) {
   const fullscreenHost = useRef<HTMLDivElement>(null);
+  const hasOpened = useRef(false);
+  const firstStream = useRef(props.stream.url);
+  const warm = useRef<{ url: string; request: Promise<Response | undefined>; at: number; controller: AbortController }>();
+  useEffect(() => () => warm.current?.controller.abort(), []);
+  const prefetch = (url: string) => {
+    if (warm.current?.url === url && Date.now() - warm.current.at < 60_000) return;
+    warm.current?.controller.abort();
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 10_000);
+    warm.current = {
+      url,
+      at: Date.now(),
+      controller,
+      request: fetch(url, { signal: controller.signal })
+        .then((response) => response.ok ? response : undefined)
+        .catch(() => undefined)
+        .finally(() => window.clearTimeout(timeout)),
+    };
+  };
+  const takePrefetch = (url: string) => {
+    const pending = warm.current;
+    if (pending?.url !== url || Date.now() - pending.at >= 60_000) return undefined;
+    return pending.request.then((response) => response?.clone());
+  };
   return (
     <div className="apex-player-fullscreen-host" ref={fullscreenHost}>
-      <EpisodePlayer key={props.stream.url} {...props} fullscreenHost={fullscreenHost} />
+      <EpisodePlayer
+        key={props.stream.url}
+        {...props}
+        fullscreenHost={fullscreenHost}
+        initialOpen={firstStream.current === props.stream.url && !hasOpened.current}
+        onPlaybackStarted={() => { hasOpened.current = true; }}
+        prefetch={prefetch}
+        takePrefetch={takePrefetch}
+      />
     </div>
   );
 }
 
 function EpisodePlayer(props: PlayerProps & {
   fullscreenHost: React.RefObject<HTMLDivElement>;
+  initialOpen: boolean;
+  onPlaybackStarted: () => void;
+  prefetch: (url: string) => void;
+  takePrefetch: (url: string) => Promise<Response | undefined> | undefined;
 }) {
   const url = new URL(props.stream.url, window.location.origin);
   const id = Number(url.searchParams.get("id"));
   const { episode } = props;
+  const [initialOpen] = useState(props.initialOpen);
   const audio = props.audio || "sub";
   const dialog = useRef<HTMLDivElement>(null);
   const video = useRef<HTMLVideoElement>(null);
@@ -132,7 +169,7 @@ function EpisodePlayer(props: PlayerProps & {
   const [saved] = useState(() =>
     resumeSeconds(readEpisodeProgress(id, episode) || props.resume),
   );
-  const [start, setStart] = useState<number | null>(saved ? null : 0);
+  const [start, setStart] = useState<number | null>(initialOpen && saved ? null : saved || 0);
   const hideTimer = useRef<number>();
   const watched = useRef(false);
   const lastSaved = useRef(0);
@@ -176,7 +213,9 @@ function EpisodePlayer(props: PlayerProps & {
       setError(message);
       callbacks.current.onPlaybackSource?.("anipm", audio);
     };
-    void fetch(props.stream.url, { signal: controller.signal })
+    const streamUrl = props.stream.url;
+    const prefetched = callbacks.current.takePrefetch(streamUrl);
+    void (async () => (await prefetched) ?? fetch(streamUrl, { signal: controller.signal }))()
       .then(async (response) => {
         const data = await response.json();
         if (
@@ -382,6 +421,13 @@ function EpisodePlayer(props: PlayerProps & {
     document.fullscreenElement
       ? document.exitFullscreen()
       : props.fullscreenHost.current?.requestFullscreen();
+  const warmNextEpisode = () => {
+    if (!props.canNext) return;
+    const next = new URL(props.stream.url, window.location.origin);
+    next.searchParams.set("episode", String(episode + 1));
+    next.searchParams.set("audio", audio);
+    props.prefetch(next.pathname + next.search);
+  };
   const chooseEpisode = (number: number) => {
     persist(true);
     setMenu(undefined);
@@ -489,7 +535,12 @@ function EpisodePlayer(props: PlayerProps & {
         }}
         onLoadedMetadata={(event) => setDuration(event.currentTarget.duration)}
         onPlay={() => setPaused(false)}
-        onPlaying={() => setHasVideoFrame(true)}
+        onPlaying={() => {
+          setHasVideoFrame(true);
+          if (hasVideoFrame) return;
+          props.onPlaybackStarted();
+          warmNextEpisode();
+        }}
         onPause={() => {
           setPaused(true);
           persist(true);
@@ -497,6 +548,7 @@ function EpisodePlayer(props: PlayerProps & {
         onTimeUpdate={(event) => {
           const media = event.currentTarget;
           setPosition(media.currentTime);
+          if (media.duration - media.currentTime < 45) warmNextEpisode();
           persist();
           if (
             !watched.current &&
@@ -529,7 +581,7 @@ function EpisodePlayer(props: PlayerProps & {
           />
         )}
       </video>
-      {!hasVideoFrame && props.anime && (
+      {initialOpen && !hasVideoFrame && props.anime && (
         <div className="apex-player-loading-art"><HeroBackdrop anime={props.anime} /></div>
       )}
       {ass && (
@@ -571,9 +623,9 @@ function EpisodePlayer(props: PlayerProps & {
           {error || captionError}
         </p>
       ) : null}
-      {!hasVideoFrame && start !== null && !error && (
+      {initialOpen && !hasVideoFrame && start !== null && !error && (
         <div className="apex-player-loading" role="status">
-          {logo ? <img src={logo} alt={props.title} /> : <strong>{props.title}</strong>}
+          <strong>{props.title}</strong>
           <span>Episode {episode} · {audio === "dub" ? "Dub" : "Sub"}</span>
           <span className="apex-player-loading-line" aria-hidden="true" />
           <small>{source ? "Starting playback…" : "Finding a stream…"}</small>

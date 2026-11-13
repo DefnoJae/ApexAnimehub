@@ -10,8 +10,10 @@ test("native shortcuts navigate episodes and playback syncs once at 80%", async 
   const revokeObjectURL = URL.revokeObjectURL;
   URL.createObjectURL = jest.fn(() => "blob:captions");
   URL.revokeObjectURL = jest.fn();
+  const canPlay = jest.spyOn(HTMLMediaElement.prototype, "canPlayType").mockReturnValue("maybe");
   const fetchMock = jest.spyOn(global, "fetch").mockImplementation(async (input) => ({
     ok: true,
+    clone() { return this; },
     json: async () => ({ url: "https://stream.animeparadise.moe/test.mp4", audio: "sub", chapters: [{ kind: "intro", start: 5, end: 15 }], subtitles: [{ url: "https://example.test/english.vtt", label: "English", format: "vtt" }]  }),
     text: async () => String(input).endsWith(".vtt") ? "WEBVTT\n\n00:00:01.000 --> 00:00:02.000\nHello" : "",
   }) as Response);
@@ -31,6 +33,7 @@ test("native shortcuts navigate episodes and playback syncs once at 80%", async 
   } as unknown as PlayerProps;
   try {
     await act(async () => root.render(<NativeVideoPlayer {...props} />));
+    expect(node.querySelector(".apex-player-loading-line")).not.toBeNull();
     const host = node.firstElementChild as HTMLElement;
     host.requestFullscreen = jest.fn().mockResolvedValue(undefined);
     const video = node.querySelector("video")!;
@@ -84,12 +87,14 @@ test("native shortcuts navigate episodes and playback syncs once at 80%", async 
     act(() => video.dispatchEvent(new Event("ended")));
     expect(props.onEpisodeChange).toHaveBeenCalledTimes(2);
     await act(async () => root.render(<NativeVideoPlayer {...props} episode={3}
-      stream={{ ...props.stream, url: "/api/playback?id=1&episode=3" }} />));
+      stream={{ ...props.stream, url: "/api/playback?id=1&episode=3&audio=sub" }} />));
     expect(node.firstElementChild).toBe(host);
     expect(node.querySelector("video")).not.toBe(video);
+    expect(node.querySelector(".apex-player-loading-line")).toBeNull();
   } finally {
     act(() => root.unmount());
     fetchMock.mockRestore();
+    canPlay.mockRestore();
     URL.createObjectURL = createObjectURL;
     URL.revokeObjectURL = revokeObjectURL;
     jest.useRealTimers();

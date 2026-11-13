@@ -559,7 +559,7 @@
 .apex-player-loading small { color: #fffb; }
 .apex-player-loading-line {
   width: min(160px, 40vw);
-  height: 3px;
+  height: 2px;
   overflow: hidden;
   border-radius: 999px;
   background: #ffffff30;
@@ -570,10 +570,10 @@
   width: 44%;
   height: 100%;
   border-radius: inherit;
-  background: #fff;
-  animation: apex-player-load 1.2s ease-in-out infinite alternate;
+  background: linear-gradient(90deg, transparent, #fff 65%, #fff8);
+  animation: apex-player-load 1s ease-in-out infinite alternate;
 }
-@keyframes apex-player-load { to { transform: translateX(127%); } }
+@keyframes apex-player-load { to { transform: translateX(127.27%); } }
 @media (prefers-reduced-motion: reduce) {
   .apex-player-loading-line::after { animation: none; }
 }
@@ -633,3 +633,6 @@
   top: max(64px, 12%);
   bottom: auto;
 }
+
+.apex-player-loading-art { filter: blur(15px); transform: scale(1.04); }
+.apex-player-loading strong { font-size: clamp(24px, 4vw, 52px); line-height: 1.04; max-width: 22ch; }
