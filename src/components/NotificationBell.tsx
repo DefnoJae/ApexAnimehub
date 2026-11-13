@@ -94,7 +94,6 @@ export function NotificationBell({
                   {activeVisitors}
                 </span>
               )}
-              <small>{feed.unreadCount ? feed.unreadCount + " new" : ""}</small>
             </h2>
             <button
               aria-label="Close notifications"

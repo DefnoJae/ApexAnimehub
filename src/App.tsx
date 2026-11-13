@@ -45,6 +45,7 @@ export default function App() {
   const [showAccounts, setShowAccounts] = useState(false);
   const { route, navigate, back, closePlayer } = usePageRoute();
   const view = route.view;
+  const [watchOrderAnime, setWatchOrderAnime] = useState<DashboardAnime | null>(null);
   const [loading, setLoading] = useState(true);
   const [contentError, setContentError] = useState<string | null>(null);
   const [searchError, setSearchError] = useState<string | null>(null);
@@ -720,6 +721,8 @@ export default function App() {
                   )
                 }
                 key={selectedAnime.id}
+                watchOrderAnime={watchOrderAnime}
+                onWatchOrderChange={setWatchOrderAnime}
                 anime={selectedAnime}
                 accounts={accounts}
                 total={totalEpisodes}

@@ -58,10 +58,12 @@ export function graphLayout(data: OrderGraph) {
 export default function WatchOrder({
   anime,
   accounts,
+  activeAnimeId = anime.id,
   onSelect,
   onClose,
 }: {
   anime: OrderAnime;
+  activeAnimeId?: number;
   accounts: ReturnType<typeof useAccounts>;
   onSelect: (anime: DashboardAnime) => void;
   onClose: () => void;
@@ -113,12 +115,12 @@ export default function WatchOrder({
   }, [anime.id, attempt]);
   const positions = useMemo(() => (data ? graphLayout(data) : null), [data]);
   useEffect(() => {
-    const selected = positions?.nodes.find(({ node }) => node.id === anime.id);
+    const selected = positions?.nodes.find(({ node }) => node.id === activeAnimeId);
     const element = viewport.current;
     if (!element || !selected) return;
     element.scrollLeft = Math.max(0, selected.x - element.clientWidth / 2);
     element.scrollTop = Math.max(0, selected.y - element.clientHeight / 2);
-  }, [positions, anime.id]);
+  }, [positions, activeAnimeId]);
   const fit = () => {
     if (!positions || !viewport.current) return;
     setZoom(
@@ -297,7 +299,7 @@ export default function WatchOrder({
                   const completed = entries.some(
                     (entry) => entry.status === "completed",
                   );
-                  const current = node.id === anime.id;
+                  const current = node.id === activeAnimeId;
                   return (
                     <button
                       key={node.id}

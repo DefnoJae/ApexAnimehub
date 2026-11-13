@@ -91,6 +91,8 @@ export function AnimeDetails({
   onSelect,
   onConnect,
   onStudio,
+  watchOrderAnime,
+  onWatchOrderChange,
 }: {
   anime: DetailAnime;
   accounts: ReturnType<typeof useAccounts>;
@@ -106,13 +108,17 @@ export function AnimeDetails({
   onBack: () => void;
   onSelect: (anime: DashboardAnime) => void;
   onConnect: () => void;
+  watchOrderAnime?: DashboardAnime | null;
+  onWatchOrderChange?: (anime: DashboardAnime | null) => void;
   onStudio?: (id: number, name: string) => void;
 }) {
   const [tab, setTab] = useState<"episodes" | "related" | "recommendations">(
     "episodes",
   );
   const [expanded, setExpanded] = useState(false);
-  const [orderId, setOrderId] = useState<number | null>(null);
+  const [localWatchOrder, setLocalWatchOrder] = useState<DashboardAnime | null>(null);
+  const orderAnime = watchOrderAnime === undefined ? localWatchOrder : watchOrderAnime;
+  const setOrderAnime = onWatchOrderChange ?? setLocalWatchOrder;
   const [source, setSource] = useState<"apex" | "megaplay" | "anipm">(
     preferredPlaybackSource,
   );
@@ -293,13 +299,9 @@ export function AnimeDetails({
                   className="detail-watch-order-toggle"
                   aria-label="Watch Order"
                   title="Watch Order"
-                  aria-expanded={orderId === anime.id}
+                  aria-expanded={!!orderAnime}
                   aria-controls="anime-watch-order"
-                  onClick={() =>
-                    setOrderId((value) =>
-                      value === anime.id ? null : anime.id,
-                    )
-                  }
+                  onClick={() => setOrderAnime(orderAnime ? null : anime)}
                 >
                   <ListOrdered size={21} aria-hidden="true" />
                 </button>
@@ -333,15 +335,15 @@ export function AnimeDetails({
           </div>
         </div>
       </header>
-      {orderId === anime.id && (
+      {orderAnime && (
         <div className="detail-watch-order-wrap">
           <Suspense fallback={<p role="status">Loading Watch Order…</p>}>
             <WatchOrder
-              key={anime.id}
-              anime={anime}
+              anime={orderAnime}
+              activeAnimeId={anime.id}
               accounts={accounts}
               onSelect={onSelect}
-              onClose={() => setOrderId(null)}
+              onClose={() => setOrderAnime(null)}
             />
           </Suspense>
         </div>
