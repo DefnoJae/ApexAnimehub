@@ -384,11 +384,12 @@ function createServer() {
     }
   });
 }
-const cleanup = setInterval(() => {
-  for (const [id, session] of sessions)
-    if (session.expiresAt < Date.now()) sessions.delete(id);
-}, 60000);
-cleanup.unref();
-if (require.main === module)
+if (require.main === module) {
+  const cleanup = setInterval(() => {
+    for (const [id, session] of sessions)
+      if (session.expiresAt < Date.now()) sessions.delete(id);
+  }, 60000);
+  cleanup.unref();
   createServer().listen(Number(process.env.PORT || 3001), "127.0.0.1");
+}
 module.exports = { createServer, sessions };
