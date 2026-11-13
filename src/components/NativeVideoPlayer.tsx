@@ -323,7 +323,7 @@ function EpisodePlayer(props: PlayerProps & {
             (line, timing: string, settings: string) =>
               /(?:^|\s)(?:line|region|vertical):/.test(settings)
                 ? line
-                : timing + settings.trimEnd() + " line:88%,end",
+                : timing + settings.trimEnd() + " line:80%",
           );
           objectUrl = URL.createObjectURL(new Blob([raised], { type: "text/vtt" }));
           setLoadedCaption({ track: selected.url, url: objectUrl });
