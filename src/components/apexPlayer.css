@@ -639,8 +639,54 @@
   background: #fff;
 }
 .apex-player-timeline output { z-index: 1; }
-.apex-caption-group summary { cursor: pointer; padding: 8px; }
-.apex-caption-group button { display: block; width: 100%; text-align: left; padding: 8px; border-radius: 8px; }
+.apex-player-menu.apex-caption-menu {
+  width: min(390px, calc(100% - 32px));
+  background: #171d26ed;
+}
+.apex-caption-menu header,
+.apex-caption-group {
+  border-bottom: 1px solid #ffffff26;
+  padding-bottom: 10px;
+}
+.apex-caption-group {
+  margin-top: 10px;
+}
+.apex-caption-group:last-child { border-bottom: 0; padding-bottom: 0; }
+.apex-caption-group h3 {
+  margin: 0 0 8px;
+  color: #b4bac4;
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+.apex-caption-menu .apex-caption-option,
+.apex-caption-appearance summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  cursor: pointer;
+  text-align: left;
+}
+.apex-caption-menu .apex-caption-option {
+  width: 100%;
+  margin-top: 5px;
+  padding: 8px 10px;
+  border: 1px solid #ffffff30;
+  border-radius: 8px;
+  background: #ffffff08;
+}
+.apex-caption-menu .apex-caption-option[aria-pressed="true"] {
+  border-color: #ffffff70;
+  background: #ffffff30;
+}
+.apex-caption-option svg,
+.apex-caption-appearance summary svg { flex-shrink: 0; }
+.apex-caption-appearance summary { padding: 10px 0; list-style: none; }
+.apex-caption-appearance summary::-webkit-details-marker { display: none; }
+.apex-caption-appearance summary:hover { color: #cbd4e3; }
+.apex-caption-appearance[open] summary svg { transform: rotate(90deg); }
 .apex-cinema video::cue { font-family: Arial, sans-serif; font-weight: 700; }
 
 /* Plain SignSync text gets its own lane when a dialogue track is selected. */

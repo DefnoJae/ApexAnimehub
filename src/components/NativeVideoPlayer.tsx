@@ -4,6 +4,8 @@ import {
   ArrowLeft,
   AudioLines,
   Check,
+  ChevronRight,
+  Circle,
   Layers,
   ListVideo,
   Maximize,
@@ -463,6 +465,12 @@ function EpisodePlayer(props: PlayerProps & {
   });
   const showMenu = (name: Menu) =>
     setMenu((current) => (current === name ? undefined : name));
+  const captionOption = (label: string, url: string) => (
+    <button key={url} className="apex-caption-option" type="button" aria-pressed={track === url} onClick={() => setTrack(url)}>
+      <span>{label}</span>
+      {track === url ? <Check size={17} aria-hidden="true" /> : <Circle size={17} aria-hidden="true" />}
+    </button>
+  );
   const icon = (
     label: string,
     content: React.ReactNode,
@@ -727,7 +735,7 @@ function EpisodePlayer(props: PlayerProps & {
         </section>
       )}
       {menu && menu !== "episodes" && (
-        <section className="apex-player-menu" aria-label={menu}>
+        <section className={`apex-player-menu${menu === "captions" ? " apex-caption-menu" : ""}`} aria-label={menu === "captions" ? "Subtitles" : menu}>
           <header>
             <h2>
               {menu === "captions"
@@ -743,77 +751,77 @@ function EpisodePlayer(props: PlayerProps & {
           {menu === "captions" && (
             <>
               {captionError && <p role="alert">{captionError}</p>}
-              <button aria-pressed={!track} onClick={() => setTrack("")}>
-                Off
-              </button>
+              {captionOption("Off", "")}
               {(["signs", "cc", "full", "other"] as const).map((kind) => {
                 const tracks = eligibleTracks.filter((item) => {
                   const english = /^(en|eng)(-|$)|english/i.test(item.language || item.label) || /english/i.test(item.label);
                   return kind === "other" ? !english : english && trackKind(item) === kind;
                 });
                 if (!tracks.length) return null;
-                const heading = { signs: "English Signs & Songs", cc: "English closed captions", full: "English full subtitles", other: "Other languages" }[kind];
-                const buttons = tracks.map((item) => (
-                  <button key={item.url} type="button" aria-pressed={track === item.url} onClick={() => setTrack(item.url)}>
-                    {item.label}
-                  </button>
-                ));
-                return kind === "other" ? (
-                  <details key={kind} className="apex-caption-group"><summary>{heading}</summary>{buttons}</details>
-                ) : (
-                  <div key={kind}><strong>{heading}</strong>{buttons}</div>
+                const heading = { signs: "Signs & Songs", cc: "Closed captions", full: "Full subtitles", other: "Other languages" }[kind];
+                return (
+                  <div key={kind} className="apex-caption-group" role="group" aria-label={heading}>
+                    <h3>{heading}</h3>
+                    {tracks.map((item) => captionOption(item.label, item.url))}
+                  </div>
                 );
               })}
-              <label>
-                On English dub
-                <StyledSelect
-                  aria-label="On English dub"
-                  value={captionMode}
-                  onChange={(event) => {
-                    const mode = event.target.value as CaptionMode;
-                    setCaptionMode(mode);
-                    remember("dub_captions", mode);
-                  }}
-                >
-                  <option value="signs">Prefer Signs & Songs</option>
-                  <option value="full">Prefer full English CC</option>
-                  <option value="off">Off</option>
-                </StyledSelect>
-              </label>
-              <label>
-                Dialogue size
-                <input
-                  type="range"
-                  min="14"
-                  max="56"
-                  value={captionSize}
-                  onChange={(e) => setCaptionSize(Number(e.target.value))}
-                />
-              </label>
-              <label>
-                Dialogue color
-                <input
-                  type="color"
-                  value={captionColor}
-                  onChange={(e) => setCaptionColor(e.target.value)}
-                />
-              </label>
-              <label>
-                Dialogue outline
-                <input
-                  type="checkbox"
-                  checked={captionOutline}
-                  onChange={(e) => setCaptionOutline(e.target.checked)}
-                />
-              </label>
-              <label>
-                Dialogue background
-                <input
-                  type="checkbox"
-                  checked={captionBackground}
-                  onChange={(e) => setCaptionBackground(e.target.checked)}
-                />
-              </label>
+              <div className="apex-caption-group" role="group" aria-label="Preferences">
+                <h3>Preferences</h3>
+                <label>
+                  On English dub
+                  <StyledSelect
+                    aria-label="On English dub"
+                    value={captionMode}
+                    onChange={(event) => {
+                      const mode = event.target.value as CaptionMode;
+                      setCaptionMode(mode);
+                      remember("dub_captions", mode);
+                    }}
+                  >
+                    <option value="signs">Prefer Signs & Songs</option>
+                    <option value="full">Prefer full English CC</option>
+                    <option value="off">Off</option>
+                  </StyledSelect>
+                </label>
+                <details className="apex-caption-appearance">
+                  <summary>Dialogue appearance <ChevronRight size={16} aria-hidden="true" /></summary>
+                  <label>
+                    Dialogue size
+                    <input
+                      type="range"
+                      min="14"
+                      max="56"
+                      value={captionSize}
+                      onChange={(e) => setCaptionSize(Number(e.target.value))}
+                    />
+                  </label>
+                  <label>
+                    Dialogue color
+                    <input
+                      type="color"
+                      value={captionColor}
+                      onChange={(e) => setCaptionColor(e.target.value)}
+                    />
+                  </label>
+                  <label>
+                    Dialogue outline
+                    <input
+                      type="checkbox"
+                      checked={captionOutline}
+                      onChange={(e) => setCaptionOutline(e.target.checked)}
+                    />
+                  </label>
+                  <label>
+                    Dialogue background
+                    <input
+                      type="checkbox"
+                      checked={captionBackground}
+                      onChange={(e) => setCaptionBackground(e.target.checked)}
+                    />
+                  </label>
+                </details>
+              </div>
             </>
           )}
           {menu === "audio" && (
