@@ -5,6 +5,7 @@ import type { DashboardAnime } from "./HomeDashboard";
 export interface PlayerProps {
   anime?: DashboardAnime;
   episodeCount?: number;
+  watchedThrough?: number;
   audio?: AudioLanguage;
   onPlaybackSource?: (source: PlaybackSource, audio: AudioLanguage) => void;
   resume?: { position?: number; duration?: number };

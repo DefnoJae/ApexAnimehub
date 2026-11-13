@@ -506,6 +506,12 @@ export default function App() {
           stream={playingStream}
           canNext={canNextEpisode}
           episodeCount={availableEpisodes}
+          watchedThrough={Math.max(
+            0,
+            ...accounts.libraryEntries
+              .filter((entry) => sameAnime(entry.anime, selectedAnime))
+              .map((entry) => entry.progress),
+          )}
           audio={route.audio}
           onPlaybackSource={(source, audio) => {
             navigate(

@@ -1,17 +1,19 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight, X } from "lucide-react";
-import type { EpisodeMetadata } from "../utils/episodeMetadata";
+import { Check, ChevronLeft, ChevronRight, X } from "lucide-react";
+import { namedEpisodeTitle, type EpisodeMetadata } from "../utils/episodeMetadata";
 
 export function PlayerEpisodeCarousel({
   episode,
   numbers,
   episodes,
+  watchedThrough = 0,
   onSelect,
   onClose,
 }: {
   episode: number;
   numbers: number[];
   episodes: Record<string, EpisodeMetadata>;
+  watchedThrough?: number;
   onSelect: (episode: number) => void;
   onClose: () => void;
 }) {
@@ -102,21 +104,27 @@ export function PlayerEpisodeCarousel({
             setCenter(next);
           }}
         >
-          {numbers.map((number) => (
-            <div className="apex-carousel-slot" data-episode={number} key={number}>
-              <button
-                type="button"
-                className="apex-carousel-card"
-                data-position={number === center ? "center" : number < center ? "left" : "right"}
-                aria-current={number === episode ? "true" : undefined}
-                tabIndex={number === center ? 0 : -1}
-                onClick={() => onSelect(number)}
-              >
-                {episodes[number]?.image && <img src={episodes[number].image} alt="" loading="lazy" />}
-                <span><b>E{number}</b>{episodes[number]?.title || `Episode ${number}`}</span>
-              </button>
-            </div>
-          ))}
+          {numbers.map((number) => {
+            const title = namedEpisodeTitle(episodes[number]?.title, number);
+            const isWatched = number <= watchedThrough;
+            return (
+              <div className="apex-carousel-slot" data-episode={number} key={number}>
+                <button
+                  type="button"
+                  className="apex-carousel-card"
+                  data-position={number === center ? "center" : number < center ? "left" : "right"}
+                  aria-current={number === episode ? "true" : undefined}
+                  aria-label={`Episode ${number}${title ? ` · ${title}` : ""}${isWatched ? ", watched" : ""}`}
+                  tabIndex={number === center ? 0 : -1}
+                  onClick={() => onSelect(number)}
+                >
+                  {episodes[number]?.image && <img src={episodes[number].image} alt="" loading="lazy" />}
+                  {isWatched && <Check className="apex-episode-watched" size={20} aria-hidden="true" />}
+                  <span>{title ? <><b>E{number}</b>{title}</> : `Episode ${number}`}</span>
+                </button>
+              </div>
+            );
+          })}
         </div>
         <button type="button" className="apex-carousel-arrow is-left" aria-label="Browse previous episode" disabled={center <= 1} onClick={() => move(-1)}>
           <ChevronLeft size={20} />

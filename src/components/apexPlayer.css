@@ -519,6 +519,16 @@
   font-weight: 650;
   text-align: left;
 }
+.apex-episode-watched {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 1;
+  padding: 3px;
+  border-radius: 50%;
+  background: #101714e6;
+  color: #a5e5c9;
+}
 .apex-carousel-card b {
   flex: none;
   padding: 1px 5px;

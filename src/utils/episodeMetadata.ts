@@ -15,6 +15,12 @@ const DAY = 86400000;
 const text = (value: unknown): string | undefined =>
   typeof value === "string" && value.trim() ? value.trim() : undefined;
 
+export function namedEpisodeTitle(title: string | undefined, episode: number) {
+  const value = title?.trim();
+  const numberLabel = value?.match(/^(?:episode|ep\.?)\s*0*(\d+)$/i);
+  return numberLabel && Number(numberLabel[1]) === episode ? undefined : value;
+}
+
 export function parseEpisodes(data: unknown, id: number): Episodes {
   if (!data || typeof data !== "object") return {};
   const payload = data as {

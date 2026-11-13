@@ -3,6 +3,7 @@ import Hls from "hls.js";
 import {
   ArrowLeft,
   AudioLines,
+  Check,
   Layers,
   ListVideo,
   Maximize,
@@ -24,6 +25,7 @@ import { usePlayerKeyboard } from "../hooks/usePlayerKeyboard";
 import { fetchHeroArtwork } from "../utils/heroArtwork";
 import {
   fetchEpisodeMetadata,
+  namedEpisodeTitle,
   type EpisodeMetadata,
 } from "../utils/episodeMetadata";
 import {
@@ -175,6 +177,7 @@ function EpisodePlayer(props: PlayerProps & {
   const lastSaved = useRef(0);
   const selectedTrack = useRef("");
   const currentEpisode = episodes[episode];
+  const episodeTitle = namedEpisodeTitle(currentEpisode?.title, episode);
   const noFonts = useRef<string[]>([]);
   const eligibleTracks = source?.subtitles || [];
   const chapters = source?.chapters || [];
@@ -605,7 +608,7 @@ function EpisodePlayer(props: PlayerProps & {
         })}
         <span>
           {props.title} · Episode {episode}
-          {currentEpisode?.title ? " · " + currentEpisode.title : ""}
+          {episodeTitle && ` · ${episodeTitle}`}
         </span>
         <div className="apex-player-signsync">
           <SignSync
@@ -661,7 +664,7 @@ function EpisodePlayer(props: PlayerProps & {
             )}
             <strong>
               Episode {episode}
-              {currentEpisode?.title ? " · " + currentEpisode.title : ""}
+              {episodeTitle && ` · ${episodeTitle}`}
             </strong>
             {currentEpisode?.overview && <p>{currentEpisode.overview}</p>}
             <small>{playbackTime(Math.max(0, duration - position))} left</small>
@@ -669,7 +672,7 @@ function EpisodePlayer(props: PlayerProps & {
         </div>
       )}
       {menu === "episodes" && !side && (
-        <PlayerEpisodeCarousel episode={episode} numbers={episodeNumbers} episodes={episodes} onSelect={chooseEpisode} onClose={() => { setMenu(undefined); dialog.current?.focus({ preventScroll: true }); }} />
+        <PlayerEpisodeCarousel episode={episode} numbers={episodeNumbers} episodes={episodes} watchedThrough={props.watchedThrough} onSelect={chooseEpisode} onClose={() => { setMenu(undefined); dialog.current?.focus({ preventScroll: true }); }} />
       )}
       {menu === "episodes" && side && (
         <section
@@ -700,22 +703,26 @@ function EpisodePlayer(props: PlayerProps & {
               }
             }}
           >
-            {episodeNumbers.map((number) => (
-              <button
-                key={number}
-                type="button"
-                autoFocus={number === episode}
-                aria-current={number === episode ? "true" : undefined}
-                onClick={() => chooseEpisode(number)}
-              >
-                {episodes[number]?.image && (
-                  <img src={episodes[number].image} alt="" loading="lazy" />
-                )}
-                <span>
-                  Ep {number} · {episodes[number]?.title || "Episode " + number}
-                </span>
-              </button>
-            ))}
+            {episodeNumbers.map((number) => {
+              const title = namedEpisodeTitle(episodes[number]?.title, number);
+              const isWatched = number <= (props.watchedThrough ?? 0);
+              return (
+                <button
+                  key={number}
+                  type="button"
+                  autoFocus={number === episode}
+                  aria-current={number === episode ? "true" : undefined}
+                  aria-label={`Episode ${number}${title ? ` · ${title}` : ""}${isWatched ? ", watched" : ""}`}
+                  onClick={() => chooseEpisode(number)}
+                >
+                  {episodes[number]?.image && (
+                    <img src={episodes[number].image} alt="" loading="lazy" />
+                  )}
+                  {isWatched && <Check className="apex-episode-watched" size={20} aria-hidden="true" />}
+                  <span>Episode {number}{title && ` · ${title}`}</span>
+                </button>
+              );
+            })}
           </div>
         </section>
       )}

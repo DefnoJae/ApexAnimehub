@@ -19,9 +19,12 @@ test("centers the playing episode and snaps to the next card without starting it
   HTMLElement.prototype.scrollTo = scroll;
   window.matchMedia = jest.fn().mockReturnValue({ matches: false });
   try {
-    act(() => root.render(<PlayerEpisodeCarousel episode={2} numbers={[1, 2, 3]} episodes={{}} onSelect={select} onClose={close} />));
+    act(() => root.render(<PlayerEpisodeCarousel episode={2} numbers={[1, 2, 3]} episodes={{ 2: { title: "Episode 2" }, 3: { title: "A real title" } }} watchedThrough={1} onSelect={select} onClose={close} />));
     expect(scroll).toHaveBeenLastCalledWith({ left: 200, behavior: "auto" });
-    expect(container.querySelector('[data-position="center"]')?.textContent).toContain("Episode 2");
+    expect(container.querySelector('[data-position="center"]')?.textContent).toBe("Episode 2");
+    expect(container.querySelector('[aria-label="Episode 1, watched"] .apex-episode-watched')).not.toBeNull();
+    expect(container.querySelector('[aria-label="Episode 2"] .apex-episode-watched')).toBeNull();
+    expect(container.querySelector('[aria-label="Episode 3 · A real title"]')).not.toBeNull();
     act(() => container.querySelector<HTMLButtonElement>('[aria-label="Browse next episode"]')!.click());
     expect(scroll).toHaveBeenLastCalledWith({ left: 400, behavior: "smooth" });
     expect(select).not.toHaveBeenCalled();
