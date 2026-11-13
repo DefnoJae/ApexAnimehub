@@ -540,3 +540,82 @@
 @media (prefers-reduced-motion: reduce) {
   .apex-carousel-card { transition: none; }
 }
+
+.apex-player-loading {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 12px;
+  padding: 24px;
+  text-align: center;
+  pointer-events: none;
+  background: radial-gradient(ellipse, #070a11a8, #05070dd9);
+}
+.apex-player-loading img { width: min(260px, 50vw); max-height: 155px; object-fit: contain; }
+.apex-player-loading strong { font-size: clamp(18px, 3vw, 30px); max-width: 36ch; }
+.apex-player-loading span { font-size: 14px; }
+.apex-player-loading small { color: #fffb; }
+.apex-player-spinner {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2px solid #ffffff32;
+  border-top-color: #fff;
+  animation: apex-player-spin .85s linear infinite;
+}
+@keyframes apex-player-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .apex-player-spinner { animation: none; }
+}
+.apex-player-skip {
+  position: absolute;
+  bottom: 80px;
+  left: 20px;
+  z-index: 6;
+  padding: 10px 17px;
+  color: white;
+  border-radius: 999px;
+  border: 1px solid #ffffff5c;
+  background: #141414a8;
+  backdrop-filter: blur(12px);
+}
+.apex-player-skip:hover { background: #414141e8; }
+.apex-timeline-glass {
+  position: absolute;
+  top: 50%;
+  translate: 0 -50%;
+  left: 0;
+  right: 0;
+  height: 3px;
+  border-radius: 99px;
+  background: linear-gradient(90deg,#ffffffe0 var(--played),#ffffff45 var(--played));
+  box-shadow: 0 0 3px #fff3;
+  pointer-events: none;
+}
+.apex-timeline-glass i { position: absolute; height: 100%; background: #ffffff80; }
+.apex-player-timeline input {
+  position: relative;
+  appearance: none;
+  background: transparent;
+}
+.apex-player-timeline input::-webkit-slider-thumb {
+  appearance: none;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 4px #0008;
+}
+.apex-player-timeline input::-moz-range-thumb {
+  width: 11px;
+  height: 11px;
+  border: 0;
+  border-radius: 50%;
+  background: #fff;
+}
+.apex-player-timeline output { z-index: 1; }
+.apex-caption-group summary { cursor: pointer; padding: 8px; }
+.apex-caption-group button { display: block; width: 100%; text-align: left; padding: 8px; border-radius: 8px; }
+.apex-cinema video::cue { font-family: Arial, sans-serif; font-weight: 700; }

@@ -75,6 +75,12 @@ function decodeMaterial(wasm, fragment, extra, token, seed) {
   });
 }
 
+function chapter(value, kind) {
+  if (!value || !Number.isFinite(value.start) || !Number.isFinite(value.end) ||
+      value.start < 0 || value.end <= value.start) return null;
+  return { kind, start: value.start, end: value.end };
+}
+
 async function resolveReanime(id, episode, audio, signal) {
   const response = await read(`${site}/api/flix/${id}/${episode}`, signal);
   const { servers } = await response.json();
@@ -93,7 +99,7 @@ async function resolveReanime(id, episode, audio, signal) {
   const data = {};
   for (const prop of expression.properties) {
     const name = prop.key?.name ?? prop.key?.value;
-    if (typeof name === "string" && /^(obfuscation_seed|obfuscated_crypto_data|w_payload|subtitles|[a-f0-9]+_[a-f0-9]+)$/.test(name))
+    if (typeof name === "string" && /^(obfuscation_seed|obfuscated_crypto_data|w_payload|subtitles|intro_chapter|outro_chapter|[a-f0-9]+_[a-f0-9]+)$/.test(name))
       data[name] = literal(prop.value);
   }
   const seed = data.obfuscation_seed;
@@ -122,6 +128,7 @@ async function resolveReanime(id, episode, audio, signal) {
     stream: mediaUrl(stream.toString().replace(/\0/g, "").trim()).href,
     playlistKey: Buffer.from(playlistKey).toString("base64"),
     subtitles: Array.isArray(data.subtitles) ? data.subtitles : [],
+    chapters: [chapter(data.intro_chapter, "intro"), chapter(data.outro_chapter, "outro")].filter(Boolean),
   };
 }
 
@@ -160,6 +167,7 @@ async function resolvePlayback(id, episode, audio) {
     audio,
     quality: "auto",
     provider: "Re:Anime",
+    chapters: result.chapters,
   };
 }
 

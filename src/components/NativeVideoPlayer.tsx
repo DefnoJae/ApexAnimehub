@@ -41,7 +41,9 @@ import "./nativeVideoPlayer.css";
 import "./apexPlayer.css";
 
 type Track = { url: string; label: string; language?: string; format: string };
+type Chapter = { kind: "intro" | "outro"; start: number; end: number };
 type MediaSource = {
+  chapters?: Chapter[];
   url: string;
   subtitles: Track[];
   provider: string;
@@ -123,8 +125,8 @@ function EpisodePlayer(props: PlayerProps & {
   const [speed, setSpeed] = useState(1);
   const [quality, setQuality] = useState(-1);
   const [levels, setLevels] = useState<number[]>([]);
-  const [captionSize, setCaptionSize] = useState(20);
-  const [captionBackground, setCaptionBackground] = useState(true);
+  const [captionSize, setCaptionSize] = useState(30);
+  const [captionBackground, setCaptionBackground] = useState(false);
   const [filter, setFilter] = useState("none");
   const [scrub, setScrub] = useState<number>();
   const [saved] = useState(() =>
@@ -138,6 +140,11 @@ function EpisodePlayer(props: PlayerProps & {
   const currentEpisode = episodes[episode];
   const noFonts = useRef<string[]>([]);
   const eligibleTracks = source?.subtitles || [];
+  const chapters = source?.chapters || [];
+  const activeChapter = hasVideoFrame && chapters.find((chapter) =>
+    position >= chapter.start && position < chapter.end &&
+    chapter.start < duration && chapter.end <= duration + 1,
+  );
 
   const persist = (force = false) => {
     const media = video.current;
@@ -502,6 +509,9 @@ function EpisodePlayer(props: PlayerProps & {
             src={loadedCaption.url}
             kind="subtitles"
             label={eligibleTracks.find((item) => item.url === track)?.label}
+            onLoad={(event) => {
+              event.currentTarget.track.mode = pauseOverlay ? "hidden" : "showing";
+            }}
             onError={() => setCaptionError("This subtitle track could not render. Try another track.")}
           />
         )}
@@ -547,11 +557,15 @@ function EpisodePlayer(props: PlayerProps & {
         <p role="alert" className="apex-player-status">
           {error || captionError}
         </p>
-      ) : !source && start !== null ? (
-        <p role="status" className="apex-player-status">
-          Finding a stream…
-        </p>
       ) : null}
+      {!hasVideoFrame && start !== null && !error && (
+        <div className="apex-player-loading" role="status">
+          {logo ? <img src={logo} alt={props.title} /> : <strong>{props.title}</strong>}
+          <span>Episode {episode} · {audio === "dub" ? "Dub" : "Sub"}</span>
+          <span className="apex-player-spinner" aria-hidden="true" />
+          <small>{source ? "Starting playback…" : "Finding a stream…"}</small>
+        </div>
+      )}
       {start === null && (
         <div className="anipm-resume-prompt">
           <h2>Continue watching?</h2>
@@ -656,28 +670,24 @@ function EpisodePlayer(props: PlayerProps & {
               <button aria-pressed={!track} onClick={() => setTrack("")}>
                 Off
               </button>
-              {(
-                [
-                  ["signs", "Signs & Songs"],
-                  ["full", "Full subtitles"],
-                  ["cc", "Closed captions"],
-                ] as const
-              ).map(([kind, label]) => (
-                <div key={kind}>
-                  <strong>{label}</strong>
-                  {eligibleTracks
-                    .filter((item) => trackKind(item) === kind)
-                    .map((item) => (
-                      <button
-                        key={item.url}
-                        aria-pressed={track === item.url}
-                        onClick={() => setTrack(item.url)}
-                      >
-                        {item.label}
-                      </button>
-                    ))}
-                </div>
-              ))}
+              {(["signs", "cc", "full", "other"] as const).map((kind) => {
+                const tracks = eligibleTracks.filter((item) => {
+                  const english = /^(en|eng)(-|$)|english/i.test(item.language || item.label) || /english/i.test(item.label);
+                  return kind === "other" ? !english : english && trackKind(item) === kind;
+                });
+                if (!tracks.length) return null;
+                const heading = { signs: "English Signs & Songs", cc: "English closed captions", full: "English full subtitles", other: "Other languages" }[kind];
+                const buttons = tracks.map((item) => (
+                  <button key={item.url} type="button" aria-pressed={track === item.url} onClick={() => setTrack(item.url)}>
+                    {item.label}
+                  </button>
+                ));
+                return kind === "other" ? (
+                  <details key={kind} className="apex-caption-group"><summary>{heading}</summary>{buttons}</details>
+                ) : (
+                  <div key={kind}><strong>{heading}</strong>{buttons}</div>
+                );
+              })}
               <label>
                 On English dub
                 <StyledSelect
@@ -900,9 +910,19 @@ function EpisodePlayer(props: PlayerProps & {
           )}
         </section>
       )}
+      {activeChapter && menu !== "episodes" && (
+        <button className="apex-player-skip" type="button" onClick={() => seek(activeChapter.end)}>
+          {activeChapter.kind === "intro" ? "Skip intro" : "Skip ending"}
+        </button>
+      )}
       {start !== null && (
         <footer className="apex-player-bottom" hidden={!controls || menu === "episodes"}>
-          <div className="apex-player-timeline">
+          <div className="apex-player-timeline" style={{ "--played": (position / (duration || 1)) * 100 + "%" } as React.CSSProperties}>
+            <div className="apex-timeline-glass" aria-hidden="true">
+              {chapters.filter((chapter) => chapter.start < duration && chapter.end <= duration + 1).map((chapter) => (
+                <i key={chapter.kind} style={{ left: chapter.start / duration * 100 + "%", width: (Math.min(duration, chapter.end) - chapter.start) / duration * 100 + "%" }} />
+              ))}
+            </div>
             {scrub !== undefined && (
               <output
                 style={{

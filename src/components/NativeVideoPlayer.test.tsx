@@ -12,7 +12,7 @@ test("native shortcuts navigate episodes and playback syncs once at 80%", async 
   URL.revokeObjectURL = jest.fn();
   const fetchMock = jest.spyOn(global, "fetch").mockImplementation(async (input) => ({
     ok: true,
-    json: async () => ({ url: "https://stream.animeparadise.moe/test.mp4", audio: "sub", subtitles: [{ url: "https://example.test/english.vtt", label: "English", format: "vtt" }]  }),
+    json: async () => ({ url: "https://stream.animeparadise.moe/test.mp4", audio: "sub", chapters: [{ kind: "intro", start: 5, end: 15 }], subtitles: [{ url: "https://example.test/english.vtt", label: "English", format: "vtt" }]  }),
     text: async () => String(input).endsWith(".vtt") ? "WEBVTT\n\n00:00:01.000 --> 00:00:02.000\nHello" : "",
   }) as Response);
   const node = document.body.appendChild(document.createElement("div"));
@@ -46,6 +46,17 @@ test("native shortcuts navigate episodes and playback syncs once at 80%", async 
     expect(textTrack.mode).toBe("hidden");
     act(() => video.dispatchEvent(new Event("play")));
     expect(textTrack.mode).toBe("showing");
+    act(() => {
+      video.dispatchEvent(new Event("playing"));
+      video.currentTime = 8;
+      video.dispatchEvent(new Event("timeupdate"));
+    });
+    const skip = Array.from(node.querySelectorAll("button")).find((button) => button.textContent === "Skip intro");
+    expect(skip).toBeDefined();
+    act(() => skip!.click());
+    expect(video.currentTime).toBe(15);
+    act(() => video.dispatchEvent(new Event("timeupdate")));
+    expect(skip!.isConnected).toBe(false);
     const key = (value: string) => act(() => document.body.dispatchEvent(
       new KeyboardEvent("keydown", { key: value, bubbles: true, cancelable: true }),
     ));
