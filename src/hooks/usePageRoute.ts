@@ -5,7 +5,7 @@ export type PlaybackSource = "anipm" | "apex" | "megaplay";
 export function preferredPlaybackSource(): PlaybackSource {
   try {
     const source = localStorage.getItem("apex_playback_source");
-    if (source === "megaplay") return source;
+    if (source === "apex" || source === "megaplay") return source;
   } catch {}
   return "anipm";
 }

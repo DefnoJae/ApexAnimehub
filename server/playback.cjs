@@ -1,6 +1,3 @@
-// Temporarily stop video transfer through Vercel, including previously issued URLs.
-const playbackPaused = true;
-const { resolvePlayback, serveMedia } = require("./reanime.cjs");
 const cache = new Map();
 const pending = new Map();
 function coverId(url) {
@@ -79,22 +76,13 @@ function allowed(value) {
     return false;
   }
 }
-async function resolve(id, episode, audio) {
-  if (audio === "dub") return resolvePlayback(id, episode, audio);
-  try {
-    return await resolveParadise(id, episode, audio);
-  } catch {
-    return resolvePlayback(id, episode, audio);
-  }
-}
 async function handler(req, res) {
   const relay = new URL(req.url, "https://localhost").searchParams.get("media");
-  if (relay !== null && !playbackPaused) return serveMedia(req, res, relay);
   res.setHeader("Content-Type", "application/json");
   res.setHeader("Cache-Control", "no-store");
   if (relay !== null) {
     res.statusCode = 410;
-    return res.end(JSON.stringify({ error: "Apex Player is temporarily unavailable. Use Ani.pm." }));
+    return res.end(JSON.stringify({ error: "The video relay is disabled." }));
   }
   if (req.method !== "GET") {
     res.statusCode = 405;
@@ -113,11 +101,11 @@ async function handler(req, res) {
     res.statusCode = 400;
     return res.end(JSON.stringify({ error: "Invalid anime or episode" }));
   }
-  if (playbackPaused) {
-    res.statusCode = 503;
-    return res.end(JSON.stringify({ error: "Apex Player is temporarily unavailable. Use Ani.pm." }));
-  }
   const audio = url.searchParams.get("audio") === "dub" ? "dub" : "sub";
+  if (audio === "dub") {
+    res.statusCode = 404;
+    return res.end(JSON.stringify({ error: "No direct dub source is available. Use Ani.pm." }));
+  }
   const key = `${id}:${episode}:${audio}`;
   try {
     const saved = cache.get(key);
@@ -131,7 +119,7 @@ async function handler(req, res) {
           JSON.stringify({ error: "Player source is busy. Please retry." }),
         );
       }
-      request = resolve(id, episode, audio);
+      request = resolveParadise(id, episode, audio);
       pending.set(key, request);
       request
         .then((value) => {

@@ -73,11 +73,13 @@ export default function App() {
     selectedAnime.episodes &&
     activeEpisode > selectedAnime.episodes
   );
-  const playbackSource = route.source === "apex" ? "anipm" : route.source;
+  const playbackSource = route.source === "apex" && route.audio === "dub" ? "anipm" : route.source;
   const streamName =
     playbackSource === "anipm"
       ? `Ani.pm (${route.audio === "dub" ? "Dub" : "Sub"})`
-      : `MegaPlay (${route.audio === "dub" ? "Dub" : "Sub"})`;
+      : playbackSource === "apex"
+        ? "Apex Player (Sub)"
+        : `MegaPlay (${route.audio === "dub" ? "Dub" : "Sub"})`;
   const playingStream =
     route.play &&
     !detailLoading &&
@@ -89,7 +91,9 @@ export default function App() {
           url:
             playbackSource === "anipm"
               ? aniPmUrl(route.animeId!, activeEpisode, route.audio)
-              : `https://megaplay.buzz/stream/ani/${route.animeId}/${activeEpisode}/${route.audio}?color=${THEME_COLOR}`,
+              : playbackSource === "apex"
+                ? `/api/playback?id=${route.animeId}&episode=${activeEpisode}&audio=sub`
+                : `https://megaplay.buzz/stream/ani/${route.animeId}/${activeEpisode}/${route.audio}?color=${THEME_COLOR}`,
         }
       : null;
 
