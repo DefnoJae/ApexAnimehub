@@ -196,7 +196,7 @@ async function serveMedia(req, res, token) {
     const url = mediaUrl(href);
     try {
       const response = await read(url, AbortSignal.timeout(15000), {
-        Origin: player, Referer: player + "/", ...(req.headers.range ? { Range: req.headers.range } : {}),
+        Origin: player, Referer: player + "/", "Accept-Encoding": "identity", ...(req.headers.range ? { Range: req.headers.range } : {}),
       });
       res.setHeader("Cache-Control", "private, max-age=120");
       if (url.pathname.endsWith(".m3u8") || /mpegurl/i.test(response.headers.get("content-type") || "")) {
@@ -209,6 +209,8 @@ async function serveMedia(req, res, token) {
       res.statusCode = response.status;
       res.setHeader("Content-Type", "application/octet-stream");
       for (const header of ["content-length", "content-range", "accept-ranges"]) {
+        // fetch decodes compressed bodies. The upstream wire length no longer applies.
+        if (header === "content-length" && response.headers.get("content-encoding")) continue;
         const value = response.headers.get(header);
         if (value) res.setHeader(header, value);
       }
