@@ -111,13 +111,20 @@ async function episodesFor(id) {
             "query($id:Int!){Media(id:$id,type:ANIME){id title{english romaji native} episodes format startDate{year month day}}}",
           variables: { id },
         }),
-      }),
+      }).catch(() => null),
       json("https://api.ani.zip/mappings?anilist_id=" + id).catch(() => ({})),
     ]);
-    const media = identity.data?.Media;
-    if (media?.id !== id) throw new Error("Episode identity unavailable");
     const m =
       Number(mapping.mappings?.anilist_id) === id ? mapping.mappings : {};
+    const first = /^(\d{4})-(\d{2})-(\d{2})$/.exec(mapping.episodes?.["1"]?.airDate || "");
+    const media = identity?.data?.Media ?? (m.anilist_id && first ? {
+      id,
+      format: m.type,
+      episodes: Number(mapping.episodeCount) || undefined,
+      startDate: { year: Number(first[1]), month: Number(first[2]), day: Number(first[3]) },
+      title: { english: mapping.titles?.en, romaji: mapping.titles?.["x-jat"] },
+    } : null);
+    if (media?.id !== id) throw new Error("Episode identity unavailable");
     if (media.format === "MOVIE" || m?.type === "MOVIE") return {};
     let tmdbId = m?.themoviedb_id;
     if (!/^\d+$/.test(String(tmdbId || ""))) {

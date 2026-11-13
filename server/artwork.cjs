@@ -264,7 +264,25 @@ async function artwork(id, ancestors = new Set()) {
           (key && !token ? "api_key=" + encodeURIComponent(key) : ""),
         token ? { Authorization: "Bearer " + token } : {},
       );
-    const media = await mediaIdentity(id);
+    const media = await mediaIdentity(id).catch(() => null);
+    if (!media) {
+      const mapped = await json("https://api.ani.zip/mappings?anilist_id=" + id);
+      const mapping = mapped.mappings;
+      const tmdbId = Number(mapping?.themoviedb_id);
+      if (Number(mapping?.anilist_id) !== id || !Number.isSafeInteger(tmdbId) || tmdbId <= 0)
+        throw new Error("Artwork identity unavailable");
+      const tmdbType = mapping.type === "MOVIE" ? "movie" : "tv";
+      const data = {
+        anilistId: id,
+        ...selectImages(await tmdb(`${tmdbType}/${tmdbId}/images?include_image_language=en,null`)),
+        tmdbId,
+        tmdbType,
+        match: "mapped",
+      };
+      if (cache.size >= 500) cache.delete(cache.keys().next().value);
+      cache.set(id, { updated: Date.now(), data });
+      return data;
+    }
     const data = { anilistId: id, ...(await ownArtwork(media, tmdb)) };
     if (!data.logos.length && officialLogos[id]) {
       data.logos = [officialLogos[id]];
