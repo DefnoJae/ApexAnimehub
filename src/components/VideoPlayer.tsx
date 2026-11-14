@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import { SkipForward } from "lucide-react";
 import type { useAccounts } from "../hooks/useAccounts";
 import type { AudioLanguage, PlaybackSource } from "../hooks/usePageRoute";
 import type { DashboardAnime } from "./HomeDashboard";
@@ -54,7 +55,7 @@ export function VideoPlayer(props: PlayerProps) {
       </React.Suspense>
     );
   if (props.stream.url.startsWith("/api/reanime-embed?"))
-    return <ReAnimePlayer key={props.stream.url} {...props} />;
+    return <ReAnimePlayer {...props} />;
   const native = props.stream.url.startsWith("/api/playback?");
   if (native)
     return (
@@ -66,7 +67,7 @@ export function VideoPlayer(props: PlayerProps) {
 }
 function ReAnimePlayer(props: PlayerProps) {
   const request = props.stream.url;
-  const [resolved, setResolved] = useState<string | null>();
+  const [resolved, setResolved] = useState<{ request: string; url: string | null }>();
   useEffect(() => {
     const controller = new AbortController();
     const options = { signal: controller.signal, credentials: "omit" as const };
@@ -80,20 +81,20 @@ function ReAnimePlayer(props: PlayerProps) {
         const data = await response.json();
         const url = new URL(data.url);
         if (url.origin !== "https://flixcloud.cc") throw new Error("Invalid player URL");
-        if (!controller.signal.aborted) setResolved(url.href);
+        if (!controller.signal.aborted) setResolved({ request, url: url.href });
       })
       .catch(() => {
-        if (!controller.signal.aborted) setResolved(null);
+        if (!controller.signal.aborted) setResolved({ request, url: null });
       });
     return () => controller.abort();
   }, [request]);
-  if (resolved) return <EmbedVideoPlayer {...props} stream={{ ...props.stream, url: resolved }} />;
+  const current = resolved?.request === request ? resolved : undefined;
   return (
-    <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center gap-4 bg-black text-white">
-      <p role="status">{resolved === null ? "ReAnime could not load this episode." : "Loading ReAnime…"}</p>
-      {resolved === null && <button onClick={() => props.onPlaybackSource?.("anipm", props.audio ?? "sub")}>Use Ani.pm</button>}
-      <button onClick={props.onClose}>Close</button>
-    </div>
+    <EmbedVideoPlayer
+      {...props}
+      stream={{ ...props.stream, url: current?.url ?? "about:blank" }}
+      reAnimeStatus={current?.url ? "ready" : current ? "failed" : "loading"}
+    />
   );
 }
 
@@ -111,7 +112,8 @@ function EmbedVideoPlayer({
   onClose,
   onProgress,
   accounts,
-}: PlayerProps) {
+  reAnimeStatus,
+}: PlayerProps & { reAnimeStatus?: "loading" | "failed" | "ready" }) {
   const frame = useRef<HTMLDivElement>(null),
     iframe = useRef<HTMLIFrameElement>(null);
   const watched = useRef(false);
@@ -341,7 +343,22 @@ function EmbedVideoPlayer({
           {error}
         </p>
       )}
-      <iframe
+      {reAnimeStatus && reAnimeStatus !== "ready" && (
+        <div className="flex flex-1 flex-col items-center justify-center gap-4">
+          <p role="status">
+            {reAnimeStatus === "failed"
+              ? "ReAnime could not load this episode."
+              : "Loading ReAnime…"}
+          </p>
+          {reAnimeStatus === "failed" && (
+            <button onClick={() => onPlaybackSource?.("anipm", audio ?? "sub")}>
+              Use Ani.pm
+            </button>
+          )}
+          <button onClick={onClose}>Close</button>
+        </div>
+      )}
+      {(!reAnimeStatus || reAnimeStatus === "ready") && <iframe
         key={origin === "https://animeembed.com" ? stream.url : undefined}
         ref={iframe}
         tabIndex={-1}
@@ -362,7 +379,18 @@ function EmbedVideoPlayer({
         className="w-full flex-1 min-h-0 border-none"
         allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
         allowFullScreen
-      />
+      />}
+      {reAnimeStatus === "ready" && canNext && (
+        <button
+          type="button"
+          onClick={onNext}
+          aria-label="Next episode"
+          title="Next episode (N)"
+          className="absolute bottom-2 left-[min(14rem,48vw)] grid h-10 w-10 place-items-center rounded-full bg-black/70 text-white shadow-sm transition-colors hover:bg-zinc-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white"
+        >
+          <SkipForward size={19} aria-hidden="true" />
+        </button>
+      )}
     </div>
   );
 }
