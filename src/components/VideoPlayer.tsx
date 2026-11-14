@@ -56,7 +56,7 @@ export function VideoPlayer(props: PlayerProps) {
     );
   if (props.stream.url.startsWith("/api/reanime-embed?"))
     return <ReAnimePlayer {...props} />;
-  const native = props.stream.url.startsWith("/api/playback?");
+  const native = new URL(props.stream.url, window.location.origin).pathname === "/api/playback";
   if (native)
     return (
       <React.Suspense fallback={<p role="status">Loading player…</p>}>

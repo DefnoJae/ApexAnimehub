@@ -8,7 +8,19 @@ module.exports = (req, res) => {
     req.url = route + (url.searchParams.size ? "?" + url.searchParams : "");
   }
   const playbackUrl = new URL(req.url, "https://localhost");
-  if (isNativeDub(playbackUrl)) return nativeDub(req, res, playbackUrl);
+  if (isNativeDub(playbackUrl)) {
+    res.setHeader("Vary", "Origin");
+    if (req.headers.origin === "https://apexanime.pages.dev") {
+      res.setHeader("Access-Control-Allow-Origin", "https://apexanime.pages.dev");
+      if (req.method === "OPTIONS") {
+        res.setHeader("Access-Control-Allow-Methods", "GET");
+        res.setHeader("Access-Control-Allow-Headers", "Range");
+        res.statusCode = 204;
+        return res.end();
+      }
+    }
+    return nativeDub(req, res, playbackUrl);
+  }
   const { pathname } = playbackUrl;
   if ((pathname === "/api/artwork" || pathname === "/api/reanime-embed") &&
       req.headers.origin === "https://apexanime.pages.dev") {

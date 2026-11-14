@@ -92,7 +92,7 @@ export default function App() {
             playbackSource === "anipm"
               ? aniPmUrl(route.animeId!, activeEpisode, route.audio)
               : playbackSource === "apex"
-                ? `/api/playback?id=${route.animeId}&episode=${activeEpisode}&audio=${route.audio}&title=${encodeURIComponent(getDisplayTitle(selectedAnime))}`
+                ? `${route.audio === "dub" && window.location.hostname === "apexanime.pages.dev" ? "https://apexanime.vercel.app" : ""}/api/playback?id=${route.animeId}&episode=${activeEpisode}&audio=${route.audio}&title=${encodeURIComponent(getDisplayTitle(selectedAnime))}`
                 : playbackSource === "reanime"
                   ? `/api/reanime-embed?id=${route.animeId}&episode=${activeEpisode}&audio=${route.audio}`
                   : playbackSource === "animeembed"

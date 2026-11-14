@@ -15,7 +15,13 @@ async function nativeDub(req, res, url) {
   }
 
   try {
-    return res.end(JSON.stringify(await resolvePlayback(id, episode, "dub")));
+    const media = await resolvePlayback(id, episode, "dub");
+    if (req.headers?.origin === "https://apexanime.pages.dev") {
+      const absolute = (path) => new URL(path, "https://apexanime.vercel.app").href;
+      media.url = absolute(media.url);
+      media.subtitles = media.subtitles.map((track) => ({ ...track, url: absolute(track.url) }));
+    }
+    return res.end(JSON.stringify(media));
   } catch {
     res.statusCode = 502;
     return res.end(JSON.stringify({ error: "English dub is unavailable for this episode." }));
