@@ -1,7 +1,7 @@
 const { randomBytes, createHash, createCipheriv, createDecipheriv } = require('node:crypto');
 const { createServer, sessions } = require('./oauth.cjs');
 function key() { const secret = process.env.SESSION_SECRET || process.env.ANILIST_CLIENT_SECRET || process.env.MAL_CLIENT_SECRET; if (!secret || secret.length < 16) throw new Error('Set SESSION_SECRET to a strong random server secret'); return createHash('sha256').update(secret).digest(); }
-function seal(session) { const iv = randomBytes(12), cipher = createCipheriv('aes-256-gcm', key(), iv); const bytes = Buffer.concat([cipher.update(JSON.stringify(session)), cipher.final()]); return Buffer.concat([iv, cipher.getAuthTag(), bytes]).toString('base64url'); }
+function seal(session) { const iv = randomBytes(12), cipher = createCipheriv('aes-256-gcm', key(), iv); const bytes = Buffer.concat([cipher.update(Buffer.from(JSON.stringify(session), 'utf8')), cipher.final()]); return Buffer.concat([iv, cipher.getAuthTag(), bytes]).toString('base64url'); }
 function open(value) { try { const bytes = Buffer.from(value, 'base64url'); const cipher = createDecipheriv('aes-256-gcm', key(), bytes.subarray(0, 12)); cipher.setAuthTag(bytes.subarray(12, 28)); const session = JSON.parse(Buffer.concat([cipher.update(bytes.subarray(28)), cipher.final()]).toString()); return session.expiresAt > Date.now() ? session : null; } catch { return null; } }
 const server = createServer();
 function handler(req, res) {
@@ -40,7 +40,7 @@ function handler(req, res) {
         if (sealed.length > 10500) throw new Error('Account session too large');
         res.setHeader('Set-Cookie', [0, 1, 2].map(i => 'apex_auth_' + i + '=' + sealed.slice(i * 3500, (i + 1) * 3500) + '; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=' + (sealed.slice(i * 3500, (i + 1) * 3500) ? Math.max(0, Math.floor((clean.expiresAt - Date.now()) / 1000)) : 0)));
       } else if (value) res.setHeader('Set-Cookie', [0,1,2].map(i => 'apex_auth_' + i + '=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0'));
-    } catch { res.statusCode = 503; res.removeHeader('Location'); args = [JSON.stringify({ error: 'Account sessions are not configured. Set a strong SESSION_SECRET in Vercel.' })]; }
+    } catch { res.statusCode = 503; res.removeHeader('Location'); args = [JSON.stringify({ error: 'Unable to create an account session.' })]; }
     sessions.delete(id); sessions.delete(nextId);
     return finish(args);
   };
