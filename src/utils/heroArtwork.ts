@@ -58,7 +58,8 @@ export function isHeroBanner(width: number, height: number): boolean {
 async function fetchHeroMedia(anilistId: number): Promise<CachedArtwork> {
   const empty = { logos: [], backdrops: [], updatedAt: 0 };
   if (!Number.isSafeInteger(anilistId) || anilistId <= 0) return empty;
-  const key = "apex_tmdb_artwork_v8_" + anilistId;
+  const backup = window.location.hostname === "apexanime.pages.dev";
+  const key = (backup ? "apex_tmdb_artwork_v9_" : "apex_tmdb_artwork_v8_") + anilistId;
   let freshCache = false;
   let cached: CachedArtwork | null = null;
   try {
@@ -68,12 +69,12 @@ async function fetchHeroMedia(anilistId: number): Promise<CachedArtwork> {
     // if the provider is temporarily unavailable during migration.
     const value = JSON.parse(
       current ||
-        localStorage.getItem("apex_tmdb_artwork_v7_" + anilistId) ||
+        localStorage.getItem((backup ? "apex_tmdb_artwork_v8_" : "apex_tmdb_artwork_v7_") + anilistId) ||
         "null",
     );
     if (
       value &&
-      (freshCache || (value.match === "exact" && value.logos?.length)) &&
+      (freshCache || backup || (value.match === "exact" && value.logos?.length)) &&
       Array.isArray(value.logos) &&
       value.logos.every(safeLogo) &&
       Array.isArray(value.backdrops) &&
@@ -99,17 +100,30 @@ async function fetchHeroMedia(anilistId: number): Promise<CachedArtwork> {
     const controller = new AbortController(),
       timer = setTimeout(() => controller.abort(), 45000);
     try {
-      const response = await fetch(
-        "/api/artwork?anilist_id=" + anilistId + "&v=8",
-        {
-          signal: controller.signal,
-          credentials: "omit",
-        },
-      );
-      if (!response.ok) throw new Error("Artwork unavailable");
-      const data = await response.json();
-      if (!data || Number(data.anilistId) !== anilistId)
-        throw new Error("Artwork ID mismatch");
+      const path = "/api/artwork?anilist_id=" + anilistId + "&v=8";
+      const read = async (url: string) => {
+        const response = await fetch(url, { signal: controller.signal, credentials: "omit" });
+        if (!response.ok) throw new Error("Artwork unavailable");
+        const data = await response.json();
+        if (!data || Number(data.anilistId) !== anilistId)
+          throw new Error("Artwork ID mismatch");
+        return data;
+      };
+      let data = await read(path).catch((error) => {
+        if (!backup) throw error;
+        return null;
+      });
+      if (backup && (!data || !artworkLogos(data, anilistId).length || !artworkBackdrops(data, anilistId).length)) {
+        const primary = await read("https://apexanime.vercel.app" + path).catch(() => null);
+        if (primary) {
+          data = {
+            ...primary,
+            logos: artworkLogos(primary, anilistId).length ? primary.logos : data?.logos,
+            backdrops: artworkBackdrops(primary, anilistId).length ? primary.backdrops : data?.backdrops,
+          };
+        }
+      }
+      if (!data) throw new Error("Artwork unavailable");
       const logos = artworkLogos(data, anilistId);
       if (
         !logos.length &&

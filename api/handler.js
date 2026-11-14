@@ -6,7 +6,13 @@ module.exports = (req, res) => {
     url.searchParams.delete("route");
     req.url = route + (url.searchParams.size ? "?" + url.searchParams : "");
   }
-  if (new URL(req.url, "https://localhost").pathname === "/api/playback")
+  const pathname = new URL(req.url, "https://localhost").pathname;
+  if ((pathname === "/api/artwork" || pathname === "/api/reanime-embed") &&
+      req.headers.origin === "https://apexanime.pages.dev") {
+    res.setHeader("Access-Control-Allow-Origin", "https://apexanime.pages.dev");
+    res.setHeader("Vary", "Origin");
+  }
+  if (pathname === "/api/playback")
     return require("../server/playback.cjs").handler(req, res);
   if (new URL(req.url, "https://localhost").pathname === "/api/artwork")
     return require("../server/artwork.cjs").handler(req, res);

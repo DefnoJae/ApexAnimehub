@@ -69,7 +69,12 @@ function ReAnimePlayer(props: PlayerProps) {
   const [resolved, setResolved] = useState<string | null>();
   useEffect(() => {
     const controller = new AbortController();
-    fetch(request, { signal: controller.signal })
+    const options = { signal: controller.signal, credentials: "omit" as const };
+    fetch(request, options)
+      .then((response) => {
+        if (response.ok || window.location.hostname !== "apexanime.pages.dev") return response;
+        return fetch("https://apexanime.vercel.app" + request, options);
+      })
       .then(async (response) => {
         if (!response.ok) throw new Error("ReAnime lookup failed");
         const data = await response.json();
