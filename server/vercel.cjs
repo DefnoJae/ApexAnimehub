@@ -1,3 +1,4 @@
+const { nativeDub, isNativeDub } = require("./native-dub.cjs");
 const { randomBytes, createHash, createCipheriv, createDecipheriv } = require('node:crypto');
 const { createServer, sessions } = require('./oauth.cjs');
 function key() { const secret = process.env.SESSION_SECRET || process.env.ANILIST_CLIENT_SECRET || process.env.MAL_CLIENT_SECRET; if (!secret || secret.length < 16) throw new Error('Set SESSION_SECRET to a strong random server secret'); return createHash('sha256').update(secret).digest(); }
@@ -5,6 +6,8 @@ function seal(session) { const iv = randomBytes(12), cipher = createCipheriv('ae
 function open(value) { try { const bytes = Buffer.from(value, 'base64url'); const cipher = createDecipheriv('aes-256-gcm', key(), bytes.subarray(0, 12)); cipher.setAuthTag(bytes.subarray(12, 28)); const session = JSON.parse(Buffer.concat([cipher.update(bytes.subarray(28)), cipher.final()]).toString()); return session.expiresAt > Date.now() ? session : null; } catch { return null; } }
 const server = createServer();
 function handler(req, res) {
+  const playbackUrl = new URL(req.url, "https://localhost");
+  if (isNativeDub(playbackUrl)) return nativeDub(req, res, playbackUrl);
   if (new URL(req.url, 'https://localhost').pathname === '/api/reanime-embed')
     return require('./reanime-embed.cjs').reanimeEmbed(req, res);
   try { key(); req.apexSessionReady = true; } catch { req.apexSessionReady = false; }

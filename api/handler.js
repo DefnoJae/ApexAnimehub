@@ -1,3 +1,4 @@
+const { nativeDub, isNativeDub } = require("../server/native-dub.cjs");
 const { handler } = require("../server/vercel.cjs");
 module.exports = (req, res) => {
   const url = new URL(req.url, "https://localhost");
@@ -6,7 +7,9 @@ module.exports = (req, res) => {
     url.searchParams.delete("route");
     req.url = route + (url.searchParams.size ? "?" + url.searchParams : "");
   }
-  const pathname = new URL(req.url, "https://localhost").pathname;
+  const playbackUrl = new URL(req.url, "https://localhost");
+  if (isNativeDub(playbackUrl)) return nativeDub(req, res, playbackUrl);
+  const { pathname } = playbackUrl;
   if ((pathname === "/api/artwork" || pathname === "/api/reanime-embed") &&
       req.headers.origin === "https://apexanime.pages.dev") {
     res.setHeader("Access-Control-Allow-Origin", "https://apexanime.pages.dev");
