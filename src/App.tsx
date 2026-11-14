@@ -73,12 +73,12 @@ export default function App() {
     selectedAnime.episodes &&
     activeEpisode > selectedAnime.episodes
   );
-  const playbackSource = route.source === "apex" && route.audio === "dub" ? "anipm" : route.source;
+  const playbackSource = route.source;
   const streamName =
     playbackSource === "anipm"
       ? `Ani.pm (${route.audio === "dub" ? "Dub" : "Sub"})`
       : playbackSource === "apex"
-        ? "Apex Player (Sub)"
+        ? route.audio === "dub" ? "Apex Player (Dub via ReAnime)" : "Apex Player (Sub)"
         : `${playbackSource === "reanime" ? "ReAnime" : playbackSource === "animeembed" ? "AnimeEmbed" : "MegaPlay"} (${route.audio === "dub" ? "Dub" : "Sub"})`;
   const playingStream =
     route.play &&
@@ -92,7 +92,9 @@ export default function App() {
             playbackSource === "anipm"
               ? aniPmUrl(route.animeId!, activeEpisode, route.audio)
               : playbackSource === "apex"
-                ? `/api/playback?id=${route.animeId}&episode=${activeEpisode}&audio=sub&title=${encodeURIComponent(getDisplayTitle(selectedAnime))}`
+                ? route.audio === "dub"
+                  ? `/api/reanime-embed?id=${route.animeId}&episode=${activeEpisode}&audio=dub`
+                  : `/api/playback?id=${route.animeId}&episode=${activeEpisode}&audio=sub&title=${encodeURIComponent(getDisplayTitle(selectedAnime))}`
                 : playbackSource === "reanime"
                   ? `/api/reanime-embed?id=${route.animeId}&episode=${activeEpisode}&audio=${route.audio}`
                   : playbackSource === "animeembed"
