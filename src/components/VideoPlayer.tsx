@@ -63,6 +63,9 @@ export function VideoPlayer(props: PlayerProps) {
   return <EmbedVideoPlayer {...props} />;
 }
 function EmbedVideoPlayer({
+  anime,
+  audio,
+  onPlaybackSource,
   title,
   episode,
   stream,
@@ -87,6 +90,7 @@ function EmbedVideoPlayer({
     [error, setError] = useState("");
   const callbacks = useRef({
     onWatched,
+    onPlaybackSource,
     autoSync: accounts.autoSync,
     onPrevious,
     onNext,
@@ -96,6 +100,7 @@ function EmbedVideoPlayer({
   });
   callbacks.current = {
     onWatched,
+    onPlaybackSource,
     autoSync: accounts.autoSync,
     onPrevious,
     onNext,
@@ -123,6 +128,20 @@ function EmbedVideoPlayer({
         origin,
       );
       if (!data || !loaded.current) return;
+      if (origin === "https://animeembed.com") {
+        if (data.channel !== "animeembed" || data.version !== 1 ||
+            Number(data.animeId) !== anime?.id || Number(data.episode) !== episode ||
+            data.language !== audio) return;
+        if (data.event === "error") {
+          callbacks.current.onPlaybackSource?.("anipm", audio ?? "sub");
+          return;
+        }
+        if (data.event !== "progress" || !data.data || typeof data.data !== "object") return;
+        const progress = data.data as Record<string, unknown>;
+        data.event = "time";
+        data.currentTime = progress.currentTime;
+        data.duration = progress.duration;
+      }
       if (
         data.event === "time" ||
         data.event === "CURRENT_TIME" ||
@@ -162,14 +181,14 @@ function EmbedVideoPlayer({
     };
     window.addEventListener("message", listener);
     const poll = setInterval(() => {
-      if (origin !== "null")
+      if (origin !== "null" && origin !== "https://animeembed.com")
         iframe.current?.contentWindow?.postMessage({ cmd: "GET_TIME" }, origin);
     }, 1000);
     return () => {
       window.removeEventListener("message", listener);
       clearInterval(poll);
     };
-  }, [stream.url, origin]);
+  }, [stream.url, origin, anime?.id, episode, audio]);
   useEffect(() => {
     let reclaim: ReturnType<typeof setTimeout> | undefined;
     // Keyboard events cannot cross the provider's iframe. Keep shortcut focus on its host;
@@ -287,6 +306,7 @@ function EmbedVideoPlayer({
         </p>
       )}
       <iframe
+        key={origin === "https://animeembed.com" ? stream.url : undefined}
         ref={iframe}
         tabIndex={-1}
         onLoad={() => {

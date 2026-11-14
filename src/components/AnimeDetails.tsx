@@ -1,4 +1,4 @@
-import { preferredPlaybackSource } from "../hooks/usePageRoute";
+import { preferredPlaybackSource, type PlaybackSource } from "../hooks/usePageRoute";
 import { StyledSelect } from "./StyledSelect";
 import React, { lazy, Suspense, useState } from "react";
 import {
@@ -103,7 +103,7 @@ export function AnimeDetails({
   onPlay: (
     episode: number,
     audio: "sub" | "dub",
-    source?: "apex" | "megaplay" | "anipm",
+    source?: PlaybackSource,
   ) => void;
   onBack: () => void;
   onSelect: (anime: DashboardAnime) => void;
@@ -119,7 +119,7 @@ export function AnimeDetails({
   const [localWatchOrder, setLocalWatchOrder] = useState<DashboardAnime | null>(null);
   const orderAnime = watchOrderAnime === undefined ? localWatchOrder : watchOrderAnime;
   const setOrderAnime = onWatchOrderChange ?? setLocalWatchOrder;
-  const [source, setSource] = useState<"apex" | "megaplay" | "anipm">(
+  const [source, setSource] = useState<PlaybackSource>(
     preferredPlaybackSource,
   );
   const [audio, setAudio] = useState<"sub" | "dub">(() => {
@@ -497,10 +497,11 @@ export function AnimeDetails({
                 aria-label="Playback source"
                 value={source}
                 onChange={(e) =>
-                  setSource(e.target.value as "apex" | "megaplay" | "anipm")
+                  setSource(e.target.value as PlaybackSource)
                 }
               >
                 <option value="anipm">Ani.pm (Sub &amp; Dub)</option>
+                <option value="animeembed">AnimeEmbed (Sub &amp; Dub)</option>
                 <option value="megaplay">MegaPlay</option>
                 <option value="apex">Apex Player (Direct Sub)</option>
               </StyledSelect>
