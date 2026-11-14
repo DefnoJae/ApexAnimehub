@@ -44,11 +44,11 @@ export async function fetchDubRange(start: Date, end: Date, force = false): Prom
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
   const entries: DubEntry[] = []; const errors: string[] = []; let cached = false, updatedAt = Date.now();
   // Request only the displayed weeks. Per-week caches retain historical and future pages.
-  for (const [key, week] of Array.from(weeks.entries())) {
+  await Promise.all(Array.from(weeks.entries(), async ([key, week]) => {
     const cacheKey = 'apex_timetable_' + key + '_' + timezone;
     let saved: { entries: DubEntry[]; updatedAt: number } | null = null;
     try { saved = JSON.parse(localStorage.getItem(cacheKey) || 'null'); if (saved && (!validSchedule(saved.entries) || !Number.isFinite(saved.updatedAt))) saved = null; } catch { }
-    if (!force && saved && Date.now() - saved.updatedAt < 600000) { entries.push(...saved.entries); updatedAt = Math.min(updatedAt, saved.updatedAt); continue; }
+    if (!force && saved && Date.now() - saved.updatedAt < 600000) { entries.push(...saved.entries); updatedAt = Math.min(updatedAt, saved.updatedAt); return; }
     const controller = new AbortController(); const timer = setTimeout(() => controller.abort(), 15000);
     try {
       const query = new URLSearchParams({ type: 'dub', year: String(week.year), week: String(week.week), tz: timezone });
@@ -61,7 +61,7 @@ export async function fetchDubRange(start: Date, end: Date, force = false): Prom
       if (!data.stale) { try { localStorage.setItem(cacheKey, JSON.stringify({ entries: next, updatedAt: Date.now() })); } catch { } }
     } catch (error) { if (saved) { entries.push(...saved.entries); cached = true; updatedAt = Math.min(updatedAt, saved.updatedAt); } errors.push('Week ' + week.week + ': ' + (error instanceof Error ? error.message : 'unavailable')); }
     finally { clearTimeout(timer); }
-  }
+  }));
   const unique = new Map(entries.map(entry => [entry.route + ':' + entry.episodeDate + ':' + entry.episodeNumber, entry]));
   return { entries: Array.from(unique.values()), updatedAt: entries.length ? updatedAt : null, cached, error: errors.length ? errors.join('; ') : undefined };
 }

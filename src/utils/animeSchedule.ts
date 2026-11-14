@@ -249,6 +249,7 @@ async function dubRange(
   end: Date,
   signal: AbortSignal,
   force: boolean,
+  onEntries?: (entries: CalendarRelease[]) => void,
 ) {
   const result = await fetchDubRange(start, new Date(+end - 1), force);
   if (signal.aborted) throw new DOMException("Aborted", "AbortError");
@@ -269,6 +270,7 @@ async function dubRange(
       },
       note: entry.airingStatus || undefined,
     }));
+  onEntries?.(entries);
   let metadataWarning = "";
   // One batch per 50 IDs, rather than a lookup on every card or title guessing.
   const anilistIds = Array.from(
@@ -342,10 +344,19 @@ export async function fetchCalendarRange(
   language: ScheduleLanguage,
   signal: AbortSignal,
   force = false,
+  onPartial?: (entries: CalendarRelease[]) => void,
 ): Promise<CalendarResult> {
+  const partial = new Map<"sub" | "dub", CalendarRelease[]>();
+  const publish = (kind: "sub" | "dub", entries: CalendarRelease[]) => {
+    partial.set(kind, entries);
+    if (!signal.aborted) onPartial?.(Array.from(partial.values()).flat());
+  };
   const requests = [
-    ...(language !== "dub" ? [subRange(start, end, signal, force)] : []),
-    ...(language !== "sub" ? [dubRange(start, end, signal, force)] : []),
+    ...(language !== "dub" ? [subRange(start, end, signal, force).then((result) => {
+      publish("sub", result.entries);
+      return result;
+    })] : []),
+    ...(language !== "sub" ? [dubRange(start, end, signal, force, (entries) => publish("dub", entries))] : []),
   ];
   const results = await Promise.allSettled(requests);
   if (signal.aborted) throw new DOMException("Aborted", "AbortError");

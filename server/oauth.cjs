@@ -1,5 +1,6 @@
 // Same-origin OAuth service. Both providers' credentials stay on the server.
 const http = require("node:http");
+const { cloudflareAniListRelayKey, fetchAniListGraphql, relayUrl } = require("./anilist-api.cjs");
 const { randomBytes } = require("node:crypto");
 const {
   updateList,
@@ -45,8 +46,8 @@ async function body(req) {
 function config(provider) {
   const prefix = provider === "mal" ? "MAL" : "ANILIST";
   return {
-    clientId: process.env[prefix + "_CLIENT_ID"],
-    secret: process.env[prefix + "_CLIENT_SECRET"],
+    clientId: process.env[prefix + "_CLIENT_ID"]?.trim(),
+    secret: process.env[prefix + "_CLIENT_SECRET"]?.trim(),
     redirect:
       process.env[prefix + "_REDIRECT_URI"] ||
       origin + "/api/oauth/" + provider + "/callback",
@@ -237,21 +238,25 @@ function createServer() {
             ...(cfg.secret ? { client_secret: cfg.secret } : {}),
             ...(provider === "mal" ? { code_verifier: pending.verifier } : {}),
           };
-          const response = await fetch(cfg.tokenUrl, {
+          const relayKey = provider === "anilist" ? cloudflareAniListRelayKey() : undefined;
+          const tokenUrl = relayKey ? relayUrl : cfg.tokenUrl;
+          const response = await fetch(tokenUrl, {
             method: "POST",
             signal: AbortSignal.timeout(15000),
+            redirect: "manual",
             headers: {
-              "Content-Type":
-                provider === "mal"
-                  ? "application/x-www-form-urlencoded"
-                  : "application/json",
+              Accept: "application/json",
+              "Content-Type": relayKey ? "application/json" : "application/x-www-form-urlencoded",
+              ...(relayKey ? { Authorization: "Bearer " + relayKey } : {}),
             },
-            body:
-              provider === "mal"
-                ? new URLSearchParams(fields).toString()
-                : JSON.stringify(fields),
+            body: relayKey ? JSON.stringify({ client_secret: cfg.secret, code: fields.code })
+              : new URLSearchParams(fields).toString(),
           });
-          if (!response.ok) return redirectBack("failed");
+          if (!response.ok) {
+            console.warn("OAuth token exchange rejected", provider, response.status,
+              response.headers.get("cf-mitigated") === "challenge" ? "challenge" : "upstream");
+            return redirectBack("failed");
+          }
           const data = await response.json();
           if (
             typeof data.access_token !== "string" ||
@@ -289,15 +294,7 @@ function createServer() {
           const payload = await body(req);
           if (typeof payload.query !== "string")
             return send(400, { error: "Missing query" });
-          const upstream = await fetch("https://graphql.anilist.co", {
-            method: "POST",
-            signal: AbortSignal.timeout(15000),
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: "Bearer " + account.accessToken,
-            },
-            body: JSON.stringify(payload),
-          });
+          const upstream = await fetchAniListGraphql(account.accessToken, payload);
           if (upstream.status === 401) delete current.accounts[provider];
           return send(upstream.status, await upstream.json());
         }

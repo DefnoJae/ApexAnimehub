@@ -1,3 +1,4 @@
+const { fetchAniListGraphql } = require("./anilist-api.cjs");
 const statusMap = {
   watching: { anilist: "CURRENT", mal: "watching" },
   planning: { anilist: "PLANNING", mal: "plan_to_watch" },
@@ -20,14 +21,11 @@ async function upstream(url, options) {
   return response.json();
 }
 async function graphql(accessToken, query, variables) {
-  const payload = await upstream("https://graphql.anilist.co", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: "Bearer " + accessToken,
-    },
-    body: JSON.stringify({ query, variables }),
-  });
+  const response = await fetchAniListGraphql(accessToken, { query, variables });
+  if (!response.ok)
+    throw new Error("Provider request failed (" + response.status + ")." +
+      (response.status === 401 ? " Please reconnect your account." : ""));
+  const payload = await response.json();
   if (payload.errors?.length || !payload.data)
     throw new Error(payload.errors?.[0]?.message || "AniList returned no data");
   return payload.data;

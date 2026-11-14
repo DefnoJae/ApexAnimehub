@@ -192,6 +192,7 @@ export const DubScheduleView = ({
       preferences.language,
       controller.signal,
       force,
+      (entries) => setResult({ entries, warnings: [], updatedAt: null }),
     )
       .then((next) => {
         if (!controller.signal.aborted) setResult(next);
@@ -478,7 +479,7 @@ export const DubScheduleView = ({
           })}
           {preferences.scope === "yours" ? " · Your anime" : ""}
         </p>
-        {loading ? (
+        {loading && !entries.length ? (
           <div
             className="calendar-card-grid calendar-skeleton"
             aria-hidden="true"
