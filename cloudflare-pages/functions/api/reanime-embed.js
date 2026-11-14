@@ -11,5 +11,14 @@ export async function onRequest({ request }) {
     },
   };
   await embed.reanimeEmbed(request, adapter);
-  return response;
+  if (response.status !== 502) return response;
+
+  // Retry only the small lookup response. The iframe still loads from FlixCloud.
+  const url = new URL("/api/reanime-embed", "https://apexanime.vercel.app");
+  url.search = new URL(request.url).search;
+  try {
+    return await fetch(url, { signal: AbortSignal.timeout(5000), redirect: "error" });
+  } catch {
+    return response;
+  }
 }
