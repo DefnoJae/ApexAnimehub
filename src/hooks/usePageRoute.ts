@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 export type AudioLanguage = "sub" | "dub";
-export type PlaybackSource = "anipm" | "apex" | "megaplay" | "animeembed";
+export type PlaybackSource = "anipm" | "apex" | "megaplay" | "animeembed" | "reanime";
 export function preferredPlaybackSource(): PlaybackSource {
   try {
     const source = localStorage.getItem("apex_playback_source");
-    if (source === "apex" || source === "megaplay" || source === "animeembed") return source;
+    if (source === "apex" || source === "megaplay" || source === "animeembed" || source === "reanime") return source;
   } catch {}
   return "anipm";
 }
@@ -43,7 +43,7 @@ export function parsePageRoute(pathname: string, search = ""): PageRoute {
   const audio = params.get("audio") === "dub" ? "dub" : "sub";
   const requested = params.get("source");
   const source =
-    requested === "megaplay" || requested === "apex" || requested === "animeembed" ? requested : "anipm";
+    requested === "megaplay" || requested === "apex" || requested === "animeembed" || requested === "reanime" ? requested : "anipm";
   const path = pathname.replace(/\/+$/, "") || "/";
   const section = Object.entries(sectionPaths).find(([, url]) => url === path);
   if (section || path === "/home")

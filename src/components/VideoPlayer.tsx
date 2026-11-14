@@ -53,6 +53,8 @@ export function VideoPlayer(props: PlayerProps) {
         />
       </React.Suspense>
     );
+  if (props.stream.url.startsWith("/api/reanime-embed?"))
+    return <ReAnimePlayer key={props.stream.url} {...props} />;
   const native = props.stream.url.startsWith("/api/playback?");
   if (native)
     return (
@@ -62,6 +64,34 @@ export function VideoPlayer(props: PlayerProps) {
     );
   return <EmbedVideoPlayer {...props} />;
 }
+function ReAnimePlayer(props: PlayerProps) {
+  const request = props.stream.url;
+  const [resolved, setResolved] = useState<string | null>();
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch(request, { signal: controller.signal })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("ReAnime lookup failed");
+        const data = await response.json();
+        const url = new URL(data.url);
+        if (url.origin !== "https://flixcloud.cc") throw new Error("Invalid player URL");
+        if (!controller.signal.aborted) setResolved(url.href);
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setResolved(null);
+      });
+    return () => controller.abort();
+  }, [request]);
+  if (resolved) return <EmbedVideoPlayer {...props} stream={{ ...props.stream, url: resolved }} />;
+  return (
+    <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center gap-4 bg-black text-white">
+      <p role="status">{resolved === null ? "ReAnime could not load this episode." : "Loading ReAnime…"}</p>
+      {resolved === null && <button onClick={() => props.onPlaybackSource?.("anipm", props.audio ?? "sub")}>Use Ani.pm</button>}
+      <button onClick={props.onClose}>Close</button>
+    </div>
+  );
+}
+
 function EmbedVideoPlayer({
   anime,
   audio,
@@ -181,7 +211,7 @@ function EmbedVideoPlayer({
     };
     window.addEventListener("message", listener);
     const poll = setInterval(() => {
-      if (origin !== "null" && origin !== "https://animeembed.com")
+      if (origin !== "null" && origin !== "https://animeembed.com" && origin !== "https://flixcloud.cc")
         iframe.current?.contentWindow?.postMessage({ cmd: "GET_TIME" }, origin);
     }, 1000);
     return () => {
@@ -288,6 +318,7 @@ function EmbedVideoPlayer({
         <div className="shrink-0 flex items-center gap-4 px-4 py-2 bg-zinc-950 text-sm">
           <span className="truncate flex-1">
             {title} · Episode {episode} · {stream.name}
+            {origin === "https://flixcloud.cc" && audio === "dub" && " · Select English in Settings → Audio Tracks"}
           </span>
           <span className="text-zinc-400">
             N: Next · B: Previous · F: Fullscreen

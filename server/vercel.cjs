@@ -5,6 +5,8 @@ function seal(session) { const iv = randomBytes(12), cipher = createCipheriv('ae
 function open(value) { try { const bytes = Buffer.from(value, 'base64url'); const cipher = createDecipheriv('aes-256-gcm', key(), bytes.subarray(0, 12)); cipher.setAuthTag(bytes.subarray(12, 28)); const session = JSON.parse(Buffer.concat([cipher.update(bytes.subarray(28)), cipher.final()]).toString()); return session.expiresAt > Date.now() ? session : null; } catch { return null; } }
 const server = createServer();
 function handler(req, res) {
+  if (new URL(req.url, 'https://localhost').pathname === '/api/reanime-embed')
+    return require('./reanime-embed.cjs').reanimeEmbed(req, res);
   try { key(); req.apexSessionReady = true; } catch { req.apexSessionReady = false; }
   // Encrypted, authenticated cookies survive Vercel instance changes. Never serialize refreshing promises.
   const cookies = Object.fromEntries((req.headers.cookie || '').split(';').map(part => { const at = part.indexOf('='); return [part.slice(0, at).trim(), part.slice(at + 1)]; }));

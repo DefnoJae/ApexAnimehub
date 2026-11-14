@@ -79,7 +79,7 @@ export default function App() {
       ? `Ani.pm (${route.audio === "dub" ? "Dub" : "Sub"})`
       : playbackSource === "apex"
         ? "Apex Player (Sub)"
-        : `${playbackSource === "animeembed" ? "AnimeEmbed" : "MegaPlay"} (${route.audio === "dub" ? "Dub" : "Sub"})`;
+        : `${playbackSource === "reanime" ? "ReAnime" : playbackSource === "animeembed" ? "AnimeEmbed" : "MegaPlay"} (${route.audio === "dub" ? "Dub" : "Sub"})`;
   const playingStream =
     route.play &&
     !detailLoading &&
@@ -93,7 +93,9 @@ export default function App() {
               ? aniPmUrl(route.animeId!, activeEpisode, route.audio)
               : playbackSource === "apex"
                 ? `/api/playback?id=${route.animeId}&episode=${activeEpisode}&audio=sub&title=${encodeURIComponent(getDisplayTitle(selectedAnime))}`
-                : playbackSource === "animeembed"
+                : playbackSource === "reanime"
+                  ? `/api/reanime-embed?id=${route.animeId}&episode=${activeEpisode}&audio=${route.audio}`
+                  : playbackSource === "animeembed"
                   ? `https://animeembed.com/embed/ani/${route.animeId}/${activeEpisode}?track=${route.audio}&autoPlay=1&autoSkip=0&hide=next,audio`
                   : `https://megaplay.buzz/stream/ani/${route.animeId}/${activeEpisode}/${route.audio}?color=${THEME_COLOR}`,
         }
@@ -394,7 +396,7 @@ export default function App() {
         ? "anipm"
         : startStream.startsWith("Apex Player")
           ? "apex"
-          : startStream.startsWith("AnimeEmbed") ? "animeembed" : "megaplay";
+          : startStream.startsWith("ReAnime") ? "reanime" : startStream.startsWith("AnimeEmbed") ? "animeembed" : "megaplay";
       rememberPlayer(source);
       navigate(
         episodePage(
@@ -778,7 +780,7 @@ export default function App() {
                       ? "Apex Player (Sub)"
                       : source === "megaplay"
                         ? "MegaPlay (Sub)"
-                        : source === "animeembed" ? "AnimeEmbed (Sub)" : "Ani.pm (Sub)",
+                        : source === "reanime" ? "ReAnime (Sub)" : source === "animeembed" ? "AnimeEmbed (Sub)" : "Ani.pm (Sub)",
                   );
                 }}
                 onResume={resumePlayback}
