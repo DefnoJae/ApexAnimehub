@@ -11,12 +11,16 @@ async function reanimeEmbed(req, res) {
     return res.end(JSON.stringify({ error: "Invalid episode request" }));
   }
   try {
-    const response = await fetch(`https://reanime.cz/api/flix/${id}/${episode}`, {
-      signal: AbortSignal.timeout(7500),
-      redirect: "error",
-    });
-    if (!response.ok) throw new Error("Episode lookup failed");
-    const { servers } = await response.json();
+    const responses = await Promise.any(["reanime.cz", "reanime.wtf"].map(async (host) => {
+      const response = await fetch(`https://${host}/api/flix/${id}/${episode}`, {
+        signal: AbortSignal.timeout(7500),
+        redirect: "error",
+        headers: { Accept: "application/json", Referer: `https://${host}/` },
+      });
+      if (!response.ok) throw new Error(`Upstream HTTP ${response.status}`);
+      return response.json();
+    }));
+    const { servers } = responses;
     const entry = Array.isArray(servers) && servers.find(
       (server) => server?.serverName === "HD-1" && server.dataType === audio,
     );
