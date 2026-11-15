@@ -21,7 +21,7 @@ async function fetchWithAniListRelay(relayRequest, directRequest) {
   return directRequest();
 }
 
-function fetchAniListGraphql(accessToken, payload) {
+async function fetchAniListGraphql(accessToken, payload) {
   const relayKey = cloudflareAniListRelayKey();
   const request = (key) => fetch(key ? aniListRelayUrl() : "https://graphql.anilist.co", {
     method: "POST",
@@ -34,7 +34,23 @@ function fetchAniListGraphql(accessToken, payload) {
     },
     body: JSON.stringify(key ? { operation: "graphql", accessToken, payload } : payload),
   });
-  return relayKey ? fetchWithAniListRelay(() => request(relayKey), () => request()) : request();
+  if (!relayKey) return request();
+
+  const relay = await request(relayKey).catch(() => null);
+  if (relay && ![402, 502, 503, 504].includes(relay.status)) return relay;
+
+  // Try the provider directly when the relay itself is unavailable. Preserve
+  // the relay's failure if the provider rejects Cloudflare's network.
+  const direct = await request().catch(() => null);
+  if (direct && (!relay || ![403, 502, 503, 504].includes(direct.status))) {
+    await relay?.body?.cancel();
+    return direct;
+  }
+  if (relay) {
+    await direct?.body?.cancel();
+    return relay;
+  }
+  throw new Error("AniList is temporarily unavailable. Try again shortly.");
 }
 
 module.exports = { aniListRelayUrl, cloudflareAniListRelayKey, fetchAniListGraphql, fetchWithAniListRelay };

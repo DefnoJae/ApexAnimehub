@@ -347,28 +347,6 @@
 .detail-source option {
   background: #211a2d;
 }
-.detail-external-players {
-  border-top: 1px solid #ffffff20;
-  padding-top: 12px;
-  color: #a99bb8;
-  font-size: 12px;
-}
-.detail-external-players > div {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 8px;
-}
-.detail-external-players a {
-  padding: 7px 10px;
-  border: 1px solid #ffffff20;
-  border-radius: 8px;
-  color: #d8c7ef;
-  text-decoration: none;
-}
-.detail-external-players a:is(:hover, :focus-visible) {
-  background: #ffffff15;
-}
 .detail-play {
   display: flex;
   align-items: center;
