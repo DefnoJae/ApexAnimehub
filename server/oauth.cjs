@@ -241,7 +241,7 @@ function createServer() {
           const relayKey = provider === "anilist" ? cloudflareAniListRelayKey() : undefined;
           const exchange = (key) => fetch(key ? aniListRelayUrl() : cfg.tokenUrl, {
             method: "POST",
-            signal: AbortSignal.timeout(15000),
+            signal: AbortSignal.timeout(key ? 75000 : 15000),
             redirect: "manual",
             headers: {
               Accept: "application/json",

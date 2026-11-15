@@ -26,7 +26,7 @@ function fetchAniListGraphql(accessToken, payload) {
   const request = (key) => fetch(key ? aniListRelayUrl() : "https://graphql.anilist.co", {
     method: "POST",
     redirect: "manual",
-    signal: AbortSignal.timeout(15000),
+    signal: AbortSignal.timeout(key ? 75000 : 15000),
     headers: {
       Accept: "application/json",
       "Content-Type": "application/json",
