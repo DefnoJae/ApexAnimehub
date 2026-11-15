@@ -245,11 +245,11 @@ function createServer() {
             redirect: "manual",
             headers: {
               Accept: "application/json",
-              "Content-Type": key ? "application/json" : "application/x-www-form-urlencoded",
+              "Content-Type": provider === "anilist" ? "application/json" : "application/x-www-form-urlencoded",
               ...(key ? { Authorization: "Bearer " + key } : {}),
             },
             body: key ? JSON.stringify({ client_secret: cfg.secret, code: fields.code })
-              : new URLSearchParams(fields).toString(),
+              : provider === "anilist" ? JSON.stringify(fields) : new URLSearchParams(fields).toString(),
           });
           const response = await (relayKey
             ? fetchWithAniListRelay(() => exchange(relayKey), () => exchange())
