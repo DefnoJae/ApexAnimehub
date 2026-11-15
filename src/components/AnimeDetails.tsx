@@ -507,6 +507,17 @@ export function AnimeDetails({
                 <option value="apex">Apex Player (Sub &amp; Dub)</option>
               </StyledSelect>
             </label>
+            <div className="detail-external-players">
+              <span>External players</span>
+              <div>
+                <a href="https://anisnatch.to/home" target="_blank" rel="noopener noreferrer">
+                  AniSnatch <span aria-hidden="true">↗</span>
+                </a>
+                <a href="https://anizone.to/anime" target="_blank" rel="noopener noreferrer">
+                  AniZone <span aria-hidden="true">↗</span>
+                </a>
+              </div>
+            </div>
           </section>
         </aside>
       </div>
