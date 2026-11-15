@@ -145,6 +145,8 @@ const officialLogos = {
   190327: "/title-logos/steel-ball-run.png",
   210482: "/title-logos/steel-ball-run.png",
 };
+// AniList lists 219904 as the fifth season of the series that began at 21355.
+const verifiedOriginals = { 219904: 21355 };
 async function malArtworkIdentity(id, mapping) {
   const malId = Number(mapping.mal_id);
   if (!process.env.MAL_CLIENT_ID || !Number.isSafeInteger(malId) || malId <= 0)
@@ -288,12 +290,29 @@ async function artwork(id, ancestors = new Set()) {
           (key && !token ? "api_key=" + encodeURIComponent(key) : ""),
         token ? { Authorization: "Bearer " + token } : {},
       );
+    const originalId = verifiedOriginals[id];
+    const fillFromOriginal = async (data) => {
+      if (!originalId || (data.logos.length && data.backdrops.length)) return;
+      const original = await artwork(originalId, visited).catch(() => null);
+      if (!original) return;
+      for (const asset of ["logos", "backdrops"]) {
+        if (!data[asset].length && original[asset].length) {
+          data[asset] = original[asset];
+          data.match = "related";
+        }
+      }
+    };
     let media = await mediaIdentity(id).catch(() => null);
     if (!media) {
-      const mapped = await json("https://api.ani.zip/mappings?anilist_id=" + id);
-      const mapping = mapped.mappings;
+      const mapped = await json("https://api.ani.zip/mappings?anilist_id=" + id)
+        .catch((error) => {
+          if (!originalId) throw error;
+          return {};
+        });
+      const mapping = mapped.mappings || {};
       const tmdbId = Number(mapping?.themoviedb_id);
-      if (Number(mapping?.anilist_id) !== id)
+      const verifiedMapping = Number(mapping.anilist_id) === id;
+      if (!verifiedMapping && !originalId)
         throw new Error("Artwork identity unavailable");
       const tmdbType = mapping.type === "MOVIE" ? "movie" : "tv";
       const data = {
@@ -302,12 +321,12 @@ async function artwork(id, ancestors = new Set()) {
         backdrops: [],
         match: "none",
       };
-      if (Number.isSafeInteger(tmdbId) && tmdbId > 0) {
+      if (verifiedMapping && Number.isSafeInteger(tmdbId) && tmdbId > 0) {
         Object.assign(data, selectImages(await tmdb(`${tmdbType}/${tmdbId}/images?include_image_language=en,null`)), {
           tmdbId, tmdbType, match: "mapped",
         });
       }
-      if (!data.logos.length || !data.backdrops.length) {
+      if (verifiedMapping && (!data.logos.length || !data.backdrops.length)) {
         media = await malArtworkIdentity(id, mapping).catch(() => null);
         if (media && data.match === "none") {
           Object.assign(data, await ownArtwork(media, tmdb).catch(() => ({})));
@@ -336,6 +355,7 @@ async function artwork(id, ancestors = new Set()) {
         data.logos = [officialLogos[id]];
         if (data.match === "none") data.match = "official";
       }
+      await fillFromOriginal(data);
       if (cache.size >= 500) cache.delete(cache.keys().next().value);
       cache.set(id, { updated: Date.now(), data });
       return data;
@@ -384,6 +404,7 @@ async function artwork(id, ancestors = new Set()) {
         if (data.logos.length && data.backdrops.length) break;
       }
     }
+    await fillFromOriginal(data);
     if (cache.size >= 500) cache.delete(cache.keys().next().value);
     cache.set(id, { updated: Date.now(), data });
     return data;

@@ -155,6 +155,19 @@ async function fetchHeroMedia(anilistId: number): Promise<CachedArtwork> {
 export async function fetchHeroArtwork(anilistId: number): Promise<string[]> {
   return (await fetchHeroMedia(anilistId)).logos;
 }
+export async function fetchVerifiedHeroLogo(anilistId: number): Promise<string | null> {
+  for (const url of await fetchHeroArtwork(anilistId)) {
+    if (!safeImage(url)) continue;
+    const valid = await new Promise<boolean>((resolve) => {
+      const image = new Image();
+      image.onload = () => resolve(isTitleTreatment(image.naturalWidth, image.naturalHeight));
+      image.onerror = () => resolve(false);
+      image.src = url;
+    });
+    if (valid) return url;
+  }
+  return null;
+}
 export async function fetchHeroBackdrops(anilistId: number): Promise<string[]> {
   return (await fetchHeroMedia(anilistId)).backdrops;
 }

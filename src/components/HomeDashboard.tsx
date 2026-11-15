@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Calendar,
   Compass,
@@ -17,7 +17,7 @@ import {
   X,
 } from "lucide-react";
 import { fetchAnilist } from "../utils/anilist";
-import { fetchHeroArtwork, isTitleTreatment } from "../utils/heroArtwork";
+import { fetchVerifiedHeroLogo } from "../utils/heroArtwork";
 import { fetchDubRange } from "../utils/dubSchedule";
 import {
   currentReleaseWeek,
@@ -608,7 +608,7 @@ export function HomeDashboard({
       active = false;
     };
   }, [episodeKeys]);
-  const [slide, setSlide] = useState(0),
+  const [slideId, setSlideId] = useState<number>(),
     [paused, setPaused] = useState(false),
     [focusPaused, setFocusPaused] = useState(false),
     [pageHidden, setPageHidden] = useState(document.hidden);
@@ -621,39 +621,34 @@ export function HomeDashboard({
       return "sub";
     }
   });
-  useEffect(() => {
-    // Warm the next slides before navigation rather than fetching after the cut.
-    slides.forEach((item) => {
-      void fetchHeroArtwork(item.id).then((urls) =>
-        urls.slice(0, 1).forEach((url) => {
-          const image = new Image();
-          image.src = url;
-        }),
-      );
-    });
-  }, [slides]);
-  const [validatedLogo, setValidatedLogo] = useState<string | null>(null);
-  const [artwork, setArtwork] = useState<{
-    id: number;
-    logos: string[];
-  } | null>(null);
-  const [logoIndex, setLogoIndex] = useState(0);
-  const anime = slides[slide % Math.max(1, slides.length)],
-    resume = history.find((item) => item.anime.id === anime?.id);
+  const [logos, setLogos] = useState<Record<number, string>>({});
+  const hero = useRef<HTMLElement>(null);
+  const [heroVisible, setHeroVisible] = useState(true);
   useEffect(() => {
     let active = true;
-    setLogoIndex(0);
-    if (anime?.id) {
-      void fetchHeroArtwork(anime.id).then((logos) => {
-        if (active) setArtwork({ id: anime.id, logos });
-      });
-    }
+    slides.forEach(({ id }) => {
+      void fetchVerifiedHeroLogo(id).then((logo) => {
+        if (active && logo) {
+          setLogos((previous) => previous[id] === logo ? previous : { ...previous, [id]: logo });
+          setSlideId((previous) => previous ?? id);
+        }
+      }).catch(() => {});
+    });
     return () => {
       active = false;
     };
-  }, [anime?.id, anime?.logoImage]);
-  const titleLogo =
-    artwork?.id === anime?.id ? artwork?.logos[logoIndex] : undefined;
+  }, [slides]);
+  const featured = useMemo(() => slides.filter(({ id }) => logos[id]), [slides, logos]);
+  const slide = Math.max(0, featured.findIndex(({ id }) => id === slideId));
+  const anime = featured[slide];
+  const resume = history.find((item) => item.anime.id === anime?.id);
+  const hasHero = !!anime;
+  useEffect(() => {
+    if (!hasHero || !hero.current || typeof IntersectionObserver === "undefined") return;
+    const observer = new IntersectionObserver(([entry]) => setHeroVisible(entry.isIntersecting));
+    observer.observe(hero.current);
+    return () => observer.disconnect();
+  }, [hasHero]);
   useEffect(() => {
     const changed = () => setPageHidden(document.hidden);
     document.addEventListener("visibilitychange", changed);
@@ -664,22 +659,24 @@ export function HomeDashboard({
       paused ||
       focusPaused ||
       pageHidden ||
-      slides.length < 2 ||
+      !heroVisible ||
+      featured.length < 2 ||
       window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
     )
       return;
-    const timer = setInterval(
-      () => setSlide((value) => (value + 1) % slides.length),
+    const timer = setTimeout(
+      () => setSlideId(featured[(slide + 1) % featured.length].id),
       8000,
     );
-    return () => clearInterval(timer);
-  }, [paused, focusPaused, pageHidden, slides.length, slide]);
+    return () => clearTimeout(timer);
+  }, [paused, focusPaused, pageHidden, heroVisible, featured, slide]);
   return (
     <div className="home-dashboard">
       {anime && (
         <section
+          ref={hero}
           className={
-            "cinematic-hero " + (paused || focusPaused ? "motion-paused" : "")
+            "cinematic-hero " + (paused || focusPaused || pageHidden || !heroVisible ? "motion-paused" : "")
           }
           aria-label="Featured anime"
           aria-roledescription="carousel"
@@ -694,7 +691,7 @@ export function HomeDashboard({
               setFocusPaused(false);
           }}
         >
-          {slides.map((item) => (
+          {featured.map((item) => (
             <div
               key={item.id}
               className={
@@ -708,49 +705,14 @@ export function HomeDashboard({
           ))}
           <div className="hero-shade" />
           <div className="hero-copy" key={"copy-" + anime.id}>
-            <h1
-              className={
-                !titleLogo || validatedLogo !== titleLogo
-                  ? getDisplayTitle(anime).length > 60
-                    ? "hero-long-title"
-                    : undefined
-                  : undefined
-              }
-            >
+            <h1>
               <button
                 className="hero-title-link"
                 title={getDisplayTitle(anime)}
                 aria-label={"View anime details: " + getDisplayTitle(anime)}
                 onClick={() => onSelect(anime)}
               >
-                {artwork?.id === anime.id &&
-                  !titleLogo &&
-                  getDisplayTitle(anime)}
-                {titleLogo && (
-                  <img
-                    className="hero-logo"
-                    key={titleLogo}
-                    src={titleLogo}
-                    alt={getDisplayTitle(anime)}
-                    style={{
-                      display: validatedLogo === titleLogo ? "block" : "none",
-                    }}
-                    onLoad={(event) => {
-                      const image = event.currentTarget;
-                      if (
-                        isTitleTreatment(
-                          image.naturalWidth,
-                          image.naturalHeight,
-                        )
-                      )
-                        setValidatedLogo(titleLogo);
-                      else setLogoIndex((index) => index + 1);
-                    }}
-                    onError={() => {
-                      setLogoIndex((index) => index + 1);
-                    }}
-                  />
-                )}
+                <img className="hero-logo" src={logos[anime.id]} alt={getDisplayTitle(anime)} />
               </button>
             </h1>
             <div
@@ -783,13 +745,13 @@ export function HomeDashboard({
             role="group"
             aria-label="Featured anime slides"
           >
-            {slides.map((item, index) => (
+            {featured.map((item, index) => (
               <button
                 key={item.id}
                 aria-label={"Show " + getDisplayTitle(item)}
                 aria-pressed={slide === index}
                 onClick={() => {
-                  setSlide(index);
+                  setSlideId(item.id);
                 }}
               >
                 <span />

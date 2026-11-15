@@ -83,6 +83,10 @@ input:focus-visible {
   opacity: 0;
   pointer-events: none;
 }
+.apex-nav.nav-hidden:not(:focus-within) {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
 .apex-nav:focus-within {
   transform: translateX(-50%);
   opacity: 1;

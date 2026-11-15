@@ -236,15 +236,23 @@ export default function App() {
 
   useEffect(() => {
     let previous = window.scrollY;
-    const scroll = () => {
+    let frame: number | undefined;
+    const update = () => {
+      frame = undefined;
       const current = window.scrollY;
       if (Math.abs(current - previous) > 8) {
         setNavHidden(current > previous && current > 120);
         previous = current;
       }
     };
+    const scroll = () => {
+      if (frame === undefined) frame = window.requestAnimationFrame(update);
+    };
     window.addEventListener("scroll", scroll, { passive: true });
-    return () => window.removeEventListener("scroll", scroll);
+    return () => {
+      window.removeEventListener("scroll", scroll);
+      if (frame !== undefined) window.cancelAnimationFrame(frame);
+    };
   }, []);
   useEffect(() => {
     window.scrollTo({ top: 0 });

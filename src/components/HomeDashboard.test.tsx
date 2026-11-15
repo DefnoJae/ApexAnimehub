@@ -11,9 +11,8 @@ import { useAccounts } from "../hooks/useAccounts";
 import { fetchAnilist } from "../utils/anilist";
 import { fetchDubRange } from "../utils/dubSchedule";
 import {
-  fetchHeroArtwork,
+  fetchVerifiedHeroLogo,
   fetchHeroBackdrops,
-  isTitleTreatment,
   isHeroBackdrop,
 } from "../utils/heroArtwork";
 import { HeroBackdrop } from "./HeroBackdrop";
@@ -39,10 +38,7 @@ beforeEach(() => {
       width / height <= 2.4,
   );
   (fetchHeroBackdrops as jest.Mock).mockResolvedValue([]);
-  (isTitleTreatment as jest.Mock).mockImplementation(
-    (width: number, height: number) => width / height >= 1.5,
-  );
-  (fetchHeroArtwork as jest.Mock).mockResolvedValue([]);
+  (fetchVerifiedHeroLogo as jest.Mock).mockResolvedValue(null);
   node = document.createElement("div");
   document.body.appendChild(node);
   root = createRoot(node);
@@ -70,10 +66,7 @@ function fakeAccounts() {
   } as unknown as ReturnType<typeof useAccounts>;
 }
 
-test("a mislabeled square poster stays hidden and leaves a readable hero title", async () => {
-  (fetchHeroArtwork as jest.Mock).mockResolvedValue([
-    "https://artworks.thetvdb.com/bad-cover.png",
-  ]);
+test("a title without a verified logo is omitted from the hero", async () => {
   await act(async () => {
     root.render(
       <HomeDashboard
@@ -89,16 +82,7 @@ test("a mislabeled square poster stays hidden and leaves a readable hero title",
       />,
     );
   });
-  const image = node.querySelector("h1 img") as HTMLImageElement;
-  expect(image.style.display).toBe("none");
-  expect(node.querySelector("h1")?.textContent).toBe(""); // No text flash while the logo is being validated.
-  Object.defineProperties(image, {
-    naturalWidth: { value: 1024 },
-    naturalHeight: { value: 1024 },
-  });
-  act(() => image.dispatchEvent(new Event("load")));
-  expect(node.querySelector("h1 img")).toBeNull();
-  expect(node.querySelector("h1")?.textContent).toBe("Example anime");
+  expect(node.querySelector(".cinematic-hero")).toBeNull();
 });
 
 test("backdrop rejects thin banners and displays a verified HD landscape", async () => {
@@ -128,6 +112,7 @@ test("backdrop rejects thin banners and displays a verified HD landscape", async
 });
 
 test("carousel progresses again after manual dot selection instead of permanently stopping", async () => {
+  (fetchVerifiedHeroLogo as jest.Mock).mockResolvedValue("https://image.tmdb.org/t/p/original/logo.png");
   jest.useFakeTimers();
   const visibility = Object.getOwnPropertyDescriptor(document, "hidden");
   Object.defineProperty(document, "hidden", {
@@ -183,11 +168,9 @@ test("carousel progresses again after manual dot selection instead of permanentl
   }
 });
 
-test("hero tries alternative logo artwork and returns to text if both images fail", async () => {
-  (fetchHeroArtwork as jest.Mock).mockResolvedValue([
-    "https://images.metahub.space/logo/medium/tt123/img",
-    "https://artworks.thetvdb.com/logo.png",
-  ]);
+test("hero accepts a verified original-series logo for a later entry", async () => {
+  const logo = "https://image.tmdb.org/t/p/original/franchise.png";
+  (fetchVerifiedHeroLogo as jest.Mock).mockResolvedValue(logo);
   await act(async () => {
     root.render(
       <HomeDashboard
@@ -203,16 +186,7 @@ test("hero tries alternative logo artwork and returns to text if both images fai
       />,
     );
   });
-  expect(node.querySelector("h1 img")?.getAttribute("src")).toContain(
-    "metahub",
-  );
-  act(() => node.querySelector("h1 img")!.dispatchEvent(new Event("error")));
-  expect(node.querySelector("h1 img")?.getAttribute("src")).toContain(
-    "thetvdb",
-  );
-  act(() => node.querySelector("h1 img")!.dispatchEvent(new Event("error")));
-  expect(node.querySelector("h1 img")).toBeNull();
-  expect(node.querySelector("h1")?.textContent).toBe("Example anime");
+  expect(node.querySelector("h1 img")?.getAttribute("src")).toBe(logo);
 });
 test("quick status actions preserve progress unless explicitly completing an anime", async () => {
   const accounts = fakeAccounts();
@@ -238,6 +212,7 @@ test("quick status actions preserve progress unless explicitly completing an ani
   expect(node.textContent).toContain("Saved");
 });
 test("continue watching shows actual playback progress and routes resume to the saved episode", async () => {
+  (fetchVerifiedHeroLogo as jest.Mock).mockResolvedValue("https://image.tmdb.org/t/p/original/logo.png");
   const select = jest.fn(),
     resume = jest.fn(),
     remove = jest.fn(),
