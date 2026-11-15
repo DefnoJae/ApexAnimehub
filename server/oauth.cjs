@@ -250,6 +250,11 @@ function createServer() {
             },
             body: key ? JSON.stringify({ client_secret: cfg.secret, code: fields.code })
               : provider === "anilist" ? JSON.stringify(fields) : new URLSearchParams(fields).toString(),
+          }).then((response) => {
+            if (!response.ok) {
+              console.warn("OAuth exchange request rejected", provider, key ? "relay" : "direct", response.status);
+            }
+            return response;
           });
           const response = await (relayKey
             ? fetchWithAniListRelay(() => exchange(relayKey), () => exchange())
