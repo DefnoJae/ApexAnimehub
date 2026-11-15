@@ -1,10 +1,13 @@
 import { StyledSelect } from "./StyledSelect";
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import type { useAccounts, ListStatus } from "../hooks/useAccounts";
 import { LibraryAnime } from "../hooks/useLibrary";
 import { QuickList } from "./HomeDashboard";
 import { PersonalRating } from "./RatingPills";
 import { AnimeBadges } from "./AnimeBadges";
+
+const batchSize = 50;
+
 const labels = {
   watching: "Watching",
   planning: "Planning",
@@ -24,6 +27,8 @@ export function MyList({
   const [status, setStatus] = useState<ListStatus | "all">("all");
   const [provider, setProvider] = useState("all");
   const [search, setSearch] = useState("");
+  const [visibleCount, setVisibleCount] = useState(batchSize);
+  const sentinel = useRef<HTMLDivElement>(null);
   const [sort, setSort] = useState(() => {
     try {
       return localStorage.getItem("apex_my_list_sort_v1") || "updated";
@@ -83,6 +88,21 @@ export function MyList({
               )
             : updated(b.anime) - updated(a.anime),
   );
+  const hasMore = visibleCount < unique.length;
+  const canObserve = typeof IntersectionObserver !== "undefined";
+  useEffect(() => {
+    if (!hasMore || !canObserve || !sentinel.current) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (!entries.some((entry) => entry.isIntersecting)) return;
+        observer.disconnect();
+        setVisibleCount((count) => count + batchSize);
+      },
+      { rootMargin: "800px 0px" },
+    );
+    observer.observe(sentinel.current);
+    return () => observer.disconnect();
+  }, [hasMore, canObserve, visibleCount, search, provider, status, sort]);
   return (
     <section className="my-library">
       <div className="section-heading">
@@ -106,12 +126,18 @@ export function MyList({
           aria-label="Search my list"
           placeholder="Search your anime…"
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(e) => {
+            setSearch(e.target.value);
+            setVisibleCount(batchSize);
+          }}
         />
         <StyledSelect
           aria-label="List provider"
           value={provider}
-          onChange={(e) => setProvider(e.target.value)}
+          onChange={(e) => {
+            setProvider(e.target.value);
+            setVisibleCount(batchSize);
+          }}
         >
           <option value="all">All accounts</option>
           <option value="anilist">AniList</option>
@@ -120,7 +146,10 @@ export function MyList({
         <StyledSelect
           aria-label="Filter list status"
           value={status}
-          onChange={(e) => setStatus(e.target.value as ListStatus | "all")}
+          onChange={(e) => {
+            setStatus(e.target.value as ListStatus | "all");
+            setVisibleCount(batchSize);
+          }}
         >
           <option value="all">All statuses</option>
           {Object.entries(labels).map(([key, label]) => (
@@ -134,6 +163,7 @@ export function MyList({
           value={sort}
           onChange={(event) => {
             setSort(event.target.value);
+            setVisibleCount(batchSize);
             try {
               localStorage.setItem("apex_my_list_sort_v1", event.target.value);
             } catch {}
@@ -173,7 +203,7 @@ export function MyList({
         <p>No anime in this view.</p>
       )}
       <div className="library-grid">
-        {unique.map((entry) => {
+        {unique.slice(0, visibleCount).map((entry) => {
           const entries = entriesFor(entry.anime);
           const inProgress = entries.filter((item) =>
             (item.status === "watching" || item.status === "paused") &&
@@ -245,6 +275,16 @@ export function MyList({
           );
         })}
       </div>
+      {hasMore && (canObserve ? (
+        <div ref={sentinel} className="discovery-sentinel" aria-hidden="true" />
+      ) : (
+        <button
+          className="hero-secondary glass"
+          onClick={() => setVisibleCount((count) => count + batchSize)}
+        >
+          Load more
+        </button>
+      ))}
     </section>
   );
 }
