@@ -1,6 +1,6 @@
 // Same-origin OAuth service. Both providers' credentials stay on the server.
 const http = require("node:http");
-const { cloudflareAniListRelayKey, fetchAniListGraphql, fetchWithAniListRelay, relayUrl } = require("./anilist-api.cjs");
+const { aniListRelayUrl, cloudflareAniListRelayKey, fetchAniListGraphql, fetchWithAniListRelay } = require("./anilist-api.cjs");
 const { randomBytes } = require("node:crypto");
 const {
   updateList,
@@ -239,7 +239,7 @@ function createServer() {
             ...(provider === "mal" ? { code_verifier: pending.verifier } : {}),
           };
           const relayKey = provider === "anilist" ? cloudflareAniListRelayKey() : undefined;
-          const exchange = (key) => fetch(key ? relayUrl : cfg.tokenUrl, {
+          const exchange = (key) => fetch(key ? aniListRelayUrl() : cfg.tokenUrl, {
             method: "POST",
             signal: AbortSignal.timeout(15000),
             redirect: "manual",

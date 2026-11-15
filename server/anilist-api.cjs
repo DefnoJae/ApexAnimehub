@@ -1,4 +1,12 @@
-const relayUrl = "https://apexanime-oauth-relay.vercel.app/api/exchange";
+function aniListRelayUrl() {
+  const configured = process.env.APEX_RELAY_URL;
+  if (!configured) return "https://apexanime-oauth-relay.vercel.app/api/exchange";
+  const url = new URL(configured);
+  if (url.protocol !== "https:" || url.username || url.password || url.search || url.hash) {
+    throw new Error("Invalid AniList relay URL");
+  }
+  return url.href;
+}
 
 function cloudflareAniListRelayKey() {
   return process.env.APP_ORIGIN === "https://apexanime.pages.dev"
@@ -15,7 +23,7 @@ async function fetchWithAniListRelay(relayRequest, directRequest) {
 
 function fetchAniListGraphql(accessToken, payload) {
   const relayKey = cloudflareAniListRelayKey();
-  const request = (key) => fetch(key ? relayUrl : "https://graphql.anilist.co", {
+  const request = (key) => fetch(key ? aniListRelayUrl() : "https://graphql.anilist.co", {
     method: "POST",
     redirect: "manual",
     signal: AbortSignal.timeout(15000),
@@ -29,4 +37,4 @@ function fetchAniListGraphql(accessToken, payload) {
   return relayKey ? fetchWithAniListRelay(() => request(relayKey), () => request()) : request();
 }
 
-module.exports = { cloudflareAniListRelayKey, fetchAniListGraphql, fetchWithAniListRelay, relayUrl };
+module.exports = { aniListRelayUrl, cloudflareAniListRelayKey, fetchAniListGraphql, fetchWithAniListRelay };
