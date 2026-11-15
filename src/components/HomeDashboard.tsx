@@ -298,6 +298,60 @@ export function QuickList({
   );
 }
 
+function HomePosterCard({ anime, accounts, onSelect }: {
+  anime: DashboardAnime;
+  accounts: Accounts;
+  onSelect: (anime: DashboardAnime) => void;
+}) {
+  const [hovered, setHovered] = useState(false);
+  return (
+  <article className="poster-card">
+    <div className="poster-art">
+      <button
+        className="poster-open"
+        onPointerEnter={() => setHovered(true)}
+        onPointerLeave={() => setHovered(false)}
+        onFocus={() => setHovered(true)}
+        onBlur={() => setHovered(false)}
+        aria-label={"View details: " + getDisplayTitle(anime)}
+        onClick={() => onSelect(anime)}
+      >
+        <img
+          loading="lazy"
+            decoding="async"
+          src={anime.coverImage?.extraLarge}
+          alt={getDisplayTitle(anime)}
+        />
+        <span className="poster-hover">
+          <span>
+            View episodes <ChevronRight size={18} />
+          </span>
+          <RatingPills
+            asText
+            active={hovered}
+            id={anime.id}
+            idMal={anime.idMal}
+            averageScore={anime.averageScore}
+          />
+        </span>
+      </button>
+      <PosterPersonalRating anime={anime} accounts={accounts} />
+      <QuickList anime={anime} accounts={accounts} />
+    </div>
+    <button
+      className="poster-title"
+      title={getDisplayTitle(anime)}
+      onClick={() => onSelect(anime)}
+    >
+      {getDisplayTitle(anime)}
+    </button>
+    <div className="home-poster-metadata">
+      <AnimeBadges idMal={anime.idMal} providedScore={null} />
+    </div>
+  </article>
+  );
+}
+
 export function PosterRow({
   title,
   animes,
@@ -311,7 +365,6 @@ export function PosterRow({
   onSelect: (anime: DashboardAnime) => void;
   notice?: string;
 }) {
-  const [hovered, setHovered] = useState<number | null>(null);
   if (!animes.length && !notice) return null;
   return (
     <section className="discovery-section home-poster-row" aria-label={title}>
@@ -320,49 +373,7 @@ export function PosterRow({
       </div>
       <div className="poster-track">
         {animes.map((anime) => (
-          <article className="poster-card" key={anime.id}>
-            <div className="poster-art">
-              <button
-                className="poster-open"
-                onPointerEnter={() => setHovered(anime.id)}
-                onPointerLeave={() => setHovered(null)}
-                onFocus={() => setHovered(anime.id)}
-                onBlur={() => setHovered(null)}
-                aria-label={"View details: " + getDisplayTitle(anime)}
-                onClick={() => onSelect(anime)}
-              >
-                <img
-                  loading="lazy"
-                  src={anime.coverImage?.extraLarge}
-                  alt={getDisplayTitle(anime)}
-                />
-                <span className="poster-hover">
-                  <span>
-                    View episodes <ChevronRight size={18} />
-                  </span>
-                  <RatingPills
-                    asText
-                    active={hovered === anime.id}
-                    id={anime.id}
-                    idMal={anime.idMal}
-                    averageScore={anime.averageScore}
-                  />
-                </span>
-              </button>
-              <PosterPersonalRating anime={anime} accounts={accounts} />
-              <QuickList anime={anime} accounts={accounts} />
-            </div>
-            <button
-              className="poster-title"
-              title={getDisplayTitle(anime)}
-              onClick={() => onSelect(anime)}
-            >
-              {getDisplayTitle(anime)}
-            </button>
-            <div className="home-poster-metadata">
-              <AnimeBadges idMal={anime.idMal} providedScore={null} />
-            </div>
-          </article>
+          <HomePosterCard key={anime.id} anime={anime} accounts={accounts} onSelect={onSelect} />
         ))}
       </div>
       {notice && (
@@ -531,6 +542,7 @@ export function LatestEpisodes({
               <div>
                 <img
                   loading="lazy"
+                  decoding="async"
                   src={anime.bannerImage || anime.coverImage?.extraLarge}
                   alt=""
                 />
