@@ -1,6 +1,6 @@
 // Same-origin OAuth service. Both providers' credentials stay on the server.
 const http = require("node:http");
-const { cloudflareAniListRelayKey, fetchAniListGraphql, relayUrl } = require("./anilist-api.cjs");
+const { cloudflareAniListRelayKey, fetchAniListGraphql, fetchWithAniListRelay, relayUrl } = require("./anilist-api.cjs");
 const { randomBytes } = require("node:crypto");
 const {
   updateList,
@@ -239,19 +239,21 @@ function createServer() {
             ...(provider === "mal" ? { code_verifier: pending.verifier } : {}),
           };
           const relayKey = provider === "anilist" ? cloudflareAniListRelayKey() : undefined;
-          const tokenUrl = relayKey ? relayUrl : cfg.tokenUrl;
-          const response = await fetch(tokenUrl, {
+          const exchange = (key) => fetch(key ? relayUrl : cfg.tokenUrl, {
             method: "POST",
             signal: AbortSignal.timeout(15000),
             redirect: "manual",
             headers: {
               Accept: "application/json",
-              "Content-Type": relayKey ? "application/json" : "application/x-www-form-urlencoded",
-              ...(relayKey ? { Authorization: "Bearer " + relayKey } : {}),
+              "Content-Type": key ? "application/json" : "application/x-www-form-urlencoded",
+              ...(key ? { Authorization: "Bearer " + key } : {}),
             },
-            body: relayKey ? JSON.stringify({ client_secret: cfg.secret, code: fields.code })
+            body: key ? JSON.stringify({ client_secret: cfg.secret, code: fields.code })
               : new URLSearchParams(fields).toString(),
           });
+          const response = await (relayKey
+            ? fetchWithAniListRelay(() => exchange(relayKey), () => exchange())
+            : exchange());
           if (!response.ok) {
             console.warn("OAuth token exchange rejected", provider, response.status,
               response.headers.get("cf-mitigated") === "challenge" ? "challenge" : "upstream");

@@ -6,19 +6,27 @@ function cloudflareAniListRelayKey() {
     : undefined;
 }
 
+async function fetchWithAniListRelay(relayRequest, directRequest) {
+  const response = await relayRequest().catch(() => null);
+  if (response && response.status !== 402) return response;
+  await response?.body?.cancel();
+  return directRequest();
+}
+
 function fetchAniListGraphql(accessToken, payload) {
   const relayKey = cloudflareAniListRelayKey();
-  return fetch(relayKey ? relayUrl : "https://graphql.anilist.co", {
+  const request = (key) => fetch(key ? relayUrl : "https://graphql.anilist.co", {
     method: "POST",
     redirect: "manual",
     signal: AbortSignal.timeout(15000),
     headers: {
       Accept: "application/json",
       "Content-Type": "application/json",
-      Authorization: "Bearer " + (relayKey || accessToken),
+      Authorization: "Bearer " + (key || accessToken),
     },
-    body: JSON.stringify(relayKey ? { operation: "graphql", accessToken, payload } : payload),
+    body: JSON.stringify(key ? { operation: "graphql", accessToken, payload } : payload),
   });
+  return relayKey ? fetchWithAniListRelay(() => request(relayKey), () => request()) : request();
 }
 
-module.exports = { cloudflareAniListRelayKey, fetchAniListGraphql, relayUrl };
+module.exports = { cloudflareAniListRelayKey, fetchAniListGraphql, fetchWithAniListRelay, relayUrl };
