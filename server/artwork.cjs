@@ -145,6 +145,30 @@ const officialLogos = {
   190327: "/title-logos/steel-ball-run.png",
   210482: "/title-logos/steel-ball-run.png",
 };
+async function malArtworkIdentity(id, mapping) {
+  const malId = Number(mapping.mal_id);
+  if (!process.env.MAL_CLIENT_ID || !Number.isSafeInteger(malId) || malId <= 0)
+    return null;
+  const entry = await json(
+    `https://api.myanimelist.net/v2/anime/${malId}?fields=alternative_titles,start_date,related_anime`,
+    { "X-MAL-CLIENT-ID": process.env.MAL_CLIENT_ID },
+  );
+  if (entry.id !== malId) return null;
+  return {
+    id,
+    format: mapping.type,
+    seasonYear: Number(entry.start_date?.slice(0, 4)) || undefined,
+    title: {
+      english: entry.alternative_titles?.en,
+      romaji: entry.title,
+      native: entry.alternative_titles?.ja,
+    },
+    relatives: (entry.related_anime || []).filter(({ relation_type, node }) =>
+      ["prequel", "parent_story"].includes(relation_type) &&
+      Number.isSafeInteger(node?.id) && node.id > 0,
+    ),
+  };
+}
 async function ownArtwork(media, tmdb) {
   const type = media.format === "MOVIE" ? "movie" : "tv";
   let tmdbId;
@@ -264,21 +288,54 @@ async function artwork(id, ancestors = new Set()) {
           (key && !token ? "api_key=" + encodeURIComponent(key) : ""),
         token ? { Authorization: "Bearer " + token } : {},
       );
-    const media = await mediaIdentity(id).catch(() => null);
+    let media = await mediaIdentity(id).catch(() => null);
     if (!media) {
       const mapped = await json("https://api.ani.zip/mappings?anilist_id=" + id);
       const mapping = mapped.mappings;
       const tmdbId = Number(mapping?.themoviedb_id);
-      if (Number(mapping?.anilist_id) !== id || !Number.isSafeInteger(tmdbId) || tmdbId <= 0)
+      if (Number(mapping?.anilist_id) !== id)
         throw new Error("Artwork identity unavailable");
       const tmdbType = mapping.type === "MOVIE" ? "movie" : "tv";
       const data = {
         anilistId: id,
-        ...selectImages(await tmdb(`${tmdbType}/${tmdbId}/images?include_image_language=en,null`)),
-        tmdbId,
-        tmdbType,
-        match: "mapped",
+        logos: [],
+        backdrops: [],
+        match: "none",
       };
+      if (Number.isSafeInteger(tmdbId) && tmdbId > 0) {
+        Object.assign(data, selectImages(await tmdb(`${tmdbType}/${tmdbId}/images?include_image_language=en,null`)), {
+          tmdbId, tmdbType, match: "mapped",
+        });
+      }
+      if (!data.logos.length || !data.backdrops.length) {
+        media = await malArtworkIdentity(id, mapping).catch(() => null);
+        if (media && data.match === "none") {
+          Object.assign(data, await ownArtwork(media, tmdb).catch(() => ({})));
+        }
+        for (const { node } of (media?.relatives || []).slice(0, 3)) {
+          if (data.logos.length && data.backdrops.length) break;
+          if (!sameSeries(media, { title: { romaji: node.title } })) continue;
+          try {
+            const parent = (await json("https://api.ani.zip/mappings?mal_id=" + node.id)).mappings;
+            if (Number(parent?.mal_id) !== node.id || !Number.isSafeInteger(parent.anilist_id)) continue;
+            const fallback = await artwork(parent.anilist_id, visited);
+            if (!data.logos.length && fallback.logos.length) {
+              data.logos = fallback.logos;
+              data.match = "related";
+            }
+            if (!data.backdrops.length && fallback.backdrops.length) {
+              data.backdrops = fallback.backdrops;
+              data.match = "related";
+            }
+          } catch {
+            /* An unavailable relative does not invalidate existing artwork. */
+          }
+        }
+      }
+      if (!data.logos.length && officialLogos[id]) {
+        data.logos = [officialLogos[id]];
+        if (data.match === "none") data.match = "official";
+      }
       if (cache.size >= 500) cache.delete(cache.keys().next().value);
       cache.set(id, { updated: Date.now(), data });
       return data;
@@ -288,10 +345,7 @@ async function artwork(id, ancestors = new Set()) {
       data.logos = [officialLogos[id]];
       if (data.match === "none") data.match = "official";
     }
-    if (
-      (!data.logos.length || !data.backdrops.length) &&
-      media.format !== "MOVIE"
-    ) {
+    if (!data.logos.length || !data.backdrops.length) {
       const relations = (media.relations?.edges || []).filter(
         (edge) =>
           (["PREQUEL", "PARENT"].includes(edge.relationType) ||

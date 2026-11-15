@@ -1,6 +1,43 @@
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const { selectImages, artwork } = require("./artwork.cjs");
+
+test("an unmapped cour inherits artwork through a verified MAL prequel when AniList is unavailable", async (t) => {
+  t.mock.method(global, "fetch", async (url) => {
+    if (url.includes("graphql.anilist")) return { ok: false };
+    let data = { results: [] };
+    if (url.includes("anilist_id=801")) {
+      data = { mappings: { anilist_id: 801, mal_id: 901, type: "TV" } };
+    } else if (url.includes("anime/901?")) {
+      data = {
+        id: 901,
+        title: "Test Family 2nd Season Part 2",
+        related_anime: [{ relation_type: "prequel", node: { id: 900, title: "Test Family 2nd Season" } }],
+      };
+    } else if (url.includes("mal_id=900") || url.includes("anilist_id=800")) {
+      data = { mappings: { anilist_id: 800, mal_id: 900, type: "TV", themoviedb_id: 123 } };
+    } else if (url.includes("tv/123/images")) {
+      data = {
+        logos: [{ file_path: "/original.png", iso_639_1: "en", width: 800, height: 300 }],
+        backdrops: [{ file_path: "/original.jpg", iso_639_1: null, width: 1920, height: 1080 }],
+      };
+    }
+    return { ok: true, json: async () => data };
+  });
+  const previous = { TMDB_API_KEY: process.env.TMDB_API_KEY, MAL_CLIENT_ID: process.env.MAL_CLIENT_ID };
+  Object.assign(process.env, { TMDB_API_KEY: "test", MAL_CLIENT_ID: "test" });
+  try {
+    const result = await artwork(801);
+    assert.equal(result.match, "related");
+    assert.deepEqual(result.logos, ["https://image.tmdb.org/t/p/original/original.png"]);
+    assert.deepEqual(result.backdrops, ["https://image.tmdb.org/t/p/original/original.jpg"]);
+  } finally {
+    for (const [key, value] of Object.entries(previous)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  }
+});
 test("English PNG logos and HD language-neutral backdrops only", () => {
   const image = (file_path, iso_639_1, width = 1920, height = 1080) => ({
     file_path,
