@@ -14,6 +14,7 @@ import { QuickList } from "./HomeDashboard";
 import { PosterPersonalRating } from "./PosterPersonalRating";
 import { AnimeBadges } from "./AnimeBadges";
 import "./discovery.css";
+const discoveryYears = Array.from({ length: 201 }, (_, index) => 2100 - index);
 const statuses = [
   ["", "Any list status"],
   ["planning", "Planning"],
@@ -317,16 +318,17 @@ export function DiscoveryPage({
           <div className="discovery-choice-menu discovery-years">
             {(["from", "to"] as const).map((key) => (
               <label key={key}>
-                {key}
-                <input
+                <span>{key === "from" ? "From" : "To"}</span>
+                <StyledSelect
                   aria-label={key + " year"}
-                  type="number"
-                  min="1900"
-                  max="2100"
-                  placeholder="Any"
                   value={draft[key]}
                   onChange={(e) => change(key, e.target.value)}
-                />
+                >
+                  <option value="">Any year</option>
+                  {discoveryYears.map((year) => (
+                    <option key={year} value={year}>{year}</option>
+                  ))}
+                </StyledSelect>
               </label>
             ))}
           </div>

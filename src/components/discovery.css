@@ -116,13 +116,13 @@
   display: block;
   width: 50%;
 }
-.discovery-years input {
+.discovery-years .styled-select {
   width: 100%;
-  background: #ffffff0a;
-  border: 1px solid #ffffff20;
-  padding: 8px;
-  color: white;
   margin-top: 6px;
+}
+.discovery-years .styled-select-trigger {
+  gap: 6px;
+  padding: 8px;
 }
 .discovery-active-filters {
   display: flex;
