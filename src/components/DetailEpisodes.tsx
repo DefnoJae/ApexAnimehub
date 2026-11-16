@@ -20,6 +20,7 @@ export function DetailEpisodes({
   onSelect,
   onPlay,
   onLanguage,
+  onDubAvailability,
 }: {
   anime: DashboardAnime;
   total: number;
@@ -28,6 +29,7 @@ export function DetailEpisodes({
   onSelect: (episode: number) => void;
   onPlay?: (episode: number) => void;
   onLanguage?: (language: "sub" | "dub") => void;
+  onDubAvailability?: (hasDub: boolean) => void;
 }) {
   const [data, setData] = useState<{
       id: number;
@@ -50,7 +52,10 @@ export function DetailEpisodes({
     setAvailabilityError("");
     void fetchEpisodeAvailability(anime.id, controller.signal)
       .then((value) => {
-        if (active) setAvailability(value);
+        if (active) {
+          setAvailability(value);
+          onDubAvailability?.(value.dub.length > 0);
+        }
       })
       .catch(() => {
         if (active)
@@ -64,7 +69,7 @@ export function DetailEpisodes({
       clearTimeout(timer);
       controller.abort();
     };
-  }, [anime.id, retry]);
+  }, [anime.id, retry, onDubAvailability]);
   useEffect(() => {
     if (language !== "all" && availability) {
       const available = availability[language];
@@ -153,7 +158,7 @@ export function DetailEpisodes({
         >
           All episodes
         </button>
-        {(["sub", "dub"] as const).map((value) => (
+        {(availability?.dub.length ? ["sub", "dub"] as const : ["sub"] as const).map((value) => (
           <button
             key={value}
             disabled={!availability}

@@ -8,7 +8,14 @@ import {
   nextDetailEpisode,
 } from "./AnimeDetails";
 import { fetchEpisodeMetadata } from "../utils/episodeMetadata";
+import { fetchEpisodeAvailability } from "../utils/episodeAvailability";
+import { getDubIndex } from "../utils/animeMetadata";
 import type { useAccounts } from "../hooks/useAccounts";
+jest.mock("../utils/episodeAvailability");
+jest.mock("../utils/animeMetadata", () => ({
+  ...jest.requireActual("../utils/animeMetadata"),
+  getDubIndex: jest.fn().mockResolvedValue({ dubbed: [], partial: [] }),
+}));
 jest.mock("../utils/episodeMetadata", () => ({
   fetchEpisodeMetadata: jest.fn().mockResolvedValue({}),
 }));
@@ -27,7 +34,9 @@ const anime: DetailAnime = {
   format: "TV",
 };
 beforeEach(() => {
+  (getDubIndex as jest.Mock).mockResolvedValue({ dubbed: [], partial: [] });
   (fetchEpisodeMetadata as jest.Mock).mockResolvedValue({});
+  (fetchEpisodeAvailability as jest.Mock).mockResolvedValue({ sub: [1], dub: [] });
   node = document.createElement("div");
   document.body.appendChild(node);
   root = createRoot(node);
@@ -37,7 +46,8 @@ afterEach(() => {
   act(() => root.unmount());
   node.remove();
 });
-test("episode cards immediately play with selected language and source without changing watched progress", () => {
+test("episode cards immediately play with selected language and source without changing watched progress", async () => {
+  (fetchEpisodeAvailability as jest.Mock).mockResolvedValue({ sub: [1], dub: [5, 6] });
   const play = jest.fn(),
     episode = jest.fn(),
     sync = jest.fn();
@@ -52,7 +62,7 @@ test("episode cards immediately play with selected language and source without c
     checking: false,
     sync,
   } as unknown as ReturnType<typeof useAccounts>;
-  act(() =>
+  await act(async () =>
     root.render(
       <AnimeDetails
         anime={anime}
@@ -126,6 +136,23 @@ test("episode cards immediately play with selected language and source without c
     status.dispatchEvent(new Event("change", { bubbles: true }));
   });
   expect(sync).toHaveBeenCalledWith(anime, "completed", 12);
+});
+test("a sub-only title ignores the saved dub preference without overwriting it", async () => {
+  localStorage.setItem("apex_episode_language", "dub");
+  const onPlay = jest.fn();
+  const accounts = {
+    connected: {},
+    libraryEntries: [],
+    getListStatus: () => null,
+  } as unknown as ReturnType<typeof useAccounts>;
+  await act(async () => {
+    root.render(<AnimeDetails anime={anime} accounts={accounts} total={12} selected={1}
+      onEpisode={jest.fn()} onPlay={onPlay} onBack={jest.fn()} onSelect={jest.fn()} onConnect={jest.fn()} />);
+  });
+  expect(node.querySelector(".detail-audio")?.textContent).toBe("Sub");
+  act(() => node.querySelector<HTMLButtonElement>('[aria-label="Episode 1, not marked watched"]')!.click());
+  expect(onPlay).toHaveBeenCalledWith(1, "sub", "anipm");
+  expect(localStorage.getItem("apex_episode_language")).toBe("dub");
 });
 test("continue targets the next unwatched episode, honors unfinished local history, and restarts completed series", () => {
   expect(nextDetailEpisode(12, 4)).toBe(5);

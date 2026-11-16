@@ -1,6 +1,6 @@
 import { preferredPlaybackSource, type PlaybackSource } from "../hooks/usePageRoute";
 import { StyledSelect } from "./StyledSelect";
-import React, { lazy, Suspense, useState } from "react";
+import React, { lazy, Suspense, useEffect, useState } from "react";
 import {
   ArrowLeft,
   Bookmark,
@@ -23,6 +23,7 @@ import { AnimeBadges } from "./AnimeBadges";
 import { DetailEpisodes } from "./DetailEpisodes";
 import { QuickList } from "./HomeDashboard";
 import { ListEntryEditor } from "./ListEntryEditor";
+import { getDubIndex } from "../utils/animeMetadata";
 import "./animeDetails.css";
 import "./watchOrder.css";
 const WatchOrder = lazy(() => import("./WatchOrder"));
@@ -122,7 +123,7 @@ export function AnimeDetails({
   const [source, setSource] = useState<PlaybackSource>(
     preferredPlaybackSource,
   );
-  const [audio, setAudio] = useState<"sub" | "dub">(() => {
+  const [preferredAudio, setAudio] = useState<"sub" | "dub">(() => {
     try {
       return localStorage.getItem("apex_episode_language") === "dub"
         ? "dub"
@@ -131,6 +132,19 @@ export function AnimeDetails({
       return "sub";
     }
   });
+  const [providerHasDub, setProviderHasDub] = useState(false);
+  const [indexedDubId, setIndexedDubId] = useState<number | null>(null);
+  useEffect(() => {
+    if (!anime.idMal) return;
+    const idMal = anime.idMal;
+    let active = true;
+    void getDubIndex().then(({ dubbed, partial }) => {
+      if (active) setIndexedDubId(dubbed.includes(idMal) || partial.includes(idMal) ? idMal : null);
+    }).catch(() => {});
+    return () => { active = false; };
+  }, [anime.idMal]);
+  const hasDub = providerHasDub || (indexedDubId !== null && indexedDubId === anime.idMal);
+  const audio = hasDub ? preferredAudio : "sub";
   const matches = accounts.libraryEntries.filter((entry) =>
     sameAnime(entry.anime, anime),
   );
@@ -404,6 +418,7 @@ export function AnimeDetails({
                 onSelect={onEpisode}
                 onPlay={(episode) => onPlay(episode, audio, source)}
                 onLanguage={changeAudio}
+                onDubAvailability={setProviderHasDub}
               />
             </div>
           )}
@@ -481,7 +496,7 @@ export function AnimeDetails({
               role="group"
               aria-label="Playback language"
             >
-              {(["sub", "dub"] as const).map((value) => (
+              {(hasDub ? ["sub", "dub"] as const : ["sub"] as const).map((value) => (
                 <button
                   key={value}
                   aria-pressed={audio === value}
@@ -500,11 +515,11 @@ export function AnimeDetails({
                   setSource(e.target.value as PlaybackSource)
                 }
               >
-                <option value="anipm">Ani.pm (Sub &amp; Dub)</option>
-                <option value="reanime">ReAnime (Sub &amp; Dub)</option>
-                <option value="animeembed">AnimeEmbed (Sub &amp; Dub)</option>
+                <option value="anipm">Ani.pm ({hasDub ? "Sub & Dub" : "Sub"})</option>
+                <option value="reanime">ReAnime ({hasDub ? "Sub & Dub" : "Sub"})</option>
+                <option value="animeembed">AnimeEmbed ({hasDub ? "Sub & Dub" : "Sub"})</option>
                 <option value="megaplay">MegaPlay</option>
-                <option value="apex">Apex Player (Sub &amp; Dub)</option>
+                <option value="apex">Apex Player ({hasDub ? "Sub & Dub" : "Sub"})</option>
               </StyledSelect>
             </label>
           </section>
