@@ -14,7 +14,11 @@ import { QuickList } from "./HomeDashboard";
 import { PosterPersonalRating } from "./PosterPersonalRating";
 import { AnimeBadges } from "./AnimeBadges";
 import "./discovery.css";
-const discoveryYears = Array.from({ length: 201 }, (_, index) => 2100 - index);
+const currentYear = new Date().getFullYear();
+const discoveryYears = Array.from(
+  { length: currentYear - 1900 + 1 },
+  (_, index) => currentYear - index,
+);
 const statuses = [
   ["", "Any list status"],
   ["planning", "Planning"],
@@ -33,6 +37,8 @@ function savedFilters(): DiscoveryFilters {
       return {
         ...defaultFilters,
         ...saved,
+        from: Number(saved.from) > currentYear ? "" : saved.from ?? defaultFilters.from,
+        to: Number(saved.to) > currentYear ? "" : saved.to ?? defaultFilters.to,
         studioId: undefined,
         genres: Array.isArray(saved.genres)
           ? saved.genres.filter(
