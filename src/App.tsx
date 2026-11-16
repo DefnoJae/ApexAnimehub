@@ -29,7 +29,7 @@ import {
   PlaybackSource,
   AudioLanguage,
 } from "./hooks/usePageRoute";
-import { detailQuery } from "./utils/detailQuery";
+import { detailQuery, fetchFallbackAnimeDetails } from "./utils/detailQuery";
 import { fetchHomeCatalog, HomeRow, pickHeroSlides } from "./utils/homeRows";
 
 function rememberPlayer(source: PlaybackSource) {
@@ -67,6 +67,7 @@ export default function App() {
   const previousPage = useRef<string>();
   const detailCache = useRef(new Map<number, any>());
   const seeds = useRef(new Map<number, any>());
+  const homeRequested = useRef(false);
   const invalidEpisode = !!(
     route.play &&
     selectedAnime?.id === route.animeId &&
@@ -146,7 +147,8 @@ export default function App() {
       setDetailLoading(false);
       return;
     }
-    setSelectedAnime(seeds.current.get(id) || null);
+    const seed = seeds.current.get(id);
+    setSelectedAnime(seed || null);
     setDetailLoading(true);
     void fetchAnilist<{ Media: any }>(detailQuery, { id }, abort.signal)
       .then((data) => {
@@ -159,7 +161,14 @@ export default function App() {
         detailCache.current.set(id, data.Media);
         setSelectedAnime(data.Media);
       })
-      .catch((error) => {
+      .catch(async (error) => {
+        if (abort.signal.aborted || seed) return;
+        const fallback = await fetchFallbackAnimeDetails(id, abort.signal).catch(() => null);
+        if (abort.signal.aborted) return;
+        if (fallback) {
+          setSelectedAnime(fallback);
+          return;
+        }
         if (!abort.signal.aborted)
           setDetailError(
             error instanceof Error
@@ -219,7 +228,13 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    loadContent();
+    if (view === "all" && !homeRequested.current) {
+      homeRequested.current = true;
+      void loadContent();
+    }
+  }, [view, loadContent]);
+
+  useEffect(() => {
     try {
       const savedHistory = localStorage.getItem("videasy_history");
       if (savedHistory) {
@@ -232,7 +247,7 @@ export default function App() {
     } catch (e) {
       console.error("Failed to read history", e);
     }
-  }, [loadContent]);
+  }, []);
 
   useEffect(() => {
     let previous = window.scrollY;
@@ -441,7 +456,7 @@ export default function App() {
     ? selectedAnime.episodes
     : selectedAnime?.nextAiringEpisode?.episode
       ? selectedAnime.nextAiringEpisode.episode - 1
-      : 1;
+      : selectedAnime?.fallbackEpisodeCount || 1;
 
   const availableEpisodes = selectedAnime?.nextAiringEpisode?.episode
     ? selectedAnime.nextAiringEpisode.episode - 1

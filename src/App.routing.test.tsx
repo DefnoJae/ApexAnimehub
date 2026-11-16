@@ -70,6 +70,36 @@ beforeEach(() => {
       ),
   );
 });
+test("a rate-limited deep link can open the requested anime and episode with fallback metadata", async () => {
+  window.history.replaceState({}, "", "/anime/191656/episode/2");
+  (fetchAnilist as jest.Mock).mockRejectedValueOnce(new Error("AniList rate limit reached."));
+  const originalFetch = global.fetch;
+  global.fetch = jest.fn().mockResolvedValue({
+    ok: true,
+    json: async () => ({
+      mappings: { anilist_id: 191656, mal_id: 61578 },
+      titles: { en: "Fallback anime" },
+      episodeCount: 12,
+    }),
+  });
+  const node = document.createElement("div");
+  document.body.append(node);
+  const root = createRoot(node);
+  try {
+    await act(async () => root.render(<App />));
+    expect(node.querySelector("h1")?.textContent).toBe("Fallback anime");
+    expect(node.querySelector('[role="dialog"]')?.textContent).toContain("Episode 2");
+    expect(global.fetch).toHaveBeenCalledWith(
+      "https://api.ani.zip/mappings?anilist_id=191656",
+      expect.any(Object),
+    );
+  } finally {
+    act(() => root.unmount());
+    node.remove();
+    global.fetch = originalFetch;
+    window.history.replaceState({}, "", "/");
+  }
+});
 test("a direct episode URL reloads the right anime, audio and episode; Back restores details without restarting playback", async () => {
   window.history.replaceState(
     {},
