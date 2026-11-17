@@ -12,21 +12,23 @@ if (input.operation === "graphql") {
     return res.status(400).json({error:"Invalid AniList request"});
   // A Render free instance can take a few seconds to wake. Give the upstream
   // request enough room after that wake-up and retry one safe read once when
-  // the provider has a transient network or gateway failure. Mutations are
-  // deliberately never retried because they can change a user's list.
+  // the provider has a transient network or gateway failure. A
+  // SaveMediaListEntry mutation is also safe to retry because it sets an
+  // explicit final state rather than applying an incremental change.
   const readOnly = /^\s*(?:query\b|\{)/.test(payload.query);
+  const idempotentSave = /\bSaveMediaListEntry\b/.test(payload.query);
   let upstream;
-  for (let attempt = 0; attempt < (readOnly ? 2 : 1); attempt += 1) {
+  for (let attempt = 0; attempt < ((readOnly || idempotentSave) ? 2 : 1); attempt += 1) {
     try {
       upstream = await fetch("https://graphql.anilist.co", {
         method: "POST", redirect: "manual", signal: AbortSignal.timeout(30000),
         headers: { Accept: "application/json", "Content-Type": "application/json", Authorization: "Bearer " + accessToken },
         body: JSON.stringify(payload),
       });
-      if (!readOnly || ![429, 502, 503, 504].includes(upstream.status) || attempt === 1) break;
+      if ((!readOnly && !idempotentSave) || ![429, 502, 503, 504].includes(upstream.status) || attempt === 1) break;
       await upstream.body?.cancel();
     } catch (error) {
-      if (!readOnly || attempt === 1) {
+      if ((!readOnly && !idempotentSave) || attempt === 1) {
         return res.status(503).json({error:"AniList is temporarily unavailable", retryable:true});
       }
     }

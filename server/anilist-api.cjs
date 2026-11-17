@@ -44,6 +44,9 @@ async function fetchAniListGraphql(accessToken, payload) {
     body: JSON.stringify(key ? { operation: "graphql", accessToken, payload } : payload),
   });
   const isRead = /^\s*(?:query\b|\{)/.test(payload.query);
+  // Saving a media-list entry sets a complete desired state, so a retry after
+  // a transport failure is safe. Other mutations remain single-shot.
+  const isIdempotentSave = /\bSaveMediaListEntry\b/.test(payload.query);
   const cacheKey = isRead && process.env.APP_ORIGIN === "https://apexanime.pages.dev"
     ? createHash("sha256").update(accessToken).update("\0").update(JSON.stringify(payload)).digest("hex")
     : null;
@@ -66,7 +69,7 @@ async function fetchAniListGraphql(accessToken, payload) {
       return direct;
     }
     const remaining = 75000 - (Date.now() - started);
-    if (isRead && remaining > 0) {
+    if ((isRead || isIdempotentSave) && remaining > 0) {
       const retry = await request(relayKey, Math.min(remaining, 30000)).catch(() => null);
       if (retry && ![402, 502, 503, 504].includes(retry.status)) {
         await relay?.body?.cancel();
