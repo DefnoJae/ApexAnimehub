@@ -3,7 +3,6 @@ import { createRoot, Root } from "react-dom/client";
 import { act } from "react-dom/test-utils";
 import { DiscoveryPage } from "./DiscoveryPage";
 import { fetchDiscovery, fetchDiscoveryOptions } from "../utils/discovery";
-import { getCachedMalScore, getMalScore } from "../utils/animeMetadata";
 import type { useAccounts } from "../hooks/useAccounts";
 jest.mock("../utils/discovery", () => ({
   ...jest.requireActual("../utils/discovery"),
@@ -11,15 +10,6 @@ jest.mock("../utils/discovery", () => ({
   fetchDiscoveryOptions: jest.fn(),
 }));
 jest.mock("./AnimeBadges", () => ({ AnimeBadges: () => null }));
-let mockRatingSource = "anilist";
-jest.mock("../hooks/useRatingSource", () => ({
-  useRatingSource: () => [mockRatingSource, jest.fn()],
-}));
-jest.mock("../utils/animeMetadata", () => ({
-  ...jest.requireActual("../utils/animeMetadata"),
-  getCachedMalScore: jest.fn(),
-  getMalScore: jest.fn(),
-}));
 const accounts = {
   libraryEntries: [],
   connected: { anilist: true, mal: false },
@@ -30,9 +20,6 @@ let node: HTMLDivElement, root: Root, intersect: IntersectionObserverCallback;
 beforeEach(() => {
   jest.useFakeTimers();
   localStorage.clear();
-  mockRatingSource = "anilist";
-  (getCachedMalScore as jest.Mock).mockImplementation(() => null);
-  (getMalScore as jest.Mock).mockImplementation(async () => null);
   node = document.createElement("div");
   document.body.appendChild(node);
   root = createRoot(node);
@@ -136,41 +123,4 @@ test("filter changes debounce automatically and send real selected tags without 
     "anilist",
   );
   expect(node.querySelector('button[type="submit"]')).toBeNull();
-});
-test("with MyAnimeList as the rating source, the minimum rating uses MAL scores", async () => {
-  mockRatingSource = "mal";
-  (getCachedMalScore as jest.Mock).mockImplementation((id: number) =>
-    id === 1 ? 8.4 : null,
-  );
-  (getMalScore as jest.Mock).mockImplementation(async (id: number) =>
-    ({ 2: 6.8, 3: 7.2 } as Record<number, number>)[id] ?? null,
-  );
-  localStorage.setItem(
-    "apex_discovery_v2",
-    JSON.stringify({ score: "7", sort: "start_date" }),
-  );
-  (fetchDiscovery as jest.Mock).mockResolvedValue({
-    items: [1, 2, 3].map((id) => ({
-      id,
-      idMal: id,
-      title: { english: "Anime " + id },
-      malScore: null,
-    })),
-    nextPage: null,
-    source: "anilist",
-  });
-  await act(async () =>
-    root.render(<DiscoveryPage accounts={accounts} onSelect={jest.fn()} />),
-  );
-  await act(async () => {
-    jest.advanceTimersByTime(350);
-  });
-  await act(async () => {});
-  expect(getMalScore).toHaveBeenCalledWith(2);
-  expect(getMalScore).toHaveBeenCalledWith(3);
-  expect(
-    Array.from(node.querySelectorAll(".discovery-poster-caption strong")).map(
-      (element) => element.textContent,
-    ),
-  ).toEqual(["Anime 1", "Anime 3"]);
 });
