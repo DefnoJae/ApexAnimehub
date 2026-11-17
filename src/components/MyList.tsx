@@ -1,5 +1,6 @@
 import { StyledSelect } from "./StyledSelect";
 import React, { useEffect, useRef, useState } from "react";
+import { isRateLimitError } from "../utils/anilist";
 import type { useAccounts, ListStatus } from "../hooks/useAccounts";
 import { LibraryAnime } from "../hooks/useLibrary";
 import { QuickList } from "./HomeDashboard";
@@ -179,7 +180,7 @@ export function MyList({
       {Object.entries(accounts.libraryErrors).map(([p, error]) => (
         <p role="alert" key={p}>
           {p === "mal" ? "MyAnimeList" : "AniList"}: {error}{" "}
-          {error?.includes("429") &&
+          {isRateLimitError(error) &&
             "The provider is busy; automatically retrying in about a minute. "}{" "}
           Saved entries are kept when available. Retry with Refresh lists.
         </p>

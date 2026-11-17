@@ -1,6 +1,9 @@
-jest.mock("../anilistAuth", () => ({ anilistRequest: jest.fn() }));
+jest.mock("../anilistAuth", () => ({
+  anilistRequest: jest.fn(),
+  getAniListToken: jest.fn(),
+}));
 
-import { anilistRequest } from "../anilistAuth";
+import { anilistRequest, getAniListToken } from "../anilistAuth";
 import {
   readAniListEntry,
   readAniListList,
@@ -13,26 +16,53 @@ beforeEach(() => {
   jest.clearAllMocks();
 });
 
-test("readAniListList normalizes identity, score, status and updatedAt", async () => {
-  (anilistRequest as jest.Mock)
-    .mockResolvedValueOnce({ Viewer: { id: 2, name: "Alice" } })
-    .mockResolvedValueOnce({
-      Page: {
-        pageInfo: { hasNextPage: true },
-        mediaList: [{
-          status: "PAUSED", progress: 7, score: 85, updatedAt: 10,
-          media: { id: 3, idMal: 4, title: { english: "Example" } },
-        }],
-      },
-    });
-  const page = await readAniListList(2);
+test("readAniListList uses the verified token and makes one list request per page", async () => {
+  const controller = new AbortController();
+  (getAniListToken as jest.Mock).mockResolvedValue({
+    accessToken: "t",
+    expiresAt: Date.now() + 3600000,
+    identity: "2",
+    name: "Alice",
+  });
+  (anilistRequest as jest.Mock).mockResolvedValue({
+    Page: {
+      pageInfo: { hasNextPage: true },
+      mediaList: [{
+        status: "PAUSED", progress: 7, score: 85, updatedAt: 10,
+        media: { id: 3, idMal: 4, title: { english: "Example" } },
+      }],
+    },
+  });
+  const page = await readAniListList(2, controller.signal);
   expect(page).toMatchObject({
     identity: "2", name: "Alice", hasNextPage: true,
     entries: [{ status: "paused", progress: 7, score: 8.5, updatedAt: 10000 }],
   });
-  expect((anilistRequest as jest.Mock).mock.calls[1][1]).toEqual({
+  expect(anilistRequest).toHaveBeenCalledTimes(1);
+  expect((anilistRequest as jest.Mock).mock.calls[0][0]).toContain(
+    "mediaList(userId:$user",
+  );
+  expect((anilistRequest as jest.Mock).mock.calls[0][1]).toEqual({
     user: 2, page: 2,
   });
+  expect(getAniListToken).toHaveBeenCalledWith(controller.signal);
+});
+
+test.each([
+  ["missing", undefined],
+  ["non-numeric", "abc"],
+  ["non-positive", "0"],
+  ["fractional", "1.5"],
+])("readAniListList rejects a %s token identity before requesting", async (_label, identity) => {
+  (getAniListToken as jest.Mock).mockResolvedValue({
+    accessToken: "t",
+    expiresAt: Date.now() + 3600000,
+    identity,
+  });
+  await expect(readAniListList(2)).rejects.toThrow(
+    "AniList connection required. Please reconnect.",
+  );
+  expect(anilistRequest).not.toHaveBeenCalled();
 });
 
 test("updates preserve automatic completion, forward progress and POINT_100 scores", async () => {

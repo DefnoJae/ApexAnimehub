@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { AccountProvider, ListAnime, ListStatus } from "./useAccounts";
+import { isRateLimitError } from "../utils/anilist";
 import {
   readAniListList,
   type AniListListPage,
@@ -323,7 +324,10 @@ export function useLibrary(connected: Record<AccountProvider, boolean>) {
     };
   }, [refreshLibrary]);
   useEffect(() => {
-    if (!Object.values(errors).some((error) => error?.includes("429"))) return;
+    if (
+      !Object.values(errors).some((error) => !!error && isRateLimitError(error))
+    )
+      return;
     const timer = window.setTimeout(() => void refreshLibrary(), 65000);
     return () => window.clearTimeout(timer);
   }, [errors, refreshLibrary]);

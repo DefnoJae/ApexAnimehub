@@ -1,6 +1,14 @@
 // mock ./anilist so getAniListToken's Viewer verification is deterministic
-jest.mock("./anilist", () => ({ fetchAnilist: jest.fn() }));
-import { fetchAnilist } from "./anilist";
+jest.mock("./anilist", () => ({
+  ...jest.requireActual("./anilist"),
+  fetchAnilist: jest.fn(),
+}));
+import {
+  ANILIST_RATE_LIMIT_MESSAGE,
+  AniListRequestError,
+  fetchAnilist,
+  isRateLimitError,
+} from "./anilist";
 import {
   ANILIST_AUTH_INVALID_EVENT,
   ANILIST_TOKEN_KEY,
@@ -18,6 +26,37 @@ beforeEach(() => {
   invalidateAniListAuth(); // clears in-memory rehydration promise between tests
 });
 
+describe("AniList rate-limit detection", () => {
+  test("exports the canonical rate-limit message", () => {
+    expect(ANILIST_RATE_LIMIT_MESSAGE).toBe(
+      "AniList rate limit reached. Please try again later.",
+    );
+  });
+
+  test.each([
+    ["exact message", ANILIST_RATE_LIMIT_MESSAGE],
+    ["message containing 429", "AniList request failed (429)"],
+    ["Error with the rate-limit message", new Error(ANILIST_RATE_LIMIT_MESSAGE)],
+    [
+      "request error with status 429",
+      new AniListRequestError(ANILIST_RATE_LIMIT_MESSAGE, 429),
+    ],
+    ["plain object with status 429", { status: 429 }],
+  ])("isRateLimitError recognises %s", (_label, value) => {
+    expect(isRateLimitError(value)).toBe(true);
+  });
+
+  test.each([
+    ["ordinary message", "Network request failed"],
+    ["ordinary error", new Error("Network request failed")],
+    ["unrelated object", { status: 500 }],
+    ["null", null],
+    ["undefined", undefined],
+  ])("isRateLimitError rejects %s", (_label, value) => {
+    expect(isRateLimitError(value)).toBe(false);
+  });
+});
+
 test("getAniListToken rehydrates from the token endpoint and verifies Viewer identity", async () => {
   localStorage.setItem(ANILIST_TOKEN_KEY, JSON.stringify({
     accessToken: "old-token",
@@ -32,10 +71,24 @@ test("getAniListToken rehydrates from the token endpoint and verifies Viewer ide
       expiresAt: Date.now() + 3600000,
     }),
   });
-  (fetchAnilist as jest.Mock).mockResolvedValue({ Viewer: { id: 77 } });
+  (fetchAnilist as jest.Mock).mockResolvedValue({ Viewer: { id: 77, name: "Alice" } });
   const token = await getAniListToken();
-  expect(token).toMatchObject({ accessToken: "new-token", identity: "77" });
-  expect(readAniListToken()).toMatchObject({ accessToken: "new-token", identity: "77" });
+  expect(token).toMatchObject({
+    accessToken: "new-token",
+    identity: "77",
+    name: "Alice",
+  });
+  expect(readAniListToken()).toMatchObject({
+    accessToken: "new-token",
+    identity: "77",
+    name: "Alice",
+  });
+  expect(fetchAnilist).toHaveBeenCalledWith(
+    expect.stringContaining("Viewer{id name}"),
+    {},
+    undefined,
+    "new-token",
+  );
   expect(global.fetch).toHaveBeenCalledWith("/api/oauth/anilist/token", {
     credentials: "same-origin",
     cache: "no-store",
@@ -52,7 +105,7 @@ test("getAniListToken reuses the in-page rehydrated token without another endpoi
       expiresAt: Date.now() + 3600000,
     }),
   });
-  (fetchAnilist as jest.Mock).mockResolvedValue({ Viewer: { id: 77 } });
+  (fetchAnilist as jest.Mock).mockResolvedValue({ Viewer: { id: 77, name: "Alice" } });
   await getAniListToken();
   await getAniListToken();
   expect(global.fetch).toHaveBeenCalledTimes(1);
@@ -89,7 +142,7 @@ test("anilistRequest invalidates on HTTP 401 or Invalid token GraphQL errors", a
     }),
   });
   (fetchAnilist as jest.Mock)
-    .mockResolvedValueOnce({ Viewer: { id: 77 } })
+    .mockResolvedValueOnce({ Viewer: { id: 77, name: "Alice" } })
     .mockRejectedValueOnce(Object.assign(new Error("Invalid token"), {
       status: 400,
       graphqlErrors: ["Invalid token"],
@@ -128,7 +181,7 @@ test("getAniListToken treats token-endpoint transport failures as retryable with
       status: 200,
       json: async () => ({ accessToken: "retry-token", expiresAt: Date.now() + 3600000 }),
     });
-  (fetchAnilist as jest.Mock).mockResolvedValue({ Viewer: { id: 77 } });
+  (fetchAnilist as jest.Mock).mockResolvedValue({ Viewer: { id: 77, name: "Alice" } });
   localStorage.setItem(ANILIST_TOKEN_KEY, JSON.stringify({
     accessToken: "original-token",
     expiresAt: Date.now() + 3600000,

@@ -206,3 +206,71 @@ test("fresh first-page values replace old complete cache before a large import f
     JSON.parse(localStorage.getItem("apex_library_v1_anilist_alice")!).entries,
   ).toHaveLength(2);
 });
+
+test("auto-retries an AniList rate limit from the saved checkpoint", async () => {
+  jest.useFakeTimers();
+  try {
+    localStorage.setItem(
+      "apex_library_v1_anilist_alice",
+      JSON.stringify({
+        identity: "alice",
+        name: "alice",
+        entries: [{ anime, status: "planning", progress: 0, updatedAt: 1 }],
+        complete: false,
+        nextPage: 30,
+        updatedAt: Date.now(),
+      }),
+    );
+    let failedPage30 = false;
+    setAniListPage((pageNumber) => {
+      if (pageNumber === 30) {
+        if (!failedPage30) {
+          failedPage30 = true;
+          throw new Error(
+            "AniList rate limit reached. Please try again later.",
+          );
+        }
+        return {
+          ...page("alice", "planning", false),
+          entries: [
+            {
+              anime: { id: 2, idMal: 22, title: { english: "Resumed" } },
+              status: "planning",
+              progress: 3,
+              updatedAt: 2,
+            },
+          ],
+        };
+      }
+      return page("alice", "planning", false);
+    });
+    await act(async () => {
+      root.render(<Harness mal={false} />);
+    });
+    expect(library.libraryErrors.anilist).toBe(
+      "AniList rate limit reached. Please try again later.",
+    );
+    const callsAfterFailure = (readAniListList as jest.Mock).mock.calls.length;
+    expect(
+      (readAniListList as jest.Mock).mock.calls
+        .slice(0, callsAfterFailure)
+        .map(([pageNumber]) => pageNumber),
+    ).toContain(30);
+
+    await act(async () => {
+      jest.advanceTimersByTime(65000);
+    });
+
+    const retryPages = (readAniListList as jest.Mock).mock.calls
+      .slice(callsAfterFailure)
+      .map(([pageNumber]) => pageNumber);
+    expect(retryPages).toContain(30);
+    expect(library.libraryErrors.anilist).toBeUndefined();
+    expect(library.lists.anilist?.complete).toBe(true);
+    expect(library.libraryEntries.map((entry) => entry.anime.id).sort()).toEqual(
+      [1, 2],
+    );
+  } finally {
+    jest.useRealTimers();
+  }
+});

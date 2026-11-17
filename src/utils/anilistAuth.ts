@@ -7,6 +7,7 @@ export interface AniListToken {
   accessToken: string;
   expiresAt: number;
   identity?: string;
+  name?: string;
 }
 
 export class AniListAuthError extends Error {
@@ -38,6 +39,7 @@ export function readAniListToken(): AniListToken | null {
       accessToken: parsed.accessToken,
       expiresAt: parsed.expiresAt,
       identity: typeof parsed.identity === "string" && parsed.identity ? parsed.identity : undefined,
+      name: typeof parsed.name === "string" && parsed.name ? parsed.name : undefined,
     };
   } catch {
     return null;
@@ -68,9 +70,13 @@ export function invalidateAniListAuth(): void {
   }
 }
 
-async function verifyIdentity(accessToken: string, expectedIdentity: string | undefined, signal?: AbortSignal): Promise<string> {
-  const viewer = await fetchAnilist<{ Viewer: { id: number } }>(
-    "query{Viewer{id}}",
+async function verifyIdentity(
+  accessToken: string,
+  expectedIdentity: string | undefined,
+  signal?: AbortSignal,
+): Promise<{ identity: string; name: string }> {
+  const viewer = await fetchAnilist<{ Viewer: { id: number; name: string } }>(
+    "query{Viewer{id name}}",
     {},
     signal,
     accessToken,
@@ -82,7 +88,11 @@ async function verifyIdentity(accessToken: string, expectedIdentity: string | un
   if (expectedIdentity && String(expectedIdentity) !== identity) {
     throw new AniListAuthError("AniList connection required. Please reconnect.");
   }
-  return identity;
+  const viewerName = viewer?.Viewer?.name;
+  const name = typeof viewerName === "string" && viewerName.trim()
+    ? viewerName
+    : identity;
+  return { identity, name };
 }
 
 async function rehydrateToken(signal?: AbortSignal): Promise<AniListToken> {
@@ -125,9 +135,9 @@ async function rehydrateToken(signal?: AbortSignal): Promise<AniListToken> {
     throw new AniListAuthError("AniList connection required. Please reconnect.");
   }
 
-  let identity: string;
+  let verified: { identity: string; name: string };
   try {
-    identity = await verifyIdentity(payload.accessToken, payload.identity, signal);
+    verified = await verifyIdentity(payload.accessToken, payload.identity, signal);
   } catch (error) {
     if (error instanceof AniListAuthError || isAuthInvalidError(error)) {
       invalidateAniListAuth();
@@ -140,7 +150,8 @@ async function rehydrateToken(signal?: AbortSignal): Promise<AniListToken> {
   const token: AniListToken = {
     accessToken: payload.accessToken,
     expiresAt: payload.expiresAt,
-    identity,
+    identity: verified.identity,
+    name: verified.name,
   };
   writeAniListToken(token);
   return token;

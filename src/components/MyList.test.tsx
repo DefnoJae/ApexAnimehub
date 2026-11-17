@@ -63,3 +63,40 @@ test("My List sorts by real entry updates and personal score, with compact score
     host.remove();
   }
 });
+
+describe.each([
+  ["the rate-limit message", "AniList rate limit reached. Please try again later."],
+  ["a 429 error", "AniList request failed (429)"],
+])("My List with %s", (_label, error) => {
+  test("shows the automatic retry hint", () => {
+    localStorage.clear();
+    const host = document.createElement("div");
+    document.body.append(host);
+    const root = createRoot(host);
+    const accounts = {
+      connected: { anilist: true, mal: false },
+      libraryEntries: [],
+      libraryErrors: { anilist: error },
+      lists: {},
+    } as unknown as ReturnType<typeof useAccounts>;
+    try {
+      act(() =>
+        root.render(
+          <MyList
+            accounts={accounts}
+            onSelect={jest.fn()}
+            onConnect={jest.fn()}
+          />,
+        ),
+      );
+      const alert = host.querySelector('[role="alert"]');
+      expect(alert?.textContent).toContain("AniList: " + error);
+      expect(alert?.textContent).toContain(
+        "automatically retrying in about a minute",
+      );
+    } finally {
+      act(() => root.unmount());
+      host.remove();
+    }
+  });
+});

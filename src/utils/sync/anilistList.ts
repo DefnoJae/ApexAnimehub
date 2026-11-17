@@ -1,4 +1,4 @@
-import { anilistRequest } from "../anilistAuth";
+import { anilistRequest, getAniListToken } from "../anilistAuth";
 import type { LibraryEntry } from "../../hooks/useLibrary";
 import type { ListStatus } from "../../hooks/useAccounts";
 
@@ -42,7 +42,6 @@ const statusMap: Record<ListStatus, AniListStatus> = {
 };
 
 // Exact query strings from server/list.cjs.
-const VIEWER_QUERY = "query{Viewer{id name}}";
 const LIST_QUERY = "query($user:Int,$page:Int){Page(page:$page,perPage:50){pageInfo{hasNextPage} mediaList(userId:$user,type:ANIME,sort:UPDATED_TIME_DESC){status progress score(format:POINT_100) updatedAt media{id idMal averageScore episodes title{english romaji} coverImage{extraLarge} bannerImage}}}}";
 const ENTRY_QUERY = "query($id:Int){Media(id:$id,type:ANIME){mediaListEntry{status progress score(format:POINT_100)}}}";
 const EXISTING_ENTRY_QUERY = "query($id:Int){Media(id:$id,type:ANIME){mediaListEntry{progress status}}}";
@@ -124,20 +123,24 @@ export async function readAniListList(
 ): Promise<AniListListPage> {
   if (!Number.isSafeInteger(page) || page < 1 || page > 10000)
     throw new Error("Invalid list page");
-  const viewer = await anilistRequest<{ Viewer: { id: number; name: string } }>(
-    VIEWER_QUERY,
-    {},
-    signal,
-  );
+  const token = await getAniListToken(signal);
+  const identity = token?.identity;
+  if (
+    typeof identity !== "string" ||
+    !/^\d+$/.test(identity) ||
+    !Number.isSafeInteger(Number(identity)) ||
+    Number(identity) <= 0
+  )
+    throw new Error("AniList connection required. Please reconnect.");
   const data = await anilistRequest<{
     Page: {
       pageInfo: { hasNextPage: boolean };
       mediaList: AniListMediaListItem[];
     };
-  }>(LIST_QUERY, { user: viewer.Viewer.id, page }, signal);
+  }>(LIST_QUERY, { user: Number(identity), page }, signal);
   return {
-    identity: String(viewer.Viewer.id),
-    name: viewer.Viewer.name,
+    identity,
+    name: token.name || identity,
     hasNextPage: data.Page.pageInfo.hasNextPage,
     entries: data.Page.mediaList.map((entry) => ({
       anime: entry.media,

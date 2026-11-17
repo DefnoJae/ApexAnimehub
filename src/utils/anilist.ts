@@ -1,5 +1,16 @@
-const rateLimitMessage = "AniList rate limit reached. Please try again later.";
+export const ANILIST_RATE_LIMIT_MESSAGE = "AniList rate limit reached. Please try again later.";
 let publicRetryAt = 0;
+
+export function isRateLimitError(value: unknown): boolean {
+  if (typeof value === "string") return isRateLimitMessage(value);
+  if (!value || typeof value !== "object") return false;
+  if ((value as { status?: unknown }).status === 429) return true;
+  return value instanceof Error && isRateLimitMessage(value.message);
+}
+
+function isRateLimitMessage(message: string): boolean {
+  return message.includes("429") || message.includes(ANILIST_RATE_LIMIT_MESSAGE);
+}
 
 export class AniListRequestError extends Error {
   status?: number;
@@ -14,7 +25,7 @@ export class AniListRequestError extends Error {
 }
 
 export async function fetchAnilist<T>(query: string, variables: Record<string, unknown> = {}, signal?: AbortSignal, token?: string): Promise<T> {
-  if (!token && Date.now() < publicRetryAt) throw new AniListRequestError(rateLimitMessage, 429);
+  if (!token && Date.now() < publicRetryAt) throw new AniListRequestError(ANILIST_RATE_LIMIT_MESSAGE, 429);
   const controller = new AbortController();
   const abort = () => controller.abort();
   signal?.addEventListener('abort', abort);
@@ -33,7 +44,7 @@ export async function fetchAnilist<T>(query: string, variables: Record<string, u
         const next = retry && /^\d+$/.test(retry) ? now + Number(retry) * 1000 : Date.parse(retry || "");
         publicRetryAt = Math.max(publicRetryAt, next > now ? next : now + 60000);
       }
-      throw new AniListRequestError(rateLimitMessage, 429);
+      throw new AniListRequestError(ANILIST_RATE_LIMIT_MESSAGE, 429);
     }
     if (!response.ok) {
       let graphqlErrors: string[] = [];
