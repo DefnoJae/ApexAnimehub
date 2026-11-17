@@ -125,6 +125,60 @@ test("one whole-number rating updates both lists, rejects decimals and displays 
   expect(document.querySelector("[role=dialog]")).toBeNull();
 });
 
+test.each([
+  ["progress", { status: "watching", progress: "3", score: 8.5 }],
+  ["score", { status: "watching", progress: 3, score: "8.5" }],
+])(
+  "rejects a malformed AniList %s without populating saved values",
+  async (_field, malformed) => {
+    (readAniListEntry as jest.Mock).mockResolvedValue(malformed);
+    const record = jest.fn();
+    const accounts = {
+      connected: { anilist: true, mal: false },
+      libraryEntries: [
+        {
+          anime,
+          provider: "anilist",
+          status: "watching",
+          progress: 2,
+          score: 4,
+        },
+      ],
+      getListStatus: () => "watching",
+      record,
+      sync: jest.fn(),
+      busy: false,
+    } as unknown as ReturnType<typeof useAccounts>;
+    await act(async () =>
+      root.render(
+        <ListEntryEditor
+          anime={anime}
+          accounts={accounts}
+          onConnect={jest.fn()}
+        />,
+      ),
+    );
+    await act(async () =>
+      (node.querySelector("button") as HTMLButtonElement).click(),
+    );
+    expect(document.body.textContent).toContain(
+      "AniList: Invalid account entry",
+    );
+    expect(
+      (document.querySelector('[aria-label="Your rating"]') as HTMLInputElement)
+        .value,
+    ).toBe("4");
+    expect(
+      (
+        document.querySelector(
+          '[aria-label="Episodes watched"]',
+        ) as HTMLInputElement
+      ).value,
+    ).toBe("2");
+    expect(record).not.toHaveBeenCalled();
+  },
+);
+
 test("saved whole ratings agree without rounding fractional or conflicting old ratings", () => {
   expect(commonWholeRating([8, 8])).toBe("8");
   expect(commonWholeRating([10])).toBe("10");
