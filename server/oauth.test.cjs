@@ -7,6 +7,7 @@ const {
   readEntry,
   validateUpdate,
 } = require("./list.cjs");
+const { fetchAniListGraphql } = require("./anilist-api.cjs");
 const browserFetch = global.fetch;
 const json = (data) => ({ ok: true, status: 200, json: async () => data });
 const origin = "http://localhost:3000";
@@ -58,6 +59,35 @@ test("list imports authenticate, paginate and normalize provider-specific status
     await assert.rejects(readList("mal", {}, -1));
   } finally {
     global.fetch = browserFetch;
+  }
+});
+test("overlapping AniList reads use separate upstream requests", async () => {
+  const previousOrigin = process.env.APP_ORIGIN;
+  const previousRelayKey = process.env.APEX_RELAY_KEY;
+  let calls = 0;
+  process.env.APP_ORIGIN = "https://apexanime.pages.dev";
+  delete process.env.APEX_RELAY_KEY;
+  global.fetch = async () => {
+    calls++;
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    return new Response(JSON.stringify({ data: { Viewer: { id: 1 } } }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  };
+  try {
+    const [first, second] = await Promise.all([
+      fetchAniListGraphql("test-token", { query: "query{Viewer{id}}" }),
+      fetchAniListGraphql("test-token", { query: "query{Viewer{id}}" }),
+    ]);
+    assert.equal(calls, 2);
+    assert.deepEqual(await first.json(), await second.json());
+  } finally {
+    global.fetch = browserFetch;
+    if (previousOrigin === undefined) delete process.env.APP_ORIGIN;
+    else process.env.APP_ORIGIN = previousOrigin;
+    if (previousRelayKey === undefined) delete process.env.APEX_RELAY_KEY;
+    else process.env.APEX_RELAY_KEY = previousRelayKey;
   }
 });
 async function serve(run) {
