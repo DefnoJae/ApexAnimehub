@@ -6,6 +6,11 @@ import { createRoot } from "react-dom/client";
 import { act } from "react-dom/test-utils";
 import { VideoPlayer, trustedPlaybackMessage } from "./VideoPlayer";
 import { sendListUpdate, useAccounts } from "../hooks/useAccounts";
+jest.mock("../utils/sync/anilistList", () => ({
+  updateAniListEntry: jest.fn(),
+  removeAniListEntry: jest.fn(),
+}));
+import { updateAniListEntry } from "../utils/sync/anilistList";
 const accounts = {
   busy: false,
   checking: false,
@@ -205,13 +210,13 @@ test("MAL uses confirmed idMal, exposes server errors, and refuses unmapped IDs"
     "confirmed MyAnimeList ID",
   );
   expect(global.fetch).not.toHaveBeenCalled();
-  (global.fetch as jest.Mock).mockResolvedValue({
-    ok: false,
-    json: async () => ({ error: "Please reconnect" }),
-  });
+  (updateAniListEntry as jest.Mock).mockRejectedValueOnce(
+    new Error("Please reconnect"),
+  );
   expect((await sendListUpdate("anilist", anime, "watching", 3)).error).toBe(
     "Please reconnect",
   );
+  expect(global.fetch).not.toHaveBeenCalled();
 });
 
 test("only playback messages from the current iframe origin and window are trusted", () => {

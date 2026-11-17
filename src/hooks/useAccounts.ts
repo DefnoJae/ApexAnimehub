@@ -1,4 +1,12 @@
 import { fetchAnilist } from "../utils/anilist";
+import {
+  clearAniListToken,
+  ANILIST_AUTH_INVALID_EVENT,
+} from "../utils/anilistAuth";
+import {
+  updateAniListEntry,
+  removeAniListEntry,
+} from "../utils/sync/anilistList";
 import { entryChanges } from "../utils/notificationChanges";
 import { useLibrary } from "./useLibrary";
 import { useNotifications } from "./useNotifications";
@@ -46,24 +54,43 @@ export async function sendListUpdate(
       throw new Error(
         "This anime has no confirmed MyAnimeList ID. Reopen its details and try again.",
       );
-    const response = await fetch("/api/list/" + provider, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        id: provider === "mal" ? anime.idMal : anime.id,
+    let raw:
+      | {
+          status: string;
+          progress?: number;
+          score?: number;
+          num_episodes_watched?: number;
+        }
+      | undefined;
+    if (provider === "anilist") {
+      raw = await updateAniListEntry({
+        id: anime.id,
         status,
-        ...(progress !== undefined ? { progress } : {}),
+        progress,
         automatic,
-        ...(edit?.manualProgress ? { manualProgress: true } : {}),
-        ...(edit?.score !== undefined ? { score: edit.score } : {}),
-      }),
-    });
-    const data = await response.json();
-    if (!response.ok || !data.success)
-      throw new Error(
-        data.error || "List update failed (" + response.status + ")",
-      );
-    const raw = data.entry;
+        manualProgress: edit?.manualProgress,
+        score: edit?.score,
+      });
+    } else {
+      const response = await fetch("/api/list/mal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: anime.idMal,
+          status,
+          ...(progress !== undefined ? { progress } : {}),
+          automatic,
+          ...(edit?.manualProgress ? { manualProgress: true } : {}),
+          ...(edit?.score !== undefined ? { score: edit.score } : {}),
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success)
+        throw new Error(
+          data.error || "List update failed (" + response.status + ")",
+        );
+      raw = data.entry;
+    }
     const normalized = raw
       ? {
           status:
@@ -176,6 +203,17 @@ export function useAccounts() {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+  useEffect(() => {
+    const onAuthInvalid = () => {
+      setConnected((value) => ({ ...value, anilist: false }));
+      setAccountError(
+        "AniList authorization expired. Reconnect AniList to continue.",
+      );
+    };
+    window.addEventListener(ANILIST_AUTH_INVALID_EVENT, onAuthInvalid);
+    return () =>
+      window.removeEventListener(ANILIST_AUTH_INVALID_EVENT, onAuthInvalid);
+  }, []);
   const toggleAutoSync = () =>
     setAutoSync((value) => {
       try {
@@ -190,6 +228,7 @@ export function useAccounts() {
       });
       if (!response.ok) throw new Error("Could not disconnect account");
       setConnected((value) => ({ ...value, [provider]: false }));
+      if (provider === "anilist") clearAniListToken();
     } catch (error) {
       setAccountError(
         error instanceof Error ? error.message : "Disconnect failed",
@@ -426,18 +465,21 @@ export function useAccounts() {
               );
               id = provider === "anilist" ? data.Media.id : data.Media.idMal;
             }
-            const response = await fetch("/api/list/" + provider, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ id, action: "remove" }),
-            });
-            const data = await response.json();
-            if (!response.ok || !data.removed)
-              throw new Error(
-                (provider === "mal" ? "MyAnimeList" : "AniList") +
-                  ": " +
-                  (data.error || "Removal failed"),
-              );
+            if (provider === "anilist") {
+              const removed = await removeAniListEntry(id!);
+              if (!removed) throw new Error("AniList: Removal failed");
+            } else {
+              const response = await fetch("/api/list/mal", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ id, action: "remove" }),
+              });
+              const data = await response.json();
+              if (!response.ok || !data.removed)
+                throw new Error(
+                  "MyAnimeList: " + (data.error || "Removal failed"),
+                );
+            }
             library.removeRecord(provider, anime);
             return provider;
           }),
