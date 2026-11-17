@@ -102,28 +102,45 @@ Show cached entries when the backend fails and retry writes later.
 ## Decisions
 
 - **Token delivery:** add `GET /api/oauth/anilist/token` to the OAuth service.
-  It returns `{ accessToken, expiresAt }` only for the current same-origin
-  session. No token is placed in a redirect URL or fragment.
-- **Token storage:** `localStorage` key `apex_anilist_token_v1`, holding the
-  access token and expiry. A helper rehydrates it from the server endpoint when
-  the server reports AniList connected but no local token exists.
+  It returns `{ accessToken, expiresAt, identity? }` only for the current
+  same-origin session, using `accessAccount()` so expired server-side accounts
+  are pruned. With no connected account it returns `401 { error: "Not connected" }`.
+  No token is placed in a redirect URL or fragment.
+- **Token storage and binding:** `localStorage` key `apex_anilist_token_v1`,
+  holding `{ accessToken, expiresAt, identity }`, where `identity` is the
+  AniList user id from `Viewer`. Rehydration always fetches from the server
+  endpoint and replaces any existing local token; a changed identity simply
+  means the old identity-keyed library cache is no longer used. `disconnect()`
+  clears the local token. If the local token is expired, the accessor re-fetches
+  once; if the re-fetched token is also expired or unusable, it is invalidated.
+- **Readiness:** `connected` continues to reflect the server session, but
+  AniList consumers do not begin work merely because it flips true. Instead they
+  call the shared async token accessor, which rehydrates on demand and throws a
+  typed auth error when no usable token exists. This avoids unauthenticated
+  first reads and empty/error caching.
 - **Transport:** all browser AniList calls use
   `fetchAnilist(query, variables, signal, token)`.
 - **Server proxy:** the existing `/api/oauth/anilist/graphql` and
   `/api/list/anilist` routes remain for compatibility, but the frontend stops
   calling them for AniList.
-- **Failure handling:** a `401` or GraphQL "Invalid token" clears the local
-  token and surfaces a reconnect prompt. `429` keeps the existing rate-limit
-  message and backoff behavior.
+- **Failure handling:** a `401` or GraphQL "Invalid token" calls a shared
+  `invalidateAniListAuth()` that clears the local token and dispatches an
+  `apex:anilist-auth-invalid` event on `window`. `useAccounts` listens for that
+  event, sets `connected.anilist` locally to `false`, and shows the existing
+  reconnect guidance. All AniList request paths use this same wrapper, including
+  the module-level activity utilities, so no caller can silently keep retrying
+  with a dead token. `429` keeps the existing rate-limit message and backoff
+  behavior.
 - **MAL:** all MAL read/update/remove paths remain unchanged.
 
 ## Implementation outline
 
 - `server/oauth.cjs`: add the additive token endpoint; no change to the OAuth
   exchange, callback, logout, or connected-state logic.
-- `src/utils/anilistAuth.ts` (new): token read/write/clear, expiry check,
-  rehydration from the server endpoint, and a thin authenticated request
-  wrapper.
+- `src/utils/anilistAuth.ts` (new): token read/write/clear, expiry and identity
+  checks, one-shot rehydration from the server endpoint, a shared async accessor
+  usable by hooks and module-level utilities, a thin authenticated request
+  wrapper, and `invalidateAniListAuth()` with its window event.
 - `src/utils/sync/anilistList.ts` (new): AniList-only port of the relevant
   `server/list.cjs` behavior, preserving the exact GraphQL queries,
   `MediaListStatus` ↔ app status mapping, `score(format:POINT_100) / 10`,
@@ -138,7 +155,9 @@ Show cached entries when the backend fails and retry writes later.
   `src/utils/sync/aniListClient.ts`: replace the proxied GraphQL calls with
   authenticated direct calls.
 - App startup: after `/api/accounts` reports AniList connected, ensure a local
-  token exists before any AniList work starts.
+  token exists before any AniList work starts. The module-level activity
+  utilities obtain the token through the shared accessor rather than taking a
+  React prop. `disconnect()` clears the local token alongside the server logout.
 - Tests: server test for the token endpoint; unit tests for token storage and
   normalization parity; update hook/util tests that currently mock server
   AniList routes.
