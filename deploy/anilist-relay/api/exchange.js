@@ -10,17 +10,31 @@ if (input.operation === "graphql") {
   if (typeof accessToken !== "string" || !/^[A-Za-z0-9._-]{1,4096}$/.test(accessToken) ||
       typeof payload?.query !== "string" || JSON.stringify(payload).length > 32768)
     return res.status(400).json({error:"Invalid AniList request"});
-  try {
-    const upstream = await fetch("https://graphql.anilist.co", {
-      method: "POST", redirect: "manual", signal: AbortSignal.timeout(12000),
-      headers: { Accept: "application/json", "Content-Type": "application/json", Authorization: "Bearer " + accessToken },
-      body: JSON.stringify(payload),
-    });
-    const data = await upstream.json().catch(() => ({error:"AniList returned a non-JSON response"}));
-    return res.status(upstream.status >= 300 && upstream.status < 400 ? 502 : upstream.status).json(data);
-  } catch {
-    return res.status(502).json({error:"AniList is unavailable"});
+  // A Render free instance can take a few seconds to wake. Give the upstream
+  // request enough room after that wake-up and retry one safe read once when
+  // the provider has a transient network or gateway failure. Mutations are
+  // deliberately never retried because they can change a user's list.
+  const readOnly = /^\s*(?:query\b|\{)/.test(payload.query);
+  let upstream;
+  for (let attempt = 0; attempt < (readOnly ? 2 : 1); attempt += 1) {
+    try {
+      upstream = await fetch("https://graphql.anilist.co", {
+        method: "POST", redirect: "manual", signal: AbortSignal.timeout(30000),
+        headers: { Accept: "application/json", "Content-Type": "application/json", Authorization: "Bearer " + accessToken },
+        body: JSON.stringify(payload),
+      });
+      if (!readOnly || ![429, 502, 503, 504].includes(upstream.status) || attempt === 1) break;
+      await upstream.body?.cancel();
+    } catch (error) {
+      if (!readOnly || attempt === 1) {
+        return res.status(503).json({error:"AniList is temporarily unavailable", retryable:true});
+      }
+    }
+    await new Promise((resolve) => setTimeout(resolve, 1000));
   }
+  if (!upstream) return res.status(503).json({error:"AniList is temporarily unavailable", retryable:true});
+  const data = await upstream.json().catch(() => ({error:"AniList returned a non-JSON response"}));
+  return res.status(upstream.status >= 300 && upstream.status < 400 ? 502 : upstream.status).json(data);
 }
 const {client_secret,code}=input;
 if(typeof client_secret!=='string'||client_secret.length>256||typeof code!=='string'||code.length>4096) return res.status(400).end();
