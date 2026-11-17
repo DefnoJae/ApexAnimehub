@@ -155,12 +155,14 @@ function createServer() {
         return send(200, { providers: info });
       }
       const route =
-        /^\/api\/oauth\/(anilist|mal)\/(start|callback|session|logout|graphql)$/.exec(
+        /^\/api\/oauth\/(anilist|mal)\/(start|callback|session|logout|graphql|token)$/.exec(
           url.pathname,
         );
       if (route) {
         const [, provider, action] = route;
         const cfg = config(provider);
+        if (action === "token" && provider === "mal")
+          return send(404, { error: "Not found" });
         if (action === "start" && req.method === "GET") {
           // The short public alias uses the registered OAuth host for account sessions.
           if (
@@ -292,6 +294,20 @@ function createServer() {
         const account = await accessAccount(current, provider);
         if (action === "session" && req.method === "GET")
           return send(account ? 200 : 401, { authenticated: !!account });
+        if (
+          action === "token" &&
+          provider === "anilist" &&
+          req.method === "GET"
+        ) {
+          if (!account) return send(401, { error: "Not connected" });
+          return send(200, {
+            accessToken: account.accessToken,
+            expiresAt: account.expiresAt,
+            ...(account.identity?.id != null
+              ? { identity: String(account.identity.id) }
+              : {}),
+          });
+        }
         if (
           action === "graphql" &&
           provider === "anilist" &&

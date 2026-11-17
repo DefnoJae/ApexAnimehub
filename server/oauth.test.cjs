@@ -452,3 +452,53 @@ test("MAL transient refresh failure preserves credentials; invalid grant disconn
     });
     assert.equal(sessions.get(id).accounts.mal, undefined);
   }));
+
+test("AniList token endpoint returns only the connected access token", async () =>
+  serve(async (base) => {
+    const id = "a".repeat(64);
+    const expiresAt = Date.now() + 3600000;
+    sessions.set(id, {
+      accounts: {
+        anilist: {
+          accessToken: "token-from-session",
+          refreshToken: "refresh-from-session",
+          expiresAt,
+          identity: { id: 77, name: "Tester" },
+        },
+      },
+      expiresAt: Date.now() + 3600000,
+    });
+    const response = await browserFetch(
+      base + "/api/oauth/anilist/token",
+      { headers: { Cookie: "apex_session=" + id } },
+    );
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), {
+      accessToken: "token-from-session",
+      expiresAt,
+      identity: "77",
+    });
+  }));
+test("AniList token endpoint rejects missing or expired sessions", async () =>
+  serve(async (base) => {
+    assert.equal(
+      (await browserFetch(base + "/api/oauth/anilist/token")).status,
+      401,
+    );
+    const id = "b".repeat(64);
+    sessions.set(id, {
+      accounts: {
+        anilist: {
+          accessToken: "expired-token",
+          expiresAt: Date.now() - 1000,
+        },
+      },
+      expiresAt: Date.now() + 3600000,
+    });
+    const expired = await browserFetch(
+      base + "/api/oauth/anilist/token",
+      { headers: { Cookie: "apex_session=" + id } },
+    );
+    assert.equal(expired.status, 401);
+    assert.deepEqual(await expired.json(), { error: "Not connected" });
+  }));
