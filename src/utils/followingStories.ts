@@ -118,7 +118,12 @@ async function request(
   } catch (error) {
     if (error instanceof AniListAuthError)
       throw new Error("Reconnect AniList to view following activity.");
-    throw error;
+    if (
+      signal.aborted ||
+      (error as { name?: string } | null)?.name === "AbortError"
+    )
+      throw error;
+    throw new Error("Following activity is temporarily unavailable.");
   }
   if (String(data?.Viewer?.id) !== identity)
     throw new Error("Following activity is temporarily unavailable.");

@@ -82,6 +82,42 @@ test("maps AniList auth failures to the existing reconnect message", async () =>
   );
 });
 
+test("maps non-auth AniList failures, including rate limits, to the exact unavailable message", async () => {
+  (anilistRequest as jest.Mock).mockRejectedValueOnce(
+    Object.assign(
+      new Error("AniList rate limit reached. Please try again later."),
+      { status: 429 },
+    ),
+  );
+  await expect(
+    fetchFollowingStories("100", new AbortController().signal),
+  ).rejects.toThrow(
+    new Error("Following activity is temporarily unavailable."),
+  );
+});
+
+test("rethrows an aborted request unchanged when the signal is aborted", async () => {
+  const controller = new AbortController();
+  controller.abort();
+  const abortError = Object.assign(new Error("The operation was aborted"), {
+    name: "AbortError",
+  });
+  (anilistRequest as jest.Mock).mockRejectedValueOnce(abortError);
+  await expect(fetchFollowingStories("101", controller.signal)).rejects.toBe(
+    abortError,
+  );
+});
+
+test("rethrows an AbortError by name even when the signal is not aborted", async () => {
+  const abortError = Object.assign(new Error("The operation was aborted"), {
+    name: "AbortError",
+  });
+  (anilistRequest as jest.Mock).mockRejectedValueOnce(abortError);
+  await expect(
+    fetchFollowingStories("102", new AbortController().signal),
+  ).rejects.toBe(abortError);
+});
+
 test("starts at the oldest unseen activity, including unseen activities inside an older user group", () => {
   const groups = groupStories([
     row,

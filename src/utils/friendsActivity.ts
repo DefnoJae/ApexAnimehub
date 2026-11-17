@@ -112,7 +112,12 @@ export async function fetchFriendsActivity(
   } catch (error) {
     if (error instanceof AniListAuthError)
       throw new Error("Reconnect AniList to see following activity.");
-    throw error;
+    if (
+      signal.aborted ||
+      (error as { name?: string } | null)?.name === "AbortError"
+    )
+      throw error;
+    throw new Error("Following activity is temporarily unavailable.");
   }
   if (!data?.Page || String(data.Viewer?.id) !== identity)
     throw new Error("Following activity is temporarily unavailable.");
