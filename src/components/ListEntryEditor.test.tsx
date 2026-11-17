@@ -1,12 +1,16 @@
+jest.mock("../utils/sync/anilistList", () => ({ readAniListEntry: jest.fn() }));
+
 import React from "react";
 import { act } from "react-dom/test-utils";
 import { createRoot, Root } from "react-dom/client";
 import { ListEntryEditor, commonWholeRating } from "./ListEntryEditor";
 import type { useAccounts } from "../hooks/useAccounts";
+import { readAniListEntry } from "../utils/sync/anilistList";
 let node: HTMLDivElement, root: Root;
 const original = global.fetch;
 const anime = { id: 1, idMal: 11, episodes: 12, title: { english: "Example" } };
 beforeEach(() => {
+  jest.clearAllMocks();
   node = document.createElement("div");
   document.body.appendChild(node);
   root = createRoot(node);
@@ -17,16 +21,17 @@ afterEach(() => {
   global.fetch = original;
 });
 test("one whole-number rating updates both lists, rejects decimals and displays provider failures", async () => {
-  global.fetch = jest.fn(async (url) => ({
+  global.fetch = jest.fn(async () => ({
     ok: true,
     json: async () => ({
-      entry: {
-        status: "watching",
-        progress: 3,
-        score: String(url).includes("/mal?") ? 7 : 8.5,
-      },
+      entry: { status: "watching", progress: 3, score: 7 },
     }),
   })) as jest.Mock;
+  (readAniListEntry as jest.Mock).mockResolvedValue({
+    status: "watching",
+    progress: 3,
+    score: 8.5,
+  });
   const sync = jest.fn().mockResolvedValue([
     { provider: "anilist", success: true },
     { provider: "mal", success: false, error: "Reconnect required" },
@@ -63,6 +68,10 @@ test("one whole-number rating updates both lists, rejects decimals and displays 
         '[aria-label="Edit watched episodes and personal scores"]',
       ) as HTMLButtonElement
     ).click(),
+  );
+  expect(readAniListEntry).toHaveBeenCalledWith(
+    anime.id,
+    expect.any(AbortSignal),
   );
   expect(
     (document.querySelector('[aria-label="Your rating"]') as HTMLInputElement)
@@ -136,6 +145,11 @@ test.each([
         entry: { status: "watching", progress: 3, score: 8 },
       }),
     })) as jest.Mock;
+    (readAniListEntry as jest.Mock).mockResolvedValue({
+      status: "watching",
+      progress: 3,
+      score: 8,
+    });
     const sync = jest.fn().mockResolvedValue([
       { provider: "anilist", success: true },
       { provider: "mal", success: true },

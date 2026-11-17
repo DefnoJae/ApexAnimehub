@@ -8,6 +8,7 @@ import type {
   useAccounts,
 } from "../hooks/useAccounts";
 import { sameAnime } from "../hooks/useLibrary";
+import { readAniListEntry } from "../utils/sync/anilistList";
 type Accounts = ReturnType<typeof useAccounts>;
 const providers: AccountProvider[] = ["anilist", "mal"];
 const label = (provider: AccountProvider) =>
@@ -138,6 +139,11 @@ function EntryDialog({
           throw new Error(
             "This anime has no confirmed " + label(provider) + " ID.",
           );
+        if (provider === "anilist")
+          return {
+            provider,
+            entry: await readAniListEntry(id, controller.signal),
+          };
         const response = await fetch(
           "/api/list/" + provider + "?animeId=" + id,
           { signal: controller.signal, cache: "no-store" },
