@@ -1,7 +1,12 @@
+jest.mock("./anilistAuth", () => ({
+  anilistRequest: jest.fn(),
+  AniListAuthError: class AniListAuthError extends Error {},
+}));
+import { AniListAuthError, anilistRequest } from "./anilistAuth";
 import { normalizeFriends, fetchFriendsActivity } from "./friendsActivity";
-const original = global.fetch;
-afterEach(() => {
-  global.fetch = original;
+
+beforeEach(() => {
+  jest.clearAllMocks();
 });
 test("normalizes exact anime IDs, ratings and missing information without invented totals", () => {
   const entries = normalizeFriends(
@@ -41,40 +46,43 @@ test("normalizes exact anime IDs, ratings and missing information without invent
   expect(entries[1].total).toBeUndefined();
 });
 test("uses authenticated following query, caches per viewer and never reuses another account's results", async () => {
-  global.fetch = jest
-    .fn()
-    .mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        data: {
-          Viewer: { id: 77 },
-          Page: {
-            pageInfo: { hasNextPage: false },
-            mediaList: [
-              {
-                mediaId: 888,
-                status: "CURRENT",
-                score: 80,
-                progress: 3,
-                user: { id: 1, name: "Real friend" },
-              },
-            ],
-          },
+  (anilistRequest as jest.Mock).mockResolvedValue({
+    Viewer: { id: 77 },
+    Page: {
+      pageInfo: { hasNextPage: false },
+      mediaList: [
+        {
+          mediaId: 888,
+          status: "CURRENT",
+          score: 80,
+          progress: 3,
+          user: { id: 1, name: "Real friend" },
         },
-      }),
-    });
+      ],
+    },
+  });
   const signal = new AbortController().signal;
   await fetchFriendsActivity(888, "77", 1, signal);
   await fetchFriendsActivity(888, "77", 1, signal);
-  expect(global.fetch).toHaveBeenCalledTimes(1);
-  const call = (global.fetch as jest.Mock).mock.calls[0];
-  expect(call[0]).toBe("/api/oauth/anilist/graphql");
-  const payload = JSON.parse(call[1].body);
-  expect(payload.query).toContain("isFollowing:true");
-  expect(payload.query).toContain("score(format:POINT_100)");
-  expect(payload.variables.mediaId).toBe(888);
+  expect(anilistRequest).toHaveBeenCalledTimes(1);
+  expect(anilistRequest).toHaveBeenCalledWith(
+    expect.stringContaining("FriendsActivity"),
+    { mediaId: 888, page: 1 },
+    signal,
+  );
+  (anilistRequest as jest.Mock).mockRejectedValueOnce(new Error("unavailable"));
   await expect(fetchFriendsActivity(888, "78", 1, signal)).rejects.toThrow(
     "unavailable",
   );
-  expect(global.fetch).toHaveBeenCalledTimes(2);
+  expect(anilistRequest).toHaveBeenCalledTimes(2);
+});
+
+test("maps AniList auth failures to the existing reconnect message", async () => {
+  const signal = new AbortController().signal;
+  (anilistRequest as jest.Mock).mockRejectedValueOnce(
+    new AniListAuthError("expired"),
+  );
+  await expect(fetchFriendsActivity(888, "79", 1, signal)).rejects.toThrow(
+    "Reconnect AniList to see following activity.",
+  );
 });

@@ -1,3 +1,5 @@
+import { anilistRequest, AniListAuthError } from "./anilistAuth";
+
 export type FriendStatus =
   | "CURRENT"
   | "COMPLETED"
@@ -98,29 +100,26 @@ export async function fetchFriendsActivity(
   const key = identity + ":" + mediaId + ":" + page;
   const saved = cache.get(key);
   if (saved && Date.now() - saved.at < TTL) return saved;
-  const response = await fetch("/api/oauth/anilist/graphql", {
-    method: "POST",
-    credentials: "same-origin",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ query, variables: { mediaId, page } }),
-    signal,
-  });
-  const data = await response.json();
-  if (
-    !response.ok ||
-    data.errors?.length ||
-    !data.data?.Page ||
-    String(data.data.Viewer?.id) !== identity
-  )
-    throw new Error(
-      response.status === 401
-        ? "Reconnect AniList to see following activity."
-        : "Following activity is temporarily unavailable.",
-    );
+  let data: {
+    Viewer?: { id: number };
+    Page?: {
+      pageInfo?: { hasNextPage?: boolean };
+      mediaList?: RawEntry[];
+    };
+  };
+  try {
+    data = await anilistRequest<typeof data>(query, { mediaId, page }, signal);
+  } catch (error) {
+    if (error instanceof AniListAuthError)
+      throw new Error("Reconnect AniList to see following activity.");
+    throw error;
+  }
+  if (!data?.Page || String(data.Viewer?.id) !== identity)
+    throw new Error("Following activity is temporarily unavailable.");
   const result = {
     at: Date.now(),
-    friends: normalizeFriends(data.data.Page.mediaList || [], mediaId),
-    nextPage: data.data.Page.pageInfo?.hasNextPage ? page + 1 : null,
+    friends: normalizeFriends(data.Page.mediaList || [], mediaId),
+    nextPage: data.Page.pageInfo?.hasNextPage ? page + 1 : null,
   };
   if (cache.size >= 150) cache.delete(cache.keys().next().value!);
   cache.set(key, result);

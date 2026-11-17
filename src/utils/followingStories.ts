@@ -1,4 +1,5 @@
 import type { DashboardAnime } from "../components/HomeDashboard";
+import { anilistRequest, AniListAuthError } from "./anilistAuth";
 export interface StoryActivity {
   id: number;
   createdAt: number;
@@ -100,31 +101,28 @@ const cache = new Map<
   { at: number; groups: StoryGroup[]; warning?: string }
 >();
 const feedQuery = `query FollowingStories($since:Int!){Viewer{id} Page(page:1,perPage:50){activities(isFollowing:true,type:ANIME_LIST,createdAt_greater:$since,sort:ID_DESC){... on ListActivity{id createdAt status progress user{id name avatar{large}} media{id idMal type isAdult title{english romaji} bannerImage coverImage{extraLarge} episodes}}}}}`;
+interface ActivityResponse {
+  Viewer?: { id: number };
+  Page?: { activities: RawActivity[] };
+  [key: string]: unknown;
+}
 async function request(
   query: string,
   variables: Record<string, unknown>,
   identity: string,
   signal: AbortSignal,
-) {
-  const response = await fetch("/api/oauth/anilist/graphql", {
-    method: "POST",
-    credentials: "same-origin",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ query, variables }),
-    signal,
-  });
-  const json = await response.json();
-  if (
-    !response.ok ||
-    json.errors?.length ||
-    String(json.data?.Viewer?.id) !== identity
-  )
-    throw new Error(
-      response.status === 401
-        ? "Reconnect AniList to view following activity."
-        : "Following activity is temporarily unavailable.",
-    );
-  return json.data;
+): Promise<ActivityResponse> {
+  let data: ActivityResponse;
+  try {
+    data = await anilistRequest<ActivityResponse>(query, variables, signal);
+  } catch (error) {
+    if (error instanceof AniListAuthError)
+      throw new Error("Reconnect AniList to view following activity.");
+    throw error;
+  }
+  if (String(data?.Viewer?.id) !== identity)
+    throw new Error("Following activity is temporarily unavailable.");
+  return data;
 }
 export async function fetchFollowingStories(
   identity: string,
@@ -157,8 +155,11 @@ export async function fetchFollowingStories(
       const scores = await request(query, {}, identity, signal);
       for (const group of batch)
         for (const activity of group.activities) {
-          const entry = scores["u" + group.user.id]?.mediaList?.find(
-            (entry: { mediaId: number }) => entry.mediaId === activity.anime.id,
+          const userScores = scores["u" + group.user.id] as
+            | { mediaList?: Array<{ mediaId: number; score?: number }> }
+            | undefined;
+          const entry = userScores?.mediaList?.find(
+            (entry) => entry.mediaId === activity.anime.id,
           );
           if (
             typeof entry?.score === "number" &&

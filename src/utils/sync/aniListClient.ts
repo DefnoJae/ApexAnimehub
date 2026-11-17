@@ -1,4 +1,5 @@
 import { fetchAnilist } from '../anilist';
+import { anilistRequest, getAniListToken, clearAniListToken } from '../anilistAuth';
 import type { SyncStatus, AnimeEntry } from '../../types/sync';
 
 
@@ -13,8 +14,12 @@ export class AniListClient {
   }
 
   async authenticate(): Promise<boolean> {
-    const response = await fetch('/api/oauth/anilist/session', { credentials: 'same-origin' });
-    return response.ok;
+    try {
+      await getAniListToken();
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   async updateAnimeProgress(
@@ -45,13 +50,12 @@ export class AniListClient {
 
       const status = totalEpisodes && episodeWatched >= totalEpisodes ? 'COMPLETED' : 'CURRENT';
 
-      const response = await fetch('/api/oauth/anilist/graphql', {
-        method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: mutation, variables: { mediaId: aniListId, progress: episodeWatched, status } }),
-      });
-      if (!response.ok) throw new Error('AniList sync failed (' + response.status + ')');
-      const data = await response.json();
-      if (data.errors?.length || !data.data?.SaveMediaListEntry) throw new Error(data.errors?.[0]?.message || 'Missing AniList update result');
+      const data = await anilistRequest<{ SaveMediaListEntry?: unknown }>(
+        mutation,
+        { mediaId: aniListId, progress: episodeWatched, status },
+        undefined,
+      );
+      if (!data?.SaveMediaListEntry) throw new Error('Missing AniList update result');
 
       return {
         success: true,
@@ -103,6 +107,7 @@ export class AniListClient {
 
   logout(): void {
     localStorage.removeItem('anilist_access_token');
+    clearAniListToken();
     void fetch('/api/oauth/anilist/logout', { method: 'POST' });
   }
 }

@@ -1,3 +1,8 @@
+jest.mock("./anilistAuth", () => ({
+  anilistRequest: jest.fn(),
+  AniListAuthError: class AniListAuthError extends Error {},
+}));
+import { AniListAuthError, anilistRequest } from "./anilistAuth";
 import {
   fetchFollowingStories,
   groupStories,
@@ -16,6 +21,9 @@ const row = {
   },
   media: { id: 10, type: "ANIME", title: { english: "Example" } },
 };
+beforeEach(() => {
+  jest.clearAllMocks();
+});
 test("groups anime list updates by stable user IDs, sorts activities, and ignores duplicates and unsafe images", () => {
   const groups = groupStories([
     row,
@@ -41,42 +49,36 @@ test("groups anime list updates by stable user IDs, sorts activities, and ignore
     ])[0].user.avatar,
   ).toBeUndefined();
 });
-test("uses authenticated proxy, verifies account identity, batches ratings and caches per account", async () => {
-  const mock = jest
-    .fn()
+test("uses direct AniList requests, verifies account identity, batches ratings and caches per account", async () => {
+  (anilistRequest as jest.Mock)
+    .mockResolvedValueOnce({ Viewer: { id: 77 }, Page: { activities: [row] } })
     .mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        data: { Viewer: { id: 77 }, Page: { activities: [row] } },
-      }),
-    })
-    .mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        data: {
-          Viewer: { id: 77 },
-          u5: { mediaList: [{ mediaId: 10, score: 8 }] },
-        },
-      }),
+      Viewer: { id: 77 },
+      u5: { mediaList: [{ mediaId: 10, score: 8 }] },
     });
-  global.fetch = mock;
   const signal = new AbortController().signal;
   const result = await fetchFollowingStories("77", signal);
   expect(result.groups[0].activities[0].score).toBe(8);
-  expect(mock.mock.calls[0][0]).toBe("/api/oauth/anilist/graphql");
-  expect(JSON.parse(mock.mock.calls[0][1].body).query).toContain(
-    "isFollowing:true",
+  expect(anilistRequest).toHaveBeenCalledWith(
+    expect.stringContaining("isFollowing:true"),
+    expect.anything(),
+    signal,
   );
   await fetchFollowingStories("77", signal);
-  expect(mock).toHaveBeenCalledTimes(2);
-  mock.mockResolvedValueOnce({
-    ok: true,
-    json: async () => ({
-      data: { Viewer: { id: 77 }, Page: { activities: [row] } },
-    }),
-  });
+  expect(anilistRequest).toHaveBeenCalledTimes(2);
+  (anilistRequest as jest.Mock).mockRejectedValueOnce(new Error("unavailable"));
   await expect(fetchFollowingStories("88", signal)).rejects.toThrow(
     "unavailable",
+  );
+});
+
+test("maps AniList auth failures to the existing reconnect message", async () => {
+  const signal = new AbortController().signal;
+  (anilistRequest as jest.Mock).mockRejectedValueOnce(
+    new AniListAuthError("expired"),
+  );
+  await expect(fetchFollowingStories("99", signal)).rejects.toThrow(
+    "Reconnect AniList to view following activity.",
   );
 });
 
