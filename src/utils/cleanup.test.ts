@@ -25,9 +25,14 @@ test('AniList rejects HTTP, GraphQL and missing-data failures', async () => {
   mock.mockResolvedValueOnce(response({}, 429));
   await expect(fetchAnilist('query {}')).rejects.toThrow('rate limit');
   mock.mockResolvedValueOnce(response({ errors: [{ message: 'Bad query' }] }));
-  await expect(fetchAnilist('query {}')).rejects.toThrow('Bad query');
+  await expect(fetchAnilist('query {}', {}, undefined, 'token-from-session')).rejects.toThrow('Bad query');
   mock.mockResolvedValueOnce(response({}));
-  await expect(fetchAnilist('query {}')).rejects.toThrow('no data');
+  await expect(fetchAnilist('query {}', {}, undefined, 'token-from-session')).rejects.toThrow('no data');
+  mock.mockResolvedValueOnce(response({ errors: [{ message: 'Invalid token' }] }, 400));
+  await expect(fetchAnilist('query {}', {}, undefined, 'token-from-session')).rejects.toMatchObject({
+    status: 400,
+    graphqlErrors: ['Invalid token'],
+  });
 });
 test('schedule falls back to saved data on network failure and ignores corrupt cache', async () => {
   const entries = [{ title: 'Example', episodeDate: '2026-10-04T12:00:00Z', episodeNumber: 1 }];

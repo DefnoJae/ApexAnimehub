@@ -1,8 +1,20 @@
 const rateLimitMessage = "AniList rate limit reached. Please try again later.";
 let publicRetryAt = 0;
 
+export class AniListRequestError extends Error {
+  status?: number;
+  graphqlErrors: string[];
+
+  constructor(message: string, status?: number, graphqlErrors: string[] = []) {
+    super(message);
+    this.name = "AniListRequestError";
+    this.status = status;
+    this.graphqlErrors = graphqlErrors;
+  }
+}
+
 export async function fetchAnilist<T>(query: string, variables: Record<string, unknown> = {}, signal?: AbortSignal, token?: string): Promise<T> {
-  if (!token && Date.now() < publicRetryAt) throw new Error(rateLimitMessage);
+  if (!token && Date.now() < publicRetryAt) throw new AniListRequestError(rateLimitMessage, 429);
   const controller = new AbortController();
   const abort = () => controller.abort();
   signal?.addEventListener('abort', abort);
@@ -21,12 +33,29 @@ export async function fetchAnilist<T>(query: string, variables: Record<string, u
         const next = retry && /^\d+$/.test(retry) ? now + Number(retry) * 1000 : Date.parse(retry || "");
         publicRetryAt = Math.max(publicRetryAt, next > now ? next : now + 60000);
       }
-      throw new Error(rateLimitMessage);
+      throw new AniListRequestError(rateLimitMessage, 429);
     }
-    if (!response.ok) throw new Error('AniList request failed (' + response.status + ')');
+    if (!response.ok) {
+      let graphqlErrors: string[] = [];
+      try {
+        const payload: { errors?: Array<{ message: string }> } = await response.json();
+        if (Array.isArray(payload?.errors)) {
+          graphqlErrors = payload.errors.map(e => e.message).filter(Boolean);
+        }
+      } catch {
+        // ignore JSON parse failures; use the existing message
+      }
+      if (graphqlErrors.length) {
+        throw new AniListRequestError(graphqlErrors.join('; '), response.status, graphqlErrors);
+      }
+      throw new AniListRequestError('AniList request failed (' + response.status + ')', response.status);
+    }
     const payload: { data?: T; errors?: Array<{ message: string }> } = await response.json();
-    if (payload.errors?.length) throw new Error(payload.errors.map(e => e.message).join('; '));
-    if (!payload.data) throw new Error('AniList returned no data');
+    if (payload.errors?.length) {
+      const messages = payload.errors.map(e => e.message);
+      throw new AniListRequestError(messages.join('; '), response.status, messages);
+    }
+    if (!payload.data) throw new AniListRequestError('AniList returned no data', response.status);
     return payload.data;
   } finally { clearTimeout(timer); signal?.removeEventListener('abort', abort); }
 }
