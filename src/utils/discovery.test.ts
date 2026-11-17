@@ -104,7 +104,7 @@ test("an unreachable MAL catalog falls back to real AniList ratings and preserve
   });
   expect(fetchAnilist).toHaveBeenCalledWith(
     expect.any(String),
-    expect.objectContaining({ score: 79, after: 20200100, before: 20270101 }),
+    expect.objectContaining({ score: 80, after: 20200100, before: 20270101 }),
     controller.signal,
   );
   await fetchDiscovery(

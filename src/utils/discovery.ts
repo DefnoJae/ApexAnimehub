@@ -228,7 +228,7 @@ async function fetchAniDiscovery(
       before: filters.to ? (Number(filters.to) + 1) * 10000 + 101 : undefined,
       season: filters.season ? filters.season.toUpperCase() : undefined,
       score:
-        Number(filters.score) > 0 ? Number(filters.score) * 10 - 1 : undefined,
+        Number(filters.score) > 0 ? Number(filters.score) * 10 : undefined,
       status: {
         airing: "RELEASING",
         complete: "FINISHED",

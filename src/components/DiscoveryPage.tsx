@@ -10,6 +10,8 @@ import {
   matchesListStatus,
 } from "../utils/discovery";
 import type { useAccounts } from "../hooks/useAccounts";
+import { useRatingSource } from "../hooks/useRatingSource";
+import { getCachedMalScore, getMalScore } from "../utils/animeMetadata";
 import { QuickList } from "./HomeDashboard";
 import { PosterPersonalRating } from "./PosterPersonalRating";
 import { AnimeBadges } from "./AnimeBadges";
@@ -238,9 +240,59 @@ export function DiscoveryPage({
   }, [loading, error, nextPage, draft, applied, listUnavailable]);
   const change = (key: keyof DiscoveryFilters, value: string) =>
     setDraft((p) => ({ ...p, [key]: value }));
-  const visible = items.filter((anime) =>
-    matchesListStatus(anime, accounts.libraryEntries, applied.listStatus),
-  );
+  const [ratingSource] = useRatingSource();
+  const minimumScore = Number(applied.score) || 0;
+  const malScoreFilter = ratingSource === "mal" && minimumScore > 0;
+  const [malScores, setMalScores] = useState<Record<number, number | null>>({});
+  const [malScoresReady, setMalScoresReady] = useState(false);
+  useEffect(() => {
+    if (!malScoreFilter) {
+      setMalScoresReady(true);
+      return;
+    }
+    let cancelled = false;
+    const ids = Array.from(
+      new Set(
+        items
+          .map((anime) => anime.idMal)
+          .filter((id): id is number => typeof id === "number" && id > 0),
+      ),
+    );
+    const known: Record<number, number | null> = {};
+    const missing: number[] = [];
+    ids.forEach((id) => {
+      const cached = getCachedMalScore(id);
+      if (cached != null) known[id] = cached;
+      else missing.push(id);
+    });
+    setMalScores(known);
+    setMalScoresReady(missing.length === 0);
+    void (async () => {
+      // Keep the rating lookups bounded; the Worker caches these scores.
+      for (let index = 0; index < missing.length; index += 4) {
+        const batch = missing.slice(index, index + 4);
+        const values = await Promise.all(batch.map((id) => getMalScore(id)));
+        if (cancelled) return;
+        batch.forEach((id, position) => {
+          known[id] = values[position];
+        });
+        setMalScores({ ...known });
+      }
+      if (!cancelled) setMalScoresReady(true);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [items, applied.score, ratingSource, malScoreFilter]);
+  const visible = items.filter((anime) => {
+    if (!matchesListStatus(anime, accounts.libraryEntries, applied.listStatus))
+      return false;
+    if (!malScoreFilter) return true;
+    if (!malScoresReady || !anime.idMal) return false;
+    const score = malScores[anime.idMal] ?? getCachedMalScore(anime.idMal);
+    return typeof score === "number" && score >= minimumScore;
+  });
+  const busy = loading || (malScoreFilter && !malScoresReady);
   const genres = draft.genres.map((id) => id.replace(/^name:/, ""));
   const chips = [
     ...genres.map((name) => ({
@@ -409,7 +461,7 @@ export function DiscoveryPage({
           {error} <button onClick={() => setRetry((v) => v + 1)}>Retry</button>
         </p>
       )}
-      <div className="discovery-grid" aria-busy={loading}>
+      <div className="discovery-grid" aria-busy={busy}>
         {visible.map((anime) => (
           <article
             className="poster-card"
@@ -446,12 +498,25 @@ export function DiscoveryPage({
           </article>
         ))}
       </div>
-      {loading && (
+      {busy && (
         <p role="status">
-          {page === 1 ? "Finding your next anime..." : "Loading more anime..."}
+          {malScoreFilter && !malScoresReady
+            ? "Checking MyAnimeList ratings..."
+            : page === 1
+              ? "Finding your next anime..."
+              : "Loading more anime..."}
         </p>
       )}
-      {!loading && !error && !visible.length && (
+      {malScoreFilter &&
+        malScoresReady &&
+        items.length > 0 &&
+        !Object.values(malScores).some((score) => typeof score === "number") && (
+          <p role="status">
+            MyAnimeList ratings are unavailable right now, so the minimum-rating
+            filter cannot be applied.
+          </p>
+        )}
+      {!busy && !error && !visible.length && (
         <p>
           No matches
           {nextPage
@@ -460,7 +525,7 @@ export function DiscoveryPage({
         </p>
       )}
       <div ref={sentinel} className="discovery-sentinel" aria-hidden="true" />
-      {!nextPage && !loading && !error && visible.length > 0 && (
+      {!nextPage && !busy && !error && visible.length > 0 && (
         <p className="discovery-end">
           You have reached the end of these results.
         </p>
