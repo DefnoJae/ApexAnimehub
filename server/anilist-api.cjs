@@ -23,10 +23,10 @@ async function fetchWithAniListRelay(relayRequest, directRequest) {
 
 async function fetchAniListGraphql(accessToken, payload) {
   const relayKey = cloudflareAniListRelayKey();
-  const request = (key) => fetch(key ? aniListRelayUrl() : "https://graphql.anilist.co", {
+  const request = (key, timeout = key ? 75000 : 15000) => fetch(key ? aniListRelayUrl() : "https://graphql.anilist.co", {
     method: "POST",
     redirect: "manual",
-    signal: AbortSignal.timeout(key ? 75000 : 15000),
+    signal: AbortSignal.timeout(timeout),
     headers: {
       Accept: "application/json",
       "Content-Type": "application/json",
@@ -36,20 +36,33 @@ async function fetchAniListGraphql(accessToken, payload) {
   });
   if (!relayKey) return request();
 
+  const started = Date.now();
+  const isRead = /^\s*(?:query\b|\{)/.test(payload.query);
   const relay = await request(relayKey).catch(() => null);
   if (relay && ![402, 502, 503, 504].includes(relay.status)) return relay;
 
   // Try the provider directly when the relay itself is unavailable. Preserve
   // the relay's failure if the provider rejects Cloudflare's network.
   const direct = await request().catch(() => null);
-  if (direct && (!relay || ![403, 502, 503, 504].includes(direct.status))) {
+  if (direct && ![403, 502, 503, 504].includes(direct.status)) {
     await relay?.body?.cancel();
     return direct;
+  }
+  const remaining = 75000 - (Date.now() - started);
+  if (isRead && remaining > 0) {
+    const retry = await request(relayKey, Math.min(remaining, 15000)).catch(() => null);
+    if (retry && ![402, 502, 503, 504].includes(retry.status)) {
+      await relay?.body?.cancel();
+      await direct?.body?.cancel();
+      return retry;
+    }
+    await retry?.body?.cancel();
   }
   if (relay) {
     await direct?.body?.cancel();
     return relay;
   }
+  if (direct) return direct;
   throw new Error("AniList is temporarily unavailable. Try again shortly.");
 }
 

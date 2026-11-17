@@ -128,7 +128,7 @@ function EntryDialog({
   }, []);
   useEffect(() => {
     const controller = new AbortController(),
-      timer = setTimeout(() => controller.abort(), 15000);
+      timer = setTimeout(() => controller.abort(), enabled.includes("anilist") ? 95000 : 15000);
     setLoading(true);
     setErrors({});
     void Promise.allSettled(
@@ -327,7 +327,7 @@ function EntryDialog({
         </label>
         <label>
           Your rating /10{" "}
-          <small>Whole numbers � saves to all connected lists</small>
+          <small>Whole numbers only. Saves to all connected lists.</small>
           <input
             aria-label="Your rating"
             type="number"
