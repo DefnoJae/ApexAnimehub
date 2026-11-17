@@ -1,13 +1,12 @@
+jest.mock("../utils/sync/anilistList", () => ({ readAniListList: jest.fn() }));
+
 import React from "react";
 import { createRoot, Root } from "react-dom/client";
 import { act } from "react-dom/test-utils";
 import { useLibrary } from "./useLibrary";
+import { readAniListList } from "../utils/sync/anilistList";
 let node: HTMLDivElement, root: Root, library: ReturnType<typeof useLibrary>;
 const original = global.fetch;
-function Harness({ anilist = true, mal = true }) {
-  library = useLibrary({ anilist, mal });
-  return null;
-}
 const anime = { id: 1, idMal: 11, title: { english: "Example" } };
 const page = (identity: string, status: string, next = false) => ({
   identity,
@@ -15,33 +14,42 @@ const page = (identity: string, status: string, next = false) => ({
   hasNextPage: next,
   entries: [{ anime, status, progress: 3, updatedAt: 1 }],
 });
+let anilistPage: (pageNumber: number) => ReturnType<typeof page>;
+function setAniListPage(fn: (pageNumber: number) => ReturnType<typeof page>) {
+  anilistPage = fn;
+}
+function Harness({ anilist = true, mal = true }) {
+  library = useLibrary({ anilist, mal });
+  return null;
+}
 beforeEach(() => {
   node = document.createElement("div");
   root = createRoot(node);
   localStorage.clear();
+  jest.clearAllMocks();
+  setAniListPage((pageNumber) => page("alice", "planning", pageNumber === 1));
+  (readAniListList as jest.Mock).mockImplementation(async (pageNumber: number) =>
+    anilistPage(pageNumber),
+  );
 });
 afterEach(() => {
   act(() => root.unmount());
   global.fetch = original;
 });
 test("imports every page, retains successful provider when another fails, and records only confirmed updates", async () => {
-  global.fetch = jest.fn(async (url) =>
-    String(url).includes("/mal")
-      ? { ok: false, json: async () => ({ error: "MAL unavailable" }) }
-      : {
-          ok: true,
-          json: async () =>
-            page("alice", "planning", String(url).endsWith("page=1")),
-        },
-  ) as jest.Mock;
+  global.fetch = jest.fn(async () => ({
+    ok: false,
+    json: async () => ({ error: "MAL unavailable" }),
+  })) as jest.Mock;
   await act(async () => {
     root.render(<Harness />);
   });
   await act(async () => {
     await new Promise((resolve) => setTimeout(resolve, 2400));
   });
+  expect(readAniListList).toHaveBeenCalledWith(2, undefined);
   expect(global.fetch).toHaveBeenCalledWith(
-    "/api/list/anilist?page=2",
+    "/api/list/mal?page=1",
     expect.anything(),
   );
   expect(library.libraryEntries).toHaveLength(2);
@@ -74,10 +82,7 @@ test("an account change cannot expose a previous account cache", async () => {
       entries: [{ anime, status: "completed" }],
     }),
   );
-  global.fetch = jest.fn(async () => ({
-    ok: true,
-    json: async () => ({ ...page("bob", "planning"), entries: [] }),
-  })) as jest.Mock;
+  setAniListPage(() => ({ ...page("bob", "planning"), entries: [] }));
   await act(async () => {
     root.render(<Harness mal={false} />);
   });
@@ -96,30 +101,21 @@ test("resumes a verified account checkpoint instead of restarting a large import
       updatedAt: Date.now(),
     }),
   );
-  global.fetch = jest.fn(async (url) => ({
-    ok: true,
-    json: async () => ({
-      ...page("alice", "planning"),
-      entries: [],
-      hasNextPage: String(url).endsWith("page=1"),
-    }),
-  })) as jest.Mock;
+  setAniListPage((pageNumber) => ({
+    ...page("alice", "planning"),
+    entries: [],
+    hasNextPage: pageNumber === 1,
+  }));
   await act(async () => {
     root.render(<Harness mal={false} />);
   });
-  expect(global.fetch).toHaveBeenCalledWith(
-    "/api/list/anilist?page=30",
-    expect.anything(),
-  );
+  expect(readAniListList).toHaveBeenCalledWith(30, undefined);
   expect(library.libraryEntries).toHaveLength(1);
   expect(library.lists.anilist?.complete).toBe(true);
 });
 
 test("confirmed status, progress and rating survive stale reimports and reload", async () => {
-  global.fetch = jest.fn(async () => ({
-    ok: true,
-    json: async () => page("alice", "planning"),
-  })) as jest.Mock;
+  setAniListPage(() => page("alice", "planning"));
   await act(async () => root.render(<Harness mal={false} />));
   act(() =>
     library.record("anilist", anime, "completed", 12, {
@@ -153,41 +149,32 @@ test("confirmed status, progress and rating survive stale reimports and reload",
     score: 9,
   });
   // Once the provider acknowledges the write, retire protection so external edits can be imported.
-  global.fetch = jest.fn(async () => ({
-    ok: true,
-    json: async () => ({
-      ...page("alice", "completed"),
-      entries: [
-        {
-          anime,
-          status: "completed",
-          progress: 12,
-          score: 9,
-          updatedAt: Date.now(),
-        },
-      ],
-    }),
-  })) as jest.Mock;
+  setAniListPage(() => ({
+    ...page("alice", "completed"),
+    entries: [
+      {
+        anime,
+        status: "completed",
+        progress: 12,
+        score: 9,
+        updatedAt: Date.now(),
+      },
+    ],
+  }));
   await act(async () => {
     await library.refreshLibrary();
   });
   expect(
     JSON.parse(localStorage.getItem("apex_library_changes_v1_anilist_alice")!),
   ).toEqual([]);
-  global.fetch = jest.fn(async () => ({
-    ok: true,
-    json: async () => page("alice", "paused"),
-  })) as jest.Mock;
+  setAniListPage(() => page("alice", "paused"));
   await act(async () => {
     await library.refreshLibrary();
   });
   expect(library.getListStatus(anime)).toBe("paused");
 });
 test("confirmed removals cannot be resurrected by stale imports", async () => {
-  global.fetch = jest.fn(async () => ({
-    ok: true,
-    json: async () => page("alice", "planning"),
-  })) as jest.Mock;
+  setAniListPage(() => page("alice", "planning"));
   await act(async () => root.render(<Harness mal={false} />));
   act(() => library.removeRecord("anilist", anime));
   await act(async () => {
@@ -209,10 +196,7 @@ test("fresh first-page values replace old complete cache before a large import f
       ],
     }),
   );
-  global.fetch = jest.fn(async () => ({
-    ok: true,
-    json: async () => page("alice", "completed", true),
-  })) as jest.Mock;
+  setAniListPage(() => page("alice", "completed", true));
   await act(async () => root.render(<Harness mal={false} />));
   expect(library.getListStatus(anime)).toBe("completed");
   expect(library.libraryEntries.some((entry) => entry.anime.id === 2)).toBe(

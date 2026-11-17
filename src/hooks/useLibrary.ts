@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { AccountProvider, ListAnime, ListStatus } from "./useAccounts";
+import {
+  readAniListList,
+  type AniListListPage,
+} from "../utils/sync/anilistList";
 export interface LibraryAnime extends ListAnime {
   coverImage?: { extraLarge?: string };
   bannerImage?: string;
@@ -143,13 +147,17 @@ export function useLibrary(connected: Record<AccountProvider, boolean>) {
               name = "",
               entries: LibraryEntry[] = [];
             for (;;) {
-              const response = await fetch(
-                "/api/list/" + provider + "?page=" + page,
-                { cache: "no-store" },
-              );
-              const data = await response.json();
-              if (!response.ok)
-                throw new Error(data.error || "Could not import list");
+              let data: AniListListPage & { error?: string };
+              if (provider === "anilist") {
+                data = await readAniListList(page, undefined);
+              } else {
+                const response = await fetch("/api/list/mal?page=" + page, {
+                  cache: "no-store",
+                });
+                data = await response.json();
+                if (!response.ok)
+                  throw new Error(data.error || "Could not import list");
+              }
               if (!Array.isArray(data.entries) || !data.identity)
                 throw new Error("Invalid list response");
               if (run !== generation.current) return;
