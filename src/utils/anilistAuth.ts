@@ -16,6 +16,14 @@ export class AniListAuthError extends Error {
   }
 }
 
+function isAuthInvalidError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const candidate = error as { status?: number; graphqlErrors?: unknown };
+  if (candidate.status === 401) return true;
+  return Array.isArray(candidate.graphqlErrors)
+    && candidate.graphqlErrors.some((message) => typeof message === "string" && /invalid token/i.test(message));
+}
+
 let tokenPromise: Promise<AniListToken> | null = null;
 
 export function readAniListToken(): AniListToken | null {
@@ -85,12 +93,18 @@ async function rehydrateToken(signal?: AbortSignal): Promise<AniListToken> {
       cache: "no-store",
       signal,
     });
-  } catch {
-    invalidateAniListAuth();
-    throw new AniListAuthError("AniList connection required. Please reconnect.");
+  } catch (error) {
+    // Transport failures (network blip, AbortError) are not auth failures; leave stored
+    // state intact and allow a later call to retry rehydration.
+    tokenPromise = null;
+    throw error;
   }
 
-  if (!response || response.status === 401) {
+  if (!response) {
+    tokenPromise = null;
+    throw new Error("No response from AniList token endpoint");
+  }
+  if (response.status === 401) {
     invalidateAniListAuth();
     throw new AniListAuthError("AniList connection required. Please reconnect.");
   }
@@ -115,7 +129,11 @@ async function rehydrateToken(signal?: AbortSignal): Promise<AniListToken> {
   try {
     identity = await verifyIdentity(payload.accessToken, payload.identity, signal);
   } catch (error) {
-    if (error instanceof AniListAuthError) invalidateAniListAuth();
+    if (error instanceof AniListAuthError || isAuthInvalidError(error)) {
+      invalidateAniListAuth();
+      if (error instanceof AniListAuthError) throw error;
+      throw new AniListAuthError("AniList connection required. Please reconnect.");
+    }
     throw error;
   }
 
@@ -156,9 +174,7 @@ export async function anilistRequest<T>(
   try {
     return await fetchAnilist<T>(query, variables ?? {}, signal, token.accessToken);
   } catch (error) {
-    const status = (error as { status?: number })?.status;
-    const graphqlErrors = (error as { graphqlErrors?: string[] })?.graphqlErrors ?? [];
-    if (status === 401 || graphqlErrors.some((message) => /invalid token/i.test(message))) {
+    if (isAuthInvalidError(error)) {
       invalidateAniListAuth();
       throw new AniListAuthError("AniList authorization expired. Please reconnect.");
     }

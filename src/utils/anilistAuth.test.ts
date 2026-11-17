@@ -36,6 +36,11 @@ test("getAniListToken rehydrates from the token endpoint and verifies Viewer ide
   const token = await getAniListToken();
   expect(token).toMatchObject({ accessToken: "new-token", identity: "77" });
   expect(readAniListToken()).toMatchObject({ accessToken: "new-token", identity: "77" });
+  expect(global.fetch).toHaveBeenCalledWith("/api/oauth/anilist/token", {
+    credentials: "same-origin",
+    cache: "no-store",
+    signal: undefined,
+  });
 });
 
 test("getAniListToken reuses the in-page rehydrated token without another endpoint call", async () => {
@@ -51,6 +56,11 @@ test("getAniListToken reuses the in-page rehydrated token without another endpoi
   await getAniListToken();
   await getAniListToken();
   expect(global.fetch).toHaveBeenCalledTimes(1);
+  expect(global.fetch).toHaveBeenCalledWith("/api/oauth/anilist/token", {
+    credentials: "same-origin",
+    cache: "no-store",
+    signal: undefined,
+  });
 });
 
 test("getAniListToken rejects and invalidates when token endpoint is 401", async () => {
@@ -107,3 +117,70 @@ test("anilistRequest invalidates on HTTP 401 or Invalid token GraphQL errors", a
   expect(listener).toHaveBeenCalledTimes(1);
   window.removeEventListener(ANILIST_AUTH_INVALID_EVENT, listener);
 });
+
+test("getAniListToken treats token-endpoint transport failures as retryable without invalidating auth", async () => {
+  const abortError = Object.assign(new Error("The operation was aborted"), { name: "AbortError" });
+  const controller = new AbortController();
+  global.fetch = jest.fn()
+    .mockRejectedValueOnce(abortError)
+    .mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({ accessToken: "retry-token", expiresAt: Date.now() + 3600000 }),
+    });
+  (fetchAnilist as jest.Mock).mockResolvedValue({ Viewer: { id: 77 } });
+  localStorage.setItem(ANILIST_TOKEN_KEY, JSON.stringify({
+    accessToken: "original-token",
+    expiresAt: Date.now() + 3600000,
+    identity: "1",
+  }));
+  const listener = jest.fn();
+  window.addEventListener(ANILIST_AUTH_INVALID_EVENT, listener);
+
+  await expect(getAniListToken(controller.signal)).rejects.toBe(abortError);
+  expect(listener).not.toHaveBeenCalled();
+  expect(readAniListToken()).toMatchObject({ accessToken: "original-token" });
+
+  const token = await getAniListToken(controller.signal);
+  expect(token).toMatchObject({ accessToken: "retry-token", identity: "77" });
+  expect(global.fetch).toHaveBeenCalledTimes(2);
+  expect(global.fetch).toHaveBeenNthCalledWith(2, "/api/oauth/anilist/token", {
+    credentials: "same-origin",
+    cache: "no-store",
+    signal: controller.signal,
+  });
+  expect(listener).not.toHaveBeenCalled();
+  window.removeEventListener(ANILIST_AUTH_INVALID_EVENT, listener);
+});
+
+const verificationAuthFailures: Array<[string, Error]> = [
+  ["HTTP 401", Object.assign(new Error("Unauthorized"), { status: 401 })],
+  ["Invalid token GraphQL error", Object.assign(new Error("Invalid token"), { status: 400, graphqlErrors: ["Invalid token"] })],
+];
+
+test.each(verificationAuthFailures)(
+  "getAniListToken invalidates when identity verification fails with %s",
+  async (_label, verificationError) => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        accessToken: "rejected-token",
+        expiresAt: Date.now() + 3600000,
+      }),
+    });
+    (fetchAnilist as jest.Mock).mockRejectedValueOnce(verificationError);
+    localStorage.setItem(ANILIST_TOKEN_KEY, JSON.stringify({
+      accessToken: "previous-token",
+      expiresAt: Date.now() + 3600000,
+      identity: "1",
+    }));
+    const listener = jest.fn();
+    window.addEventListener(ANILIST_AUTH_INVALID_EVENT, listener);
+
+    await expect(getAniListToken()).rejects.toBeInstanceOf(AniListAuthError);
+    expect(readAniListToken()).toBeNull();
+    expect(listener).toHaveBeenCalledTimes(1);
+    window.removeEventListener(ANILIST_AUTH_INVALID_EVENT, listener);
+  },
+);
