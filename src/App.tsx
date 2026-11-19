@@ -107,6 +107,7 @@ export default function App() {
     if (!selectedAnime) return Promise.resolve([]);
     const completed =
       !!selectedAnime.episodes && episode >= selectedAnime.episodes;
+    if (completed) removeFromHistory(selectedAnime.id);
     return accounts.sync(
       selectedAnime,
       completed ? "completed" : "watching",

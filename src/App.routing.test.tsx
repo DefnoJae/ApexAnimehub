@@ -37,9 +37,10 @@ jest.mock("./components/AnimeDetails", () => ({
   ),
 }));
 jest.mock("./components/VideoPlayer", () => ({
-  VideoPlayer: ({ episode, onNext, onClose }: any) => (
+  VideoPlayer: ({ episode, onNext, onClose, onWatched }: any) => (
     <div role="dialog">
       Episode {episode}
+      <button onClick={() => onWatched(episode)}>Mark watched</button>
       <button onClick={onNext}>Next</button>
       <button onClick={onClose}>Close</button>
     </div>
@@ -188,3 +189,48 @@ test.each(["setItem", "getItem"] as const)(
     }
   },
 );
+
+test("watching the final episode removes the anime from Continue Watching storage", async () => {
+  window.history.replaceState({}, "", "/anime/1/episode/12");
+  const node = document.createElement("div");
+  document.body.append(node);
+  const root = createRoot(node);
+  try {
+    await act(async () => root.render(<App />));
+    expect(JSON.parse(localStorage.getItem("videasy_history") || "[]")).toEqual([
+      expect.objectContaining({ episode: 12 }),
+    ]);
+    act(() =>
+      Array.from(node.querySelectorAll("button"))
+        .find((button) => button.textContent === "Mark watched")!
+        .click(),
+    );
+    expect(JSON.parse(localStorage.getItem("videasy_history") || "[]")).toEqual([]);
+  } finally {
+    act(() => root.unmount());
+    node.remove();
+    window.history.replaceState({}, "", "/");
+  }
+});
+
+test("watching a non-final episode keeps the anime in Continue Watching", async () => {
+  window.history.replaceState({}, "", "/anime/1/episode/3");
+  const node = document.createElement("div");
+  document.body.append(node);
+  const root = createRoot(node);
+  try {
+    await act(async () => root.render(<App />));
+    act(() =>
+      Array.from(node.querySelectorAll("button"))
+        .find((button) => button.textContent === "Mark watched")!
+        .click(),
+    );
+    expect(JSON.parse(localStorage.getItem("videasy_history") || "[]")).toEqual([
+      expect.objectContaining({ episode: 3 }),
+    ]);
+  } finally {
+    act(() => root.unmount());
+    node.remove();
+    window.history.replaceState({}, "", "/");
+  }
+});
