@@ -56,7 +56,7 @@ const EXISTING_ENTRY_WITH_DATES_QUERY = "query($id:Int){Media(id:$id,type:ANIME)
 // Declare only the date being written. Declaring the other date as an
 // unsupplied variable would send null and clear a date the user already has.
 function saveMutation(dateField?: "startedAt" | "completedAt"): string {
-  const declaration = dateField ? ",$" + dateField + ":FuzzyDate" : "";
+  const declaration = dateField ? ",$" + dateField + ":FuzzyDateInput" : "";
   const argument = dateField ? "," + dateField + ":$" + dateField : "";
   return (
     "mutation($id:Int,$status:MediaListStatus,$progress:Int,$score:Int" +

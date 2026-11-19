@@ -337,8 +337,9 @@ test("with today, the mutation declares only the date field being written", asyn
     .mockResolvedValueOnce({ SaveMediaListEntry: { id: 3, status: "CURRENT" } });
   await updateAniListEntry({ id: 3, status: "watching", today: "2026-11-19" });
   const mutation = (anilistRequest as jest.Mock).mock.calls[1][0] as string;
-  expect(mutation).toMatch(/\$startedAt:FuzzyDate/);
-  expect(mutation).not.toMatch(/\$completedAt:FuzzyDate/);
+  expect(mutation).toMatch(/\$startedAt:FuzzyDateInput\b/);
+  expect(mutation).not.toMatch(/\$startedAt:FuzzyDate\b/);
+  expect(mutation).not.toMatch(/\$completedAt:FuzzyDateInput\b/);
   expect(mutation).not.toMatch(/completedAt:\$completedAt/);
 });
 

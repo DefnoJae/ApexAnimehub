@@ -301,7 +301,10 @@ test("dates are written only on first transitions, on both server providers", as
       status: "watching",
       today: "2026-11-19",
     });
-    const aniVariables = JSON.parse(calls.at(-1).options.body).variables;
+    const aniRequest = JSON.parse(calls.at(-1).options.body);
+    const aniVariables = aniRequest.variables;
+    assert.match(aniRequest.query, /\$startedAt:FuzzyDateInput\b/);
+    assert.doesNotMatch(aniRequest.query, /\$startedAt:FuzzyDate\b/);
     assert.deepEqual(aniVariables.startedAt, { year: 2026, month: 11, day: 19 });
     assert.equal("completedAt" in aniVariables, false);
 

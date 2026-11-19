@@ -90,7 +90,7 @@ function dateDecision(provider, status, existing) {
 // Only declare the date argument being written: sending the other field as
 // null would clear a date the user already has on the provider.
 function anilistSaveMutation(dateField) {
-  const declaration = dateField ? ",$" + dateField + ":FuzzyDate" : "";
+  const declaration = dateField ? ",$" + dateField + ":FuzzyDateInput" : "";
   const argument = dateField ? "," + dateField + ":$" + dateField : "";
   return (
     "mutation($id:Int,$status:MediaListStatus,$progress:Int,$score:Int" +
