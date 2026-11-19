@@ -29,6 +29,13 @@ export interface AniListUpdateInput {
   score?: number;
   automatic?: boolean;
   manualProgress?: boolean;
+  today?: string;
+}
+
+interface AniListFuzzyDate {
+  year?: number | null;
+  month?: number | null;
+  day?: number | null;
 }
 
 type AniListStatus = "CURRENT" | "PLANNING" | "COMPLETED" | "PAUSED" | "DROPPED";
@@ -45,7 +52,9 @@ const statusMap: Record<ListStatus, AniListStatus> = {
 const LIST_QUERY = "query($user:Int,$page:Int){Page(page:$page,perPage:50){pageInfo{hasNextPage} mediaList(userId:$user,type:ANIME,sort:UPDATED_TIME_DESC){status progress score(format:POINT_100) updatedAt media{id idMal averageScore episodes title{english romaji} coverImage{extraLarge} bannerImage}}}}";
 const ENTRY_QUERY = "query($id:Int){Media(id:$id,type:ANIME){mediaListEntry{status progress score(format:POINT_100)}}}";
 const EXISTING_ENTRY_QUERY = "query($id:Int){Media(id:$id,type:ANIME){mediaListEntry{progress status}}}";
+const EXISTING_ENTRY_WITH_DATES_QUERY = "query($id:Int){Media(id:$id,type:ANIME){mediaListEntry{progress status startedAt{year month day} completedAt{year month day}}}}";
 const SAVE_MUTATION = "mutation($id:Int,$status:MediaListStatus,$progress:Int,$score:Int){SaveMediaListEntry(mediaId:$id,status:$status,progress:$progress,scoreRaw:$score){id status progress score(format:POINT_100)}}";
+const SAVE_MUTATION_WITH_DATES = "mutation($id:Int,$status:MediaListStatus,$progress:Int,$score:Int,$startedAt:FuzzyDate,$completedAt:FuzzyDate){SaveMediaListEntry(mediaId:$id,status:$status,progress:$progress,scoreRaw:$score,startedAt:$startedAt,completedAt:$completedAt){id status progress score(format:POINT_100)}}";
 const ENTRY_ID_QUERY = "query($id:Int){Media(id:$id,type:ANIME){mediaListEntry{id}}}";
 const DELETE_MUTATION = "mutation($id:Int){DeleteMediaListEntry(id:$id){deleted}}";
 
@@ -114,6 +123,20 @@ export function validateAniListUpdate(input: AniListUpdateInput): AniListUpdateI
       throw new Error("Invalid update mode");
   if (input.manualProgress && input.automatic)
     throw new Error("Manual progress cannot be automatic");
+  if (input.today !== undefined) {
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(input.today);
+    if (!match) throw new Error("Invalid date");
+    const year = Number(match[1]);
+    const month = Number(match[2]);
+    const day = Number(match[3]);
+    const date = new Date(Date.UTC(year, month - 1, day));
+    if (
+      date.getUTCFullYear() !== year ||
+      date.getUTCMonth() !== month - 1 ||
+      date.getUTCDate() !== day
+    )
+      throw new Error("Invalid date");
+  }
   return input;
 }
 
@@ -182,13 +205,36 @@ export async function updateAniListEntry(
   validateAniListUpdate(input);
   return serialize(input.id, async () => {
     let progress = input.progress;
-    let existing: { progress?: number; status?: string } | null | undefined;
-    if ((progress !== undefined && !input.manualProgress) || input.automatic) {
+    let existing:
+      | {
+          progress?: number;
+          status?: string;
+          startedAt?: AniListFuzzyDate | null;
+          completedAt?: AniListFuzzyDate | null;
+        }
+      | null
+      | undefined;
+    const needsRead =
+      (progress !== undefined && !input.manualProgress) ||
+      input.automatic ||
+      input.today !== undefined;
+    if (needsRead) {
       const data = await anilistRequest<{
         Media: {
-          mediaListEntry: { progress: number; status: string } | null;
+          mediaListEntry: {
+            progress: number;
+            status: string;
+            startedAt?: AniListFuzzyDate | null;
+            completedAt?: AniListFuzzyDate | null;
+          } | null;
         } | null;
-      }>(EXISTING_ENTRY_QUERY, { id: input.id }, signal);
+      }>(
+        input.today !== undefined
+          ? EXISTING_ENTRY_WITH_DATES_QUERY
+          : EXISTING_ENTRY_QUERY,
+        { id: input.id },
+        signal,
+      );
       if (!data.Media) throw new Error("Anime not found");
       existing = data.Media.mediaListEntry;
       if (progress !== undefined && !input.manualProgress)
@@ -198,15 +244,52 @@ export async function updateAniListEntry(
       input.automatic && existing?.status === "COMPLETED"
         ? "COMPLETED"
         : statusMap[input.status];
+    let dateVariables: {
+      startedAt?: { year: number; month: number; day: number };
+      completedAt?: { year: number; month: number; day: number };
+    } = {};
+    if (input.today !== undefined) {
+      const fuzzy = {
+        year: Number(input.today.slice(0, 4)),
+        month: Number(input.today.slice(5, 7)),
+        day: Number(input.today.slice(8, 10)),
+      };
+      const watching =
+        existing?.status === "CURRENT" || existing?.status === "REPEATING";
+      const hasStart = !!(
+        existing?.startedAt &&
+        (existing.startedAt.year ||
+          existing.startedAt.month ||
+          existing.startedAt.day)
+      );
+      const hasFinish = !!(
+        existing?.completedAt &&
+        (existing.completedAt.year ||
+          existing.completedAt.month ||
+          existing.completedAt.day)
+      );
+      if (status === "CURRENT" && !watching && !hasStart)
+        dateVariables = { startedAt: fuzzy };
+      else if (
+        status === "COMPLETED" &&
+        existing?.status !== "COMPLETED" &&
+        !hasFinish
+      )
+        dateVariables = { completedAt: fuzzy };
+    }
+    const hasDates =
+      dateVariables.startedAt !== undefined ||
+      dateVariables.completedAt !== undefined;
     const data = await anilistRequest<{
       SaveMediaListEntry: AniListMutationEntry | null;
     }>(
-      SAVE_MUTATION,
+      hasDates ? SAVE_MUTATION_WITH_DATES : SAVE_MUTATION,
       {
         id: input.id,
         status,
         ...(progress !== undefined ? { progress } : {}),
         ...(input.score !== undefined ? { score: Math.round(input.score * 10) } : {}),
+        ...dateVariables,
       },
       signal,
     );

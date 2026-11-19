@@ -182,3 +182,164 @@ test("update and remove for the same anime do not overlap", async () => {
   ]);
   expect(maxActive).toBe(1);
 });
+
+const fuzzy = { year: 2026, month: 11, day: 19 };
+
+test("with today, a first transition to watching writes startedAt", async () => {
+  (anilistRequest as jest.Mock)
+    .mockResolvedValueOnce({
+      Media: {
+        mediaListEntry: {
+          progress: 0,
+          status: "PLANNING",
+          startedAt: null,
+          completedAt: null,
+        },
+      },
+    })
+    .mockResolvedValueOnce({
+      SaveMediaListEntry: { id: 3, status: "CURRENT" },
+    });
+  await updateAniListEntry({ id: 3, status: "watching", today: "2026-11-19" });
+  expect((anilistRequest as jest.Mock).mock.calls[1][1]).toMatchObject({
+    startedAt: fuzzy,
+  });
+  expect("completedAt" in (anilistRequest as jest.Mock).mock.calls[1][1]).toBe(
+    false,
+  );
+});
+
+test("with today, a first transition to completed writes completedAt", async () => {
+  (anilistRequest as jest.Mock)
+    .mockResolvedValueOnce({
+      Media: {
+        mediaListEntry: {
+          progress: 11,
+          status: "CURRENT",
+          startedAt: { year: 2020, month: 1, day: 2 },
+          completedAt: null,
+        },
+      },
+    })
+    .mockResolvedValueOnce({
+      SaveMediaListEntry: { id: 3, status: "COMPLETED" },
+    });
+  await updateAniListEntry({ id: 3, status: "completed", today: "2026-11-19" });
+  expect((anilistRequest as jest.Mock).mock.calls[1][1]).toMatchObject({
+    completedAt: fuzzy,
+  });
+  expect("startedAt" in (anilistRequest as jest.Mock).mock.calls[1][1]).toBe(
+    false,
+  );
+});
+
+test.each([
+  ["already watching", "CURRENT", null, null],
+  ["rewatching counts as watching", "REPEATING", null, null],
+  ["existing start date is preserved", "PLANNING", { year: 2020, month: 1, day: 2 }, null],
+])("with today, %s writes no start date", async (_label, status, startedAt, completedAt) => {
+  (anilistRequest as jest.Mock)
+    .mockResolvedValueOnce({
+      Media: {
+        mediaListEntry: { progress: 4, status, startedAt, completedAt },
+      },
+    })
+    .mockResolvedValueOnce({
+      SaveMediaListEntry: { id: 3, status: "CURRENT" },
+    });
+  await updateAniListEntry({ id: 3, status: "watching", today: "2026-11-19" });
+  expect("startedAt" in (anilistRequest as jest.Mock).mock.calls[1][1]).toBe(
+    false,
+  );
+});
+
+test("with today, an already completed entry writes no finish date", async () => {
+  (anilistRequest as jest.Mock)
+    .mockResolvedValueOnce({
+      Media: {
+        mediaListEntry: {
+          progress: 12,
+          status: "COMPLETED",
+          completedAt: null,
+        },
+      },
+    })
+    .mockResolvedValueOnce({
+      SaveMediaListEntry: { id: 3, status: "COMPLETED" },
+    });
+  await updateAniListEntry({ id: 3, status: "completed", today: "2026-11-19" });
+  expect("completedAt" in (anilistRequest as jest.Mock).mock.calls[1][1]).toBe(
+    false,
+  );
+});
+
+test.each(["planning", "paused", "dropped"] as const)(
+  "with today, a %s save writes no date",
+  async (status) => {
+    (anilistRequest as jest.Mock)
+      .mockResolvedValueOnce({
+        Media: {
+          mediaListEntry: {
+            progress: 0,
+            status: "PLANNING",
+            startedAt: null,
+            completedAt: null,
+          },
+        },
+      })
+      .mockResolvedValueOnce({ SaveMediaListEntry: { id: 3, status } });
+    await updateAniListEntry({ id: 3, status, today: "2026-11-19" });
+    const variables = (anilistRequest as jest.Mock).mock.calls[1][1];
+    expect("startedAt" in variables).toBe(false);
+    expect("completedAt" in variables).toBe(false);
+  },
+);
+
+test("with today, a progress-only update writes no date", async () => {
+  (anilistRequest as jest.Mock)
+    .mockResolvedValueOnce({
+      Media: {
+        mediaListEntry: {
+          progress: 1,
+          status: "CURRENT",
+          startedAt: null,
+          completedAt: null,
+        },
+      },
+    })
+    .mockResolvedValueOnce({
+      SaveMediaListEntry: { id: 3, status: "CURRENT", progress: 5 },
+    });
+  await updateAniListEntry({
+    id: 3,
+    status: "watching",
+    progress: 5,
+    today: "2026-11-19",
+  });
+  const variables = (anilistRequest as jest.Mock).mock.calls[1][1];
+  expect("startedAt" in variables).toBe(false);
+  expect("completedAt" in variables).toBe(false);
+  expect(variables.progress).toBe(5);
+});
+
+test("without today, a status-only update makes no pre-read and sends no dates", async () => {
+  (anilistRequest as jest.Mock).mockResolvedValueOnce({
+    SaveMediaListEntry: { id: 3, status: "CURRENT" },
+  });
+  await updateAniListEntry({ id: 3, status: "watching" });
+  expect(anilistRequest).toHaveBeenCalledTimes(1);
+  expect("startedAt" in (anilistRequest as jest.Mock).mock.calls[0][1]).toBe(
+    false,
+  );
+});
+
+test("rejects an invalid today before any request", () => {
+  expect(() =>
+    validateAniListUpdate({
+      id: 3,
+      status: "watching",
+      today: "2026-2-30",
+    }),
+  ).toThrow("Invalid date");
+  expect(anilistRequest).not.toHaveBeenCalled();
+});
