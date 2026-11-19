@@ -7,6 +7,7 @@ import {
   updateAniListEntry,
   removeAniListEntry,
 } from "../utils/sync/anilistList";
+import { localToday } from "../utils/sync/localDate";
 import { entryChanges } from "../utils/notificationChanges";
 import { useLibrary } from "./useLibrary";
 import { useNotifications } from "./useNotifications";
@@ -44,6 +45,7 @@ export async function sendListUpdate(
   progress?: number,
   automatic = false,
   edit?: { manualProgress?: boolean; score?: number },
+  today?: string,
 ): Promise<AccountResult> {
   try {
     if (provider === "anilist" && !anime.id)
@@ -70,6 +72,7 @@ export async function sendListUpdate(
         automatic,
         manualProgress: edit?.manualProgress,
         score: edit?.score,
+        today,
       });
     } else {
       const response = await fetch("/api/list/mal", {
@@ -82,6 +85,7 @@ export async function sendListUpdate(
           automatic,
           ...(edit?.manualProgress ? { manualProgress: true } : {}),
           ...(edit?.score !== undefined ? { score: edit.score } : {}),
+          ...(today ? { today } : {}),
         }),
       });
       const data = await response.json();
@@ -266,6 +270,8 @@ export function useAccounts() {
     const task = queue.current
       .catch(() => {})
       .then(async () => {
+        // One local calendar day per sync, shared by both providers.
+        const today = localToday();
         let mapped = anime;
         if (enabled.includes("anilist") && !mapped.id && mapped.idMal) {
           try {
@@ -333,6 +339,7 @@ export function useAccounts() {
                     score: edit.scores?.[provider],
                   }
                 : undefined,
+              today,
             );
           }),
         );
