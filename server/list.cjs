@@ -30,6 +30,77 @@ async function graphql(accessToken, query, variables) {
     throw new Error(payload.errors?.[0]?.message || "AniList returned no data");
   return payload.data;
 }
+const ANILIST_ENTRY_QUERY =
+  "query($id:Int){Media(id:$id,type:ANIME){mediaListEntry{progress status}}}";
+const ANILIST_ENTRY_WITH_DATES_QUERY =
+  "query($id:Int){Media(id:$id,type:ANIME){mediaListEntry{progress status startedAt{year month day} completedAt{year month day}}}}";
+const MAL_ENTRY_FIELDS = "my_list_status";
+const MAL_ENTRY_WITH_DATES_FIELDS =
+  "my_list_status{status,num_episodes_watched,start_date,finish_date}";
+
+function parseToday(today) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(today);
+  if (!match) throw new Error("Invalid date");
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== month - 1 ||
+    date.getUTCDate() !== day
+  )
+    throw new Error("Invalid date");
+  return { year, month, day };
+}
+
+function dateDecision(provider, status, existing) {
+  const anilist = provider === "anilist";
+  const watching = anilist
+    ? existing?.status === "CURRENT" || existing?.status === "REPEATING"
+    : existing?.status === "watching" || existing?.status === "rewatching";
+  const completed = anilist
+    ? existing?.status === "COMPLETED"
+    : existing?.status === "completed";
+  const hasStart = anilist
+    ? !!(
+        existing?.startedAt &&
+        (existing.startedAt.year ||
+          existing.startedAt.month ||
+          existing.startedAt.day)
+      )
+    : !!existing?.start_date;
+  const hasFinish = anilist
+    ? !!(
+        existing?.completedAt &&
+        (existing.completedAt.year ||
+          existing.completedAt.month ||
+          existing.completedAt.day)
+      )
+    : !!existing?.finish_date;
+  const watchingTarget = anilist ? status === "CURRENT" : status === "watching";
+  const completedTarget = anilist
+    ? status === "COMPLETED"
+    : status === "completed";
+  if (watchingTarget && !watching && !hasStart) return "start";
+  if (completedTarget && !completed && !hasFinish) return "finish";
+  return null;
+}
+
+// Only declare the date argument being written: sending the other field as
+// null would clear a date the user already has on the provider.
+function anilistSaveMutation(dateField) {
+  const declaration = dateField ? ",$" + dateField + ":FuzzyDate" : "";
+  const argument = dateField ? "," + dateField + ":$" + dateField : "";
+  return (
+    "mutation($id:Int,$status:MediaListStatus,$progress:Int,$score:Int" +
+    declaration +
+    "){SaveMediaListEntry(mediaId:$id,status:$status,progress:$progress,scoreRaw:$score" +
+    argument +
+    "){id status progress score(format:POINT_100)}}"
+  );
+}
+
 function validateUpdate(input) {
   if (
     !Number.isSafeInteger(input.id) ||
@@ -54,6 +125,7 @@ function validateUpdate(input) {
       throw new Error("Invalid update mode");
   if (input.manualProgress && input.automatic)
     throw new Error("Manual progress cannot be automatic");
+  if (input.today !== undefined) parseToday(input.today);
   return input;
 }
 async function updateList(provider, account, input) {
@@ -68,10 +140,16 @@ async function updateList(provider, account, input) {
   // Progress reports only move forward. Explicit status-only changes preserve progress.
   if (provider === "anilist") {
     let existing;
-    if ((progress !== undefined && !input.manualProgress) || input.automatic) {
+    if (
+      (progress !== undefined && !input.manualProgress) ||
+      input.automatic ||
+      input.today !== undefined
+    ) {
       const data = await graphql(
         account.accessToken,
-        "query($id:Int){Media(id:$id,type:ANIME){mediaListEntry{progress status}}}",
+        input.today !== undefined
+          ? ANILIST_ENTRY_WITH_DATES_QUERY
+          : ANILIST_ENTRY_QUERY,
         { id: input.id },
       );
       if (!data.Media) throw new Error("Anime not found");
@@ -83,9 +161,18 @@ async function updateList(provider, account, input) {
       input.automatic && existing?.status === "COMPLETED"
         ? "COMPLETED"
         : statusMap[input.status].anilist;
+    const decision =
+      input.today !== undefined ? dateDecision(provider, status, existing) : null;
+    const dateField =
+      decision === "start"
+        ? "startedAt"
+        : decision === "finish"
+          ? "completedAt"
+          : null;
+    const fuzzy = dateField ? parseToday(input.today) : null;
     const data = await graphql(
       account.accessToken,
-      "mutation($id:Int,$status:MediaListStatus,$progress:Int,$score:Int){SaveMediaListEntry(mediaId:$id,status:$status,progress:$progress,scoreRaw:$score){id status progress score(format:POINT_100)}}",
+      anilistSaveMutation(dateField),
       {
         id: input.id,
         status,
@@ -93,6 +180,7 @@ async function updateList(provider, account, input) {
         ...(input.score !== undefined
           ? { score: Math.round(input.score * 10) }
           : {}),
+        ...(dateField ? { [dateField]: fuzzy } : {}),
       },
     );
     if (!data.SaveMediaListEntry)
@@ -100,11 +188,18 @@ async function updateList(provider, account, input) {
     return data.SaveMediaListEntry;
   }
   let existing;
-  if ((progress !== undefined && !input.manualProgress) || input.automatic) {
+  if (
+    (progress !== undefined && !input.manualProgress) ||
+    input.automatic ||
+    input.today !== undefined
+  ) {
     const data = await upstream(
       "https://api.myanimelist.net/v2/anime/" +
         input.id +
-        "?fields=my_list_status",
+        "?fields=" +
+        (input.today !== undefined
+          ? MAL_ENTRY_WITH_DATES_FIELDS
+          : MAL_ENTRY_FIELDS),
       { headers: { Authorization: "Bearer " + account.accessToken } },
     );
     existing = data.my_list_status;
@@ -115,10 +210,14 @@ async function updateList(provider, account, input) {
     input.automatic && existing?.status === "completed"
       ? "completed"
       : statusMap[input.status].mal;
+  const decision =
+    input.today !== undefined ? dateDecision(provider, status, existing) : null;
   const fields = new URLSearchParams({ status });
   if (progress !== undefined)
     fields.set("num_watched_episodes", String(progress));
   if (input.score !== undefined) fields.set("score", String(input.score));
+  if (decision === "start") fields.set("start_date", input.today);
+  if (decision === "finish") fields.set("finish_date", input.today);
   return upstream(
     "https://api.myanimelist.net/v2/anime/" + input.id + "/my_list_status",
     {

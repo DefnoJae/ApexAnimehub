@@ -322,6 +322,26 @@ test("with today, a progress-only update writes no date", async () => {
   expect(variables.progress).toBe(5);
 });
 
+test("with today, the mutation declares only the date field being written", async () => {
+  (anilistRequest as jest.Mock)
+    .mockResolvedValueOnce({
+      Media: {
+        mediaListEntry: {
+          progress: 0,
+          status: "PLANNING",
+          startedAt: null,
+          completedAt: null,
+        },
+      },
+    })
+    .mockResolvedValueOnce({ SaveMediaListEntry: { id: 3, status: "CURRENT" } });
+  await updateAniListEntry({ id: 3, status: "watching", today: "2026-11-19" });
+  const mutation = (anilistRequest as jest.Mock).mock.calls[1][0] as string;
+  expect(mutation).toMatch(/\$startedAt:FuzzyDate/);
+  expect(mutation).not.toMatch(/\$completedAt:FuzzyDate/);
+  expect(mutation).not.toMatch(/completedAt:\$completedAt/);
+});
+
 test("without today, a status-only update makes no pre-read and sends no dates", async () => {
   (anilistRequest as jest.Mock).mockResolvedValueOnce({
     SaveMediaListEntry: { id: 3, status: "CURRENT" },

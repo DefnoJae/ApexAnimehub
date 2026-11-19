@@ -265,6 +265,139 @@ test("list mappings preserve progress on status changes and reject invalid input
   }
 });
 
+test("dates are written only on first transitions, on both server providers", async () => {
+  const calls = [];
+  global.fetch = async (url, options) => {
+    calls.push({ url, options });
+    if (url.includes("graphql")) {
+      const input = JSON.parse(options.body);
+      return json({
+        data: input.query.startsWith("mutation")
+          ? { SaveMediaListEntry: { id: 1, status: input.variables.status } }
+          : {
+              Media: {
+                mediaListEntry: {
+                  status: "PLANNING",
+                  progress: 0,
+                  startedAt: null,
+                  completedAt: null,
+                },
+              },
+            },
+      });
+    }
+    return json({
+      my_list_status: {
+        status: "plan_to_watch",
+        num_episodes_watched: 0,
+        start_date: null,
+        finish_date: null,
+      },
+    });
+  };
+  try {
+    await updateList("anilist", { accessToken: "t" }, {
+      id: 1,
+      status: "watching",
+      today: "2026-11-19",
+    });
+    const aniVariables = JSON.parse(calls.at(-1).options.body).variables;
+    assert.deepEqual(aniVariables.startedAt, { year: 2026, month: 11, day: 19 });
+    assert.equal("completedAt" in aniVariables, false);
+
+    await updateList("mal", { accessToken: "t" }, {
+      id: 1,
+      status: "watching",
+      today: "2026-11-19",
+    });
+    const malFields = new URLSearchParams(calls.at(-1).options.body);
+    assert.equal(malFields.get("start_date"), "2026-11-19");
+    assert.equal(malFields.has("finish_date"), false);
+    assert.match(calls.at(-2).url, /start_date,finish_date/);
+  } finally {
+    global.fetch = browserFetch;
+  }
+});
+
+test("existing dates, target status, rewatch and progress-only saves write no date", async () => {
+  const calls = [];
+  global.fetch = async (url, options) => {
+    calls.push({ url, options });
+    if (url.includes("graphql")) {
+      const input = JSON.parse(options.body);
+      return json({
+        data: input.query.startsWith("mutation")
+          ? { SaveMediaListEntry: { id: 1, status: input.variables.status } }
+          : {
+              Media: {
+                mediaListEntry: {
+                  status: "REPEATING",
+                  progress: 5,
+                  startedAt: { year: 2020, month: 1, day: 2 },
+                  completedAt: null,
+                },
+              },
+            },
+      });
+    }
+    return json({
+      my_list_status: {
+        status: "rewatching",
+        num_episodes_watched: 5,
+        start_date: "2020-01-02",
+        finish_date: null,
+      },
+    });
+  };
+  try {
+    await updateList("anilist", { accessToken: "t" }, {
+      id: 1,
+      status: "watching",
+      today: "2026-11-19",
+    });
+    let variables = JSON.parse(calls.at(-1).options.body).variables;
+    assert.equal("startedAt" in variables, false);
+
+    await updateList("anilist", { accessToken: "t" }, {
+      id: 1,
+      status: "watching",
+      progress: 6,
+      today: "2026-11-19",
+    });
+    variables = JSON.parse(calls.at(-1).options.body).variables;
+    assert.equal("startedAt" in variables, false);
+    assert.equal(variables.progress, 6);
+
+    await updateList("mal", { accessToken: "t" }, {
+      id: 1,
+      status: "watching",
+      today: "2026-11-19",
+    });
+    let fields = new URLSearchParams(calls.at(-1).options.body);
+    assert.equal(fields.has("start_date"), false);
+
+    await updateList("mal", { accessToken: "t" }, {
+      id: 1,
+      status: "completed",
+      today: "2026-11-19",
+    });
+    fields = new URLSearchParams(calls.at(-1).options.body);
+    assert.equal(fields.get("finish_date"), "2026-11-19");
+  } finally {
+    global.fetch = browserFetch;
+  }
+});
+
+test("validateUpdate rejects a malformed today", () => {
+  assert.throws(
+    () => validateUpdate({ id: 1, status: "watching", today: "2026-02-30" }),
+    /Invalid date/,
+  );
+  assert.doesNotThrow(() =>
+    validateUpdate({ id: 1, status: "watching", today: "2026-11-19" }),
+  );
+});
+
 test("personal scores normalize AniList scale and preserve automatic progress while permitting explicit corrections", async () => {
   const calls = [];
   global.fetch = async (url, options) => {

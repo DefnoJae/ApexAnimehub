@@ -53,8 +53,19 @@ const LIST_QUERY = "query($user:Int,$page:Int){Page(page:$page,perPage:50){pageI
 const ENTRY_QUERY = "query($id:Int){Media(id:$id,type:ANIME){mediaListEntry{status progress score(format:POINT_100)}}}";
 const EXISTING_ENTRY_QUERY = "query($id:Int){Media(id:$id,type:ANIME){mediaListEntry{progress status}}}";
 const EXISTING_ENTRY_WITH_DATES_QUERY = "query($id:Int){Media(id:$id,type:ANIME){mediaListEntry{progress status startedAt{year month day} completedAt{year month day}}}}";
-const SAVE_MUTATION = "mutation($id:Int,$status:MediaListStatus,$progress:Int,$score:Int){SaveMediaListEntry(mediaId:$id,status:$status,progress:$progress,scoreRaw:$score){id status progress score(format:POINT_100)}}";
-const SAVE_MUTATION_WITH_DATES = "mutation($id:Int,$status:MediaListStatus,$progress:Int,$score:Int,$startedAt:FuzzyDate,$completedAt:FuzzyDate){SaveMediaListEntry(mediaId:$id,status:$status,progress:$progress,scoreRaw:$score,startedAt:$startedAt,completedAt:$completedAt){id status progress score(format:POINT_100)}}";
+// Declare only the date being written. Declaring the other date as an
+// unsupplied variable would send null and clear a date the user already has.
+function saveMutation(dateField?: "startedAt" | "completedAt"): string {
+  const declaration = dateField ? ",$" + dateField + ":FuzzyDate" : "";
+  const argument = dateField ? "," + dateField + ":$" + dateField : "";
+  return (
+    "mutation($id:Int,$status:MediaListStatus,$progress:Int,$score:Int" +
+    declaration +
+    "){SaveMediaListEntry(mediaId:$id,status:$status,progress:$progress,scoreRaw:$score" +
+    argument +
+    "){id status progress score(format:POINT_100)}}"
+  );
+}
 const ENTRY_ID_QUERY = "query($id:Int){Media(id:$id,type:ANIME){mediaListEntry{id}}}";
 const DELETE_MUTATION = "mutation($id:Int){DeleteMediaListEntry(id:$id){deleted}}";
 
@@ -244,10 +255,12 @@ export async function updateAniListEntry(
       input.automatic && existing?.status === "COMPLETED"
         ? "COMPLETED"
         : statusMap[input.status];
-    let dateVariables: {
-      startedAt?: { year: number; month: number; day: number };
-      completedAt?: { year: number; month: number; day: number };
-    } = {};
+    let dateWrite:
+      | {
+          field: "startedAt" | "completedAt";
+          value: { year: number; month: number; day: number };
+        }
+      | undefined;
     if (input.today !== undefined) {
       const fuzzy = {
         year: Number(input.today.slice(0, 4)),
@@ -269,27 +282,24 @@ export async function updateAniListEntry(
           existing.completedAt.day)
       );
       if (status === "CURRENT" && !watching && !hasStart)
-        dateVariables = { startedAt: fuzzy };
+        dateWrite = { field: "startedAt", value: fuzzy };
       else if (
         status === "COMPLETED" &&
         existing?.status !== "COMPLETED" &&
         !hasFinish
       )
-        dateVariables = { completedAt: fuzzy };
+        dateWrite = { field: "completedAt", value: fuzzy };
     }
-    const hasDates =
-      dateVariables.startedAt !== undefined ||
-      dateVariables.completedAt !== undefined;
     const data = await anilistRequest<{
       SaveMediaListEntry: AniListMutationEntry | null;
     }>(
-      hasDates ? SAVE_MUTATION_WITH_DATES : SAVE_MUTATION,
+      saveMutation(dateWrite?.field),
       {
         id: input.id,
         status,
         ...(progress !== undefined ? { progress } : {}),
         ...(input.score !== undefined ? { score: Math.round(input.score * 10) } : {}),
-        ...dateVariables,
+        ...(dateWrite ? { [dateWrite.field]: dateWrite.value } : {}),
       },
       signal,
     );
