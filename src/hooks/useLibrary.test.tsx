@@ -173,6 +173,34 @@ test("confirmed status, progress and rating survive stale reimports and reload",
   });
   expect(library.getListStatus(anime)).toBe("paused");
 });
+test("a newer external edit supersedes a stale confirmed change", async () => {
+  const savedAt = Date.now() - 3600000;
+  localStorage.setItem(
+    "apex_library_changes_v1_anilist_alice",
+    JSON.stringify([
+      {
+        anime,
+        entry: { anime, status: "watching", progress: 1, savedAt },
+        savedAt,
+      },
+    ]),
+  );
+  setAniListPage(() => ({
+    ...page("alice", "paused"),
+    entries: [
+      { anime, status: "paused", progress: 3, updatedAt: Date.now() },
+    ],
+  }));
+  await act(async () => root.render(<Harness mal={false} />));
+  expect(library.libraryEntries[0]).toMatchObject({
+    status: "paused",
+    progress: 3,
+  });
+  expect(
+    JSON.parse(localStorage.getItem("apex_library_changes_v1_anilist_alice")!),
+  ).toEqual([]);
+});
+
 test("confirmed removals cannot be resurrected by stale imports", async () => {
   setAniListPage(() => page("alice", "planning"));
   await act(async () => root.render(<Harness mal={false} />));

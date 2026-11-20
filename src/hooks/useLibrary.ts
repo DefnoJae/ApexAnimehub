@@ -77,11 +77,34 @@ function saveChanges(
     );
   } catch {}
 }
+// A provider entry updated after a local confirmation was saved means the
+// entry was edited elsewhere (another client, or the provider's own site).
+// Trust the newer provider value instead of replaying the stale confirmation.
+// The tolerance covers ordinary clock drift between the client and providers.
+const CLOCK_SKEW_MS = 60000;
+function supersededBy(
+  entry: LibraryEntry | undefined,
+  change: ConfirmedChange,
+) {
+  return (
+    !!entry &&
+    Number.isFinite(entry.updatedAt) &&
+    entry.updatedAt > change.savedAt + CLOCK_SKEW_MS
+  );
+}
+
 export function mergeConfirmed(
   entries: LibraryEntry[],
   changes: ConfirmedChange[],
 ) {
   return changes.reduce((merged, change) => {
+    if (
+      supersededBy(
+        entries.find((entry) => sameAnime(entry.anime, change.anime)),
+        change,
+      )
+    )
+      return merged;
     const filtered = merged.filter(
       (entry) => !sameAnime(entry.anime, change.anime),
     );
@@ -270,6 +293,7 @@ export function useLibrary(connected: Record<AccountProvider, boolean>) {
                 const entry = entries.find((entry) =>
                   sameAnime(entry.anime, change.anime),
                 );
+                if (supersededBy(entry, change)) return false;
                 return change.entry
                   ? !entry ||
                       entry.status !== change.entry.status ||
