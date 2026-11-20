@@ -133,6 +133,31 @@ test("SeaSubs bounded XZ decoder validates compressed subtitle integrity", () =>
   assert.throws(() => decode(bytes));
 });
 
+test("SeaSubs XZ decoder runs without CommonJS requires (Cloudflare Workers)", () => {
+  // Workers rejects dynamic requires such as require("stream"). Execute the
+  // bundle with no require available to catch any Node-only dependency.
+  const fs = require("node:fs");
+  const path = require("node:path");
+  const vm = require("node:vm");
+  const code = fs.readFileSync(path.join(__dirname, "seasubs-xz.cjs"), "utf8");
+  const sandbox = {
+    module: { exports: {} },
+    exports: {},
+    Buffer,
+    Uint8Array,
+    process: { versions: { node: "22.0.0" } },
+    require(id) {
+      throw new Error(`Dynamic require of "${id}" is not supported`);
+    },
+  };
+  vm.runInNewContext(code, sandbox, { filename: "seasubs-xz.cjs" });
+  const bytes = Buffer.from(
+    "/Td6WFoAAATm1rRGAgAhARYAAAB0L+Wj4AAzAC1dACuRREy8Hw3FG12cIzMbL6wQQn4EVsU1Lh0Tt60cHDWoOmobhgT3FchZjH8AAAAAAACv0UoOMmG3tgABSTTStYkgH7bzfQEAAAAABFla",
+    "base64",
+  );
+  assert.match(sandbox.module.exports.decode(bytes), /A street sign/);
+});
+
 test("styled extraction preserves ASS styles, placement, rotation and drawings", () => {
   const source = "[Script Info]\nPlayResX: 1920\nPlayResY: 1080\n[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour\nStyle: Signs,Noto Sans,40,&H00FF00FF\n" + ass.slice(ass.indexOf("[Events]"));
   const styled = styledAss(source);
