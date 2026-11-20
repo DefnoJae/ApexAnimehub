@@ -82,6 +82,26 @@ function episodeAttachments(torrent, episode, season) {
     ).values(),
   ];
 }
+function englishScore(track) {
+  // Sample cues spread across the whole track so title-card English at the
+  // start doesn't mask non-English body text (e.g. Russian/Signs tracks).
+  const step = Math.max(1, Math.floor(track.cues.length / 8));
+  const sample = track.cues
+    .filter((_, i) => i % step === 0)
+    .map((c) => c.text)
+    .join(" ");
+  const asciiLetters = (sample.match(/[A-Za-z]/g) || []).length;
+  const cyrillic = (sample.match(/[\u0400-\u04FF]/g) || []).length;
+  const otherNonAscii = Math.max(
+    0,
+    (sample.match(/[^\x00-\x7F]/g) || []).length - cyrillic,
+  );
+  const englishWords =
+    (sample.match(
+      /\b(the|be|to|of|and|a|in|that|have|it|for|not|on|with|he|as|you|do|at|this|but|his|by|from|they|we|say|her|she|or|an|will|my|one|all|would|there|their|what|so|up|out|if|about|who|get|which|go|me|when|make|can|like|time|no|just|him|know|take|people|into|year|your|good|some|could|them|see|other|than|then|now|look|only|come|its|over|think|also|back|after|use|two|how|our|work|first|well|way|even|new|want|because|any|these|give|day|most|us)\b/gi,
+    ) || []).length;
+  return asciiLetters - cyrillic * 3 - otherNonAscii * 2 + englishWords * 5;
+}
 function makeCues(content, explicitSigns = false) {
   const ass = /\[Events\]/i.test(content);
   const derived = ass ? deriveSignsSongsAss(content) : null;
@@ -281,11 +301,15 @@ async function search(id, episode) {
       }
       delete track.fonts;
     }
+    const deduped = [
+      ...new Map(tracks.map((track) => [track.id, track])).values(),
+    ];
+    // Prefer tracks whose cues are actually English, so a Russian/Signs track
+    // with misleading metadata doesn't become the default selection.
+    deduped.sort((a, b) => englishScore(b) - englishScore(a));
     const value = {
       fonts,
-      tracks: [
-        ...new Map(tracks.map((track) => [track.id, track])).values(),
-      ].slice(0, 6),
+      tracks: deduped.slice(0, 6),
       message: tracks.length
         ? "Timing is unverified. Adjust it to match this video."
         : "No readable English Signs & Songs track was found for this episode.",
@@ -337,5 +361,6 @@ module.exports = {
   styledAss,
   episodeAttachments,
   allowed,
+  englishScore,
 };
 

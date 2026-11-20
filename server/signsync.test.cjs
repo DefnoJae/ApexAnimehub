@@ -7,6 +7,7 @@ const {
   allowed,
   handler,
   search,
+  englishScore,
 } = require("./signsync.cjs");
 const ass =
   "[Script Info]\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\nDialogue: 0,0:00:10.00,0:00:13.00,Signs,,0,0,0,,{\\pos(20,30)}A street sign\nDialogue: 0,0:00:14.00,0:00:16.00,Default,,0,0,0,,Ordinary dialogue\nDialogue: 0,0:00:17.00,0:00:19.00,Signs,,0,0,0,,{\\p1}m 0 0 l 2 2";
@@ -167,4 +168,35 @@ test("styled extraction preserves ASS styles, placement, rotation and drawings",
   assert.match(styled, /\\p1/);
   assert.doesNotMatch(styled, /Ordinary dialogue/);
   assert.equal(styledAss("WEBVTT", true), undefined);
+});
+
+test("englishScore prefers English cues over Russian/Cyrillic cues", () => {
+  const russian = {
+    cues: [
+      { start: 10, end: 13, text: "Благословения и жизнь девушки-гориллы" },
+      { start: 20, end: 23, text: "Почему-то очень хочется фруктов" },
+    ],
+  };
+  const english = {
+    cues: [
+      { start: 10, end: 13, text: "The Gorilla Life of a Lady and Blessings" },
+      { start: 20, end: 23, text: "I really want to eat those for some reason" },
+    ],
+  };
+  assert.ok(englishScore(english) > englishScore(russian));
+});
+
+test("default track selection prefers English over Russian cues", () => {
+  const russian = {
+    id: "3735929054",
+    cues: [{ start: 10, end: 13, text: "Благословения и жизнь девушки-гориллы" }],
+  };
+  const english = {
+    id: "3405697342",
+    cues: [{ start: 10, end: 13, text: "The Gorilla Life of a Lady and Blessings" }],
+  };
+  const deduped = [russian, english];
+  deduped.sort((a, b) => englishScore(b) - englishScore(a));
+  assert.equal(deduped[0].id, "3405697342", "English track should be first");
+  assert.equal(deduped[1].id, "3735929054", "Russian track should be second");
 });
