@@ -187,7 +187,13 @@ export function StyledSelect({
           if (!menu.current?.contains(event.relatedTarget)) setOpen(false);
         }}
       >
-        <span className="styled-select-value">
+        <span
+          className="styled-select-value"
+          title={
+            choices.find((option) => option.value === selected)?.label ||
+            undefined
+          }
+        >
           {choices.find((option) => option.value === selected)?.label ||
             "Choose an option"}
         </span>

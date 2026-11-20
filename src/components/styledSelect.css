@@ -53,6 +53,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  min-width: 0;
 }
 .styled-select-trigger > svg {
   flex-shrink: 0;
