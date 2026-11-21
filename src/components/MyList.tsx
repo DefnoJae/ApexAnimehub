@@ -9,6 +9,82 @@ import { AnimeBadges } from "./AnimeBadges";
 
 const batchSize = 50;
 
+type MyListFilters = {
+  status: ListStatus | "all";
+  provider: string;
+  search: string;
+  sort: string;
+};
+
+const FILTERS_KEY = "apex_my_list_filters_v1";
+const LEGACY_SORT_KEY = "apex_my_list_sort_v1";
+
+const validStatuses: string[] = [
+  "all",
+  "watching",
+  "planning",
+  "completed",
+  "paused",
+  "dropped",
+];
+const validProviders: string[] = ["all", "anilist", "mal"];
+const validSorts: string[] = [
+  "updated",
+  "highest",
+  "lowest",
+  "progress",
+  "title",
+];
+
+function validValue(
+  value: unknown,
+  allowed: string[],
+  fallback: string,
+): string {
+  return typeof value === "string" && allowed.includes(value) ? value : fallback;
+}
+
+function readFilters(): MyListFilters {
+  const fallback: MyListFilters = {
+    status: "all",
+    provider: "all",
+    search: "",
+    sort: "updated",
+  };
+  try {
+    const raw = localStorage.getItem(FILTERS_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw) as Partial<MyListFilters> | null;
+      if (parsed && typeof parsed === "object") {
+        return {
+          status: validValue(
+            parsed.status,
+            validStatuses,
+            fallback.status,
+          ) as MyListFilters["status"],
+          provider: validValue(parsed.provider, validProviders, fallback.provider),
+          search:
+            typeof parsed.search === "string" ? parsed.search : fallback.search,
+          sort: validValue(parsed.sort, validSorts, fallback.sort),
+        };
+      }
+    }
+  } catch {}
+  try {
+    const legacySort = localStorage.getItem(LEGACY_SORT_KEY);
+    if (legacySort && validSorts.includes(legacySort)) {
+      return { ...fallback, sort: legacySort };
+    }
+  } catch {}
+  return fallback;
+}
+
+function saveFilters(next: MyListFilters): void {
+  try {
+    localStorage.setItem(FILTERS_KEY, JSON.stringify(next));
+  } catch {}
+}
+
 const labels = {
   watching: "Watching",
   planning: "Planning",
@@ -25,18 +101,19 @@ export function MyList({
   onSelect: (anime: LibraryAnime) => void;
   onConnect: () => void;
 }) {
-  const [status, setStatus] = useState<ListStatus | "all">("all");
-  const [provider, setProvider] = useState("all");
-  const [search, setSearch] = useState("");
+  const [initial] = useState(readFilters);
+  const [status, setStatus] = useState<ListStatus | "all">(initial.status);
+  const [provider, setProvider] = useState(initial.provider);
+  const [search, setSearch] = useState(initial.search);
   const [visibleCount, setVisibleCount] = useState(batchSize);
   const sentinel = useRef<HTMLDivElement>(null);
-  const [sort, setSort] = useState(() => {
-    try {
-      return localStorage.getItem("apex_my_list_sort_v1") || "updated";
-    } catch {
-      return "updated";
-    }
-  });
+  const [sort, setSort] = useState(initial.sort);
+  useEffect(() => saveFilters({ status, provider, search, sort }), [
+    status,
+    provider,
+    search,
+    sort,
+  ]);
   const filtered = accounts.libraryEntries.filter(
     (e) =>
       (provider === "all" || provider === e.provider) &&
@@ -165,9 +242,6 @@ export function MyList({
           onChange={(event) => {
             setSort(event.target.value);
             setVisibleCount(batchSize);
-            try {
-              localStorage.setItem("apex_my_list_sort_v1", event.target.value);
-            } catch {}
           }}
         >
           <option value="updated">Recently updated</option>

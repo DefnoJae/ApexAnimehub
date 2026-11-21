@@ -5,6 +5,18 @@ import { MyList } from "./MyList";
 import type { useAccounts } from "../hooks/useAccounts";
 jest.mock("./AnimeBadges", () => ({ AnimeBadges: () => null }));
 jest.mock("./HomeDashboard", () => ({ QuickList: () => null }));
+
+const FILTERS_KEY = "apex_my_list_filters_v1";
+
+function makeAccounts() {
+  return {
+    connected: { anilist: true, mal: true },
+    libraryEntries: [],
+    libraryErrors: {},
+    lists: {},
+  } as unknown as ReturnType<typeof useAccounts>;
+}
+
 test("My List sorts by real entry updates and personal score, with compact score overlays", () => {
   localStorage.clear();
   const host = document.createElement("div");
@@ -99,4 +111,172 @@ describe.each([
       host.remove();
     }
   });
+});
+
+test("restores and persists all four filters", () => {
+  localStorage.clear();
+  localStorage.setItem(
+    FILTERS_KEY,
+    JSON.stringify({
+      status: "completed",
+      provider: "mal",
+      search: "Naruto",
+      sort: "title",
+    }),
+  );
+  const host = document.createElement("div");
+  document.body.append(host);
+  let root = createRoot(host);
+  const accounts = makeAccounts();
+  try {
+    act(() =>
+      root.render(
+        <MyList
+          accounts={accounts}
+          onSelect={jest.fn()}
+          onConnect={jest.fn()}
+        />,
+      ),
+    );
+    expect(
+      (host.querySelector('[aria-label="Search my list"]') as HTMLInputElement)
+        .value,
+    ).toBe("Naruto");
+    expect(
+      (host.querySelector('[aria-label="List provider"]') as HTMLSelectElement)
+        .value,
+    ).toBe("mal");
+    expect(
+      (
+        host.querySelector(
+          '[aria-label="Filter list status"]',
+        ) as HTMLSelectElement
+      ).value,
+    ).toBe("completed");
+    expect(
+      (host.querySelector('[aria-label="Sort my list"]') as HTMLSelectElement)
+        .value,
+    ).toBe("title");
+
+    act(() => {
+      const status = host.querySelector<HTMLSelectElement>(
+        '[aria-label="Filter list status"]',
+      )!;
+      status.value = "watching";
+      status.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    expect(JSON.parse(localStorage.getItem(FILTERS_KEY)!)).toEqual({
+      status: "watching",
+      provider: "mal",
+      search: "Naruto",
+      sort: "title",
+    });
+
+    act(() => root.unmount());
+    root = createRoot(host);
+    act(() =>
+      root.render(
+        <MyList
+          accounts={accounts}
+          onSelect={jest.fn()}
+          onConnect={jest.fn()}
+        />,
+      ),
+    );
+    expect(
+      (host.querySelector('[aria-label="Search my list"]') as HTMLInputElement)
+        .value,
+    ).toBe("Naruto");
+    expect(
+      (host.querySelector('[aria-label="List provider"]') as HTMLSelectElement)
+        .value,
+    ).toBe("mal");
+    expect(
+      (
+        host.querySelector(
+          '[aria-label="Filter list status"]',
+        ) as HTMLSelectElement
+      ).value,
+    ).toBe("watching");
+    expect(
+      (host.querySelector('[aria-label="Sort my list"]') as HTMLSelectElement)
+        .value,
+    ).toBe("title");
+  } finally {
+    act(() => root.unmount());
+    host.remove();
+  }
+});
+
+test("migrates the legacy sort key", () => {
+  localStorage.clear();
+  localStorage.setItem("apex_my_list_sort_v1", "highest");
+  const host = document.createElement("div");
+  document.body.append(host);
+  const root = createRoot(host);
+  const accounts = makeAccounts();
+  try {
+    act(() =>
+      root.render(
+        <MyList
+          accounts={accounts}
+          onSelect={jest.fn()}
+          onConnect={jest.fn()}
+        />,
+      ),
+    );
+    expect(
+      (host.querySelector('[aria-label="Sort my list"]') as HTMLSelectElement)
+        .value,
+    ).toBe("highest");
+    expect(JSON.parse(localStorage.getItem(FILTERS_KEY)!).sort).toBe("highest");
+  } finally {
+    act(() => root.unmount());
+    host.remove();
+  }
+});
+
+test("storage failures do not crash", () => {
+  localStorage.clear();
+  const host = document.createElement("div");
+  document.body.append(host);
+  const root = createRoot(host);
+  const accounts = makeAccounts();
+  const getItem = jest
+    .spyOn(Storage.prototype, "getItem")
+    .mockImplementation(() => {
+      throw new DOMException("blocked");
+    });
+  const setItem = jest
+    .spyOn(Storage.prototype, "setItem")
+    .mockImplementation(() => {
+      throw new DOMException("blocked");
+    });
+  try {
+    act(() =>
+      root.render(
+        <MyList
+          accounts={accounts}
+          onSelect={jest.fn()}
+          onConnect={jest.fn()}
+        />,
+      ),
+    );
+    expect(
+      (
+        host.querySelector(
+          '[aria-label="Filter list status"]',
+        ) as HTMLSelectElement
+      ).value,
+    ).toBe("all");
+    expect(
+      (host.querySelector('[aria-label="Sort my list"]') as HTMLSelectElement)
+        .value,
+    ).toBe("updated");
+  } finally {
+    getItem.mockRestore();
+    setItem.mockRestore();
+    act(() => root.unmount());
+    host.remove();
+  }
 });
