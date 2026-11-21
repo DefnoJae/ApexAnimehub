@@ -7,6 +7,7 @@ import {
   parsePageRoute,
   usePageRoute,
 } from "./usePageRoute";
+import { takeScroll } from "../utils/sectionScroll";
 test("routes parse shareable sections, titles, episodes and safe provider options", () => {
   expect(parsePageRoute("/discover").view).toBe("discover");
   expect(parsePageRoute("/my-list").view).toBe("my-list");
@@ -125,5 +126,48 @@ test("closing playback returns to its detail entry and Back reaches the original
   } finally {
     act(() => root.unmount());
     window.history.replaceState({}, "", "/");
+  }
+});
+
+test("route changes remember the outgoing section scroll and never force a reset", () => {
+  window.history.replaceState({}, "", "/");
+  const scrollTo = jest.spyOn(window, "scrollTo").mockImplementation(() => {});
+  const scrollYDescriptor = Object.getOwnPropertyDescriptor(window, "scrollY");
+  const setY = (y: number) =>
+    Object.defineProperty(window, "scrollY", { value: y, configurable: true });
+  const node = document.createElement("div");
+  document.body.append(node);
+  const root = createRoot(node);
+  let router!: ReturnType<typeof usePageRoute>;
+  function Harness() {
+    router = usePageRoute();
+    return <span>{router.route.view}</span>;
+  }
+  try {
+    act(() => root.render(<Harness />));
+    act(() => router.navigate("/discover"));
+    setY(640);
+    act(() => router.navigate("/anime/1"));
+    expect(takeScroll("discover")).toBe(640);
+    expect(scrollTo).not.toHaveBeenCalled();
+
+    act(() => {
+      window.history.replaceState({ apexIndex: 0 }, "", "/discover");
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    });
+    expect(node.textContent).toContain("discover");
+    expect(scrollTo).not.toHaveBeenCalled();
+    setY(120);
+    act(() => router.navigate("/my-list"));
+    expect(takeScroll("discover")).toBe(120);
+    expect(takeScroll("my-list")).toBe(0);
+  } finally {
+    act(() => root.unmount());
+    node.remove();
+    window.history.replaceState({}, "", "/");
+    if (scrollYDescriptor)
+      Object.defineProperty(window, "scrollY", scrollYDescriptor);
+    else Reflect.deleteProperty(window, "scrollY");
+    scrollTo.mockRestore();
   }
 });

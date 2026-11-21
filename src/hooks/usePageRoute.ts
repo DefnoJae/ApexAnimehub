@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { rememberScroll, scrollSection } from "../utils/sectionScroll";
 
 export type AudioLanguage = "sub" | "dub";
 export type PlaybackSource = "anipm" | "apex" | "megaplay" | "animeembed" | "reanime";
@@ -93,6 +94,13 @@ const readRoute = () =>
 export function usePageRoute() {
   const [route, setRoute] = useState(readRoute);
   const closingPlayer = useRef(false);
+  const routeRef = useRef(route);
+  const applyRoute = useCallback((next: PageRoute) => {
+    const outgoing = routeRef.current.view;
+    if (scrollSection(outgoing)) rememberScroll(outgoing, window.scrollY);
+    routeRef.current = next;
+    setRoute(next);
+  }, []);
   useEffect(() => {
     if (typeof window.history.state?.apexIndex !== "number")
       window.history.replaceState(
@@ -100,14 +108,15 @@ export function usePageRoute() {
         "",
         window.location.href,
       );
+    if ("scrollRestoration" in window.history)
+      window.history.scrollRestoration = "manual";
     const pop = () => {
       closingPlayer.current = false;
-      setRoute(readRoute());
-      window.scrollTo({ top: 0 });
+      applyRoute(readRoute());
     };
     window.addEventListener("popstate", pop);
     return () => window.removeEventListener("popstate", pop);
-  }, []);
+  }, [applyRoute]);
   const navigate = useCallback((href: string, replace = false) => {
     const url = new URL(href, window.location.origin);
     if (url.origin !== window.location.origin) return;
@@ -139,9 +148,8 @@ export function usePageRoute() {
       "",
       url.pathname + url.search,
     );
-    setRoute(readRoute());
-    window.scrollTo({ top: 0 });
-  }, []);
+    applyRoute(readRoute());
+  }, [applyRoute]);
   const back = useCallback(
     (fallback = "/") => {
       if (window.history.state?.apexIndex > 0) window.history.back();
