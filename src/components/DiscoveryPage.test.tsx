@@ -28,11 +28,15 @@ beforeEach(() => {
     tags: ["Super Power"],
   });
   (fetchDiscovery as jest.Mock).mockImplementation(async (_f, page) => ({
-    items: Array.from({ length: 50 }, (_, i) => ({
-      id: (page - 1) * 50 + i + 1,
-      title: { english: "Anime " + ((page - 1) * 50 + i + 1) },
-      malScore: null,
-    })),
+    items: Array.from({ length: 50 }, (_, i) => {
+      const id = (page - 1) * 50 + i + 1;
+      return {
+        id,
+        title: { english: "Anime " + id },
+        malScore: null,
+        ...(id === 1 ? { year: 2009, format: "TV", episodes: 175 } : {}),
+      };
+    }),
     nextPage: page === 1 ? 2 : null,
     source: "anilist",
   }));
@@ -62,6 +66,9 @@ test("loads 50 posters, keeps quick list controls, and appends on near-bottom in
     root.render(<DiscoveryPage accounts={accounts} onSelect={jest.fn()} />),
   );
   expect(node.querySelectorAll(".poster-card")).toHaveLength(50);
+  expect(
+    node.querySelector(".poster-card .poster-caption small")?.textContent,
+  ).toBe("2009 TV 175eps");
   expect(
     node.querySelectorAll('[aria-label^="Change list status"]'),
   ).toHaveLength(50);

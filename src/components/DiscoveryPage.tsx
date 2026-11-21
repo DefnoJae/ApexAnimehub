@@ -13,6 +13,7 @@ import type { useAccounts } from "../hooks/useAccounts";
 import { QuickList } from "./HomeDashboard";
 import { PosterPersonalRating } from "./PosterPersonalRating";
 import { AnimeBadges } from "./AnimeBadges";
+import { PosterCaption } from "./PosterCaption";
 import "./discovery.css";
 const currentYear = new Date().getFullYear();
 const discoveryYears = Array.from(
@@ -427,12 +428,12 @@ export function DiscoveryPage({
               </button>
               <PosterPersonalRating anime={anime} accounts={accounts} />
               <QuickList anime={anime} accounts={accounts} />
-              <div className="discovery-poster-caption">
-                <strong>{anime.title.english || anime.title.romaji}</strong>
-                <small>
-                  {anime.year || "TBA"} · {anime.format}
-                </small>
-              </div>
+              <PosterCaption
+                title={anime.title.english || anime.title.romaji || ""}
+                year={anime.year}
+                format={anime.format}
+                episodes={anime.episodes}
+              />
             </div>
             <AnimeBadges
               showRating
