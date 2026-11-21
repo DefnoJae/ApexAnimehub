@@ -3,9 +3,9 @@ import { createRoot, Root } from "react-dom/client";
 import { act } from "react-dom/test-utils";
 import { PosterCaption, posterMeta } from "./PosterCaption";
 
-test("posterMeta shows total episodes alongside year and type", () => {
+test("posterMeta separates year, type and total with spaced centered dots", () => {
   expect(posterMeta({ year: 2009, format: "TV", episodes: 175 })).toBe(
-    "2009 TV 175eps",
+    "2009 · TV · 175eps",
   );
 });
 
@@ -17,12 +17,21 @@ test("posterMeta uses the total even when an airing progress count is present", 
       episodes: 12,
       nextAiringEpisode: { episode: 5 },
     } as Parameters<typeof posterMeta>[0]),
-  ).toBe("2026 TV 12eps");
+  ).toBe("2026 · TV · 12eps");
+});
+
+test("posterMeta keeps the centered dot when the total is unknown", () => {
+  expect(posterMeta({ year: 2020, format: "TV", episodes: null })).toBe(
+    "2020 · TV",
+  );
 });
 
 test("posterMeta omits unknown year, type and episode totals", () => {
   expect(posterMeta({ year: undefined, format: "", episodes: 0 })).toBe("TBA");
   expect(posterMeta({ year: 2020, format: null, episodes: null })).toBe("2020");
+  expect(posterMeta({ year: 2020, format: null, episodes: 12 })).toBe(
+    "2020 · 12eps",
+  );
 });
 
 let node: HTMLDivElement, root: Root;
@@ -46,6 +55,6 @@ test("PosterCaption renders the title and metadata in the overlay", () => {
     "Example",
   );
   expect(node.querySelector(".poster-caption small")?.textContent).toBe(
-    "2009 TV 175eps",
+    "2009 · TV · 175eps",
   );
 });

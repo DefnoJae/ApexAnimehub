@@ -68,7 +68,7 @@ test("loads 50 posters, keeps quick list controls, and appends on near-bottom in
   expect(node.querySelectorAll(".poster-card")).toHaveLength(50);
   expect(
     node.querySelector(".poster-card .poster-caption small")?.textContent,
-  ).toBe("2009 TV 175eps");
+  ).toBe("2009 · TV · 175eps");
   expect(
     node.querySelectorAll('[aria-label^="Change list status"]'),
   ).toHaveLength(50);

@@ -16,7 +16,7 @@ export function posterMeta({ year, format, episodes }: PosterMeta): string {
   if (type) parts.push(type);
   if (Number.isSafeInteger(episodes) && Number(episodes) > 0)
     parts.push(`${episodes}eps`);
-  return parts.join(" ");
+  return parts.join(" · ");
 }
 
 export interface PosterCaptionProps extends PosterMeta {

@@ -231,7 +231,7 @@ test("detail navigation contains only episodes, related anime and recommendation
   );
   expect(
     node.querySelector(".detail-poster-grid .poster-caption small")?.textContent,
-  ).toBe("2020 MOVIE 1eps");
+  ).toBe("2020 · MOVIE · 1eps");
   expect(node.querySelector(".detail-poster-grid .poster-title")).toBeNull();
   act(() =>
     (
@@ -243,7 +243,7 @@ test("detail navigation contains only episodes, related anime and recommendation
   );
   expect(
     node.querySelector(".detail-poster-grid .poster-caption small")?.textContent,
-  ).toBe("2009 TV 175eps");
+  ).toBe("2009 · TV · 175eps");
   expect(node.querySelector(".detail-poster-grid .poster-title")).toBeNull();
   act(() =>
     (
