@@ -14,7 +14,11 @@ jest.mock("./hooks/useAccounts", () => ({
 }));
 jest.mock("./components/HomeDashboard", () => ({
   FloatingNavigation: ({ onView }: any) => (
-    <button onClick={() => onView("all")}>Home</button>
+    <>
+      <button onClick={() => onView("all")}>Home</button>
+      <button onClick={() => onView("discover")}>Discover</button>
+      <button onClick={() => onView("my-list")}>My List</button>
+    </>
   ),
   HomeDashboard: ({ onSelect }: any) => (
     <button
@@ -45,6 +49,22 @@ jest.mock("./components/VideoPlayer", () => ({
       <button onClick={onClose}>Close</button>
     </div>
   ),
+}));
+jest.mock("./components/DiscoveryPage", () => {
+  const R = require("react");
+  return {
+    DiscoveryPage: () => {
+      const [count, setCount] = R.useState(0);
+      return (
+        <button data-testid="discovery" onClick={() => setCount(count + 1)}>
+          discover {count}
+        </button>
+      );
+    },
+  };
+});
+jest.mock("./components/MyList", () => ({
+  MyList: () => <div data-testid="mylist">my list</div>,
 }));
 beforeEach(() => {
   localStorage.clear();
@@ -231,6 +251,85 @@ test("watching a non-final episode keeps the anime in Continue Watching", async 
   } finally {
     act(() => root.unmount());
     node.remove();
+    window.history.replaceState({}, "", "/");
+  }
+});
+
+test("Discover stays mounted, hidden while away, and its scroll is restored", async () => {
+  window.history.replaceState({}, "", "/discover");
+  const scrollTo = jest.spyOn(window, "scrollTo").mockImplementation(() => {});
+  const scrollYDescriptor = Object.getOwnPropertyDescriptor(window, "scrollY");
+  const setY = (y: number) =>
+    Object.defineProperty(window, "scrollY", { value: y, configurable: true });
+  const node = document.createElement("div");
+  document.body.append(node);
+  const root = createRoot(node);
+  try {
+    await act(async () => root.render(<App />));
+    const discover = () => node.querySelector('[data-testid="discovery"]') as HTMLElement;
+    act(() => discover().click());
+    expect(discover().textContent).toBe("discover 1");
+
+    setY(300);
+    act(() => Array.from(node.querySelectorAll("button"))
+      .find((b) => b.textContent === "Home")!.click());
+    expect(window.location.pathname).toBe("/");
+    expect(discover()).not.toBeNull();
+    expect(discover().closest(".apex-section-hidden")).not.toBeNull();
+    expect(scrollTo).toHaveBeenLastCalledWith({ top: 0, behavior: "instant" });
+
+    act(() => Array.from(node.querySelectorAll("button"))
+      .find((b) => b.textContent === "Discover")!.click());
+    expect(scrollTo).toHaveBeenLastCalledWith({ top: 300, behavior: "instant" });
+    expect(discover().textContent).toBe("discover 1");
+  } finally {
+    act(() => root.unmount());
+    node.remove();
+    if (scrollYDescriptor)
+      Object.defineProperty(window, "scrollY", scrollYDescriptor);
+    else Reflect.deleteProperty(window, "scrollY");
+    scrollTo.mockRestore();
+    window.history.replaceState({}, "", "/");
+  }
+});
+
+test("My List starts at top, is remembered, and a studio deep link starts Discover at top", async () => {
+  window.history.replaceState({}, "", "/my-list");
+  const scrollTo = jest.spyOn(window, "scrollTo").mockImplementation(() => {});
+  const scrollYDescriptor = Object.getOwnPropertyDescriptor(window, "scrollY");
+  const setY = (y: number) =>
+    Object.defineProperty(window, "scrollY", { value: y, configurable: true });
+  const node = document.createElement("div");
+  document.body.append(node);
+  const root = createRoot(node);
+  const clickNav = (label: string) => act(() => {
+    Array.from(node.querySelectorAll("button"))
+      .find((b) => b.textContent === label)!.click();
+  });
+  try {
+    await act(async () => root.render(<App />));
+    expect(node.querySelector('[data-testid="mylist"]')).not.toBeNull();
+    expect(scrollTo).toHaveBeenLastCalledWith({ top: 0, behavior: "instant" });
+
+    setY(700);
+    clickNav("Discover");
+    clickNav("Home");
+    clickNav("My List");
+    expect(scrollTo).toHaveBeenLastCalledWith({ top: 700, behavior: "instant" });
+
+    setY(500);
+    act(() => {
+      window.history.replaceState({ apexIndex: 1 }, "", "/discover?studio=14");
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    });
+    expect(scrollTo).toHaveBeenLastCalledWith({ top: 0, behavior: "instant" });
+  } finally {
+    act(() => root.unmount());
+    node.remove();
+    if (scrollYDescriptor)
+      Object.defineProperty(window, "scrollY", scrollYDescriptor);
+    else Reflect.deleteProperty(window, "scrollY");
+    scrollTo.mockRestore();
     window.history.replaceState({}, "", "/");
   }
 });

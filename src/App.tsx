@@ -31,6 +31,7 @@ import {
 } from "./hooks/usePageRoute";
 import { detailQuery, fetchFallbackAnimeDetails } from "./utils/detailQuery";
 import { fetchHomeCatalog, HomeRow, pickHeroSlides } from "./utils/homeRows";
+import { clearScroll, scrollSection, takeScroll } from "./utils/sectionScroll";
 
 function rememberPlayer(source: PlaybackSource) {
   try {
@@ -51,6 +52,8 @@ export default function App() {
   const [searchError, setSearchError] = useState<string | null>(null);
   const [searchLoading, setSearchLoading] = useState(false);
   const [navHidden, setNavHidden] = useState(false);
+  const [discoverVisited, setDiscoverVisited] = useState(false);
+  const [myListVisited, setMyListVisited] = useState(false);
   const [isSearchExpanded, setIsSearchExpanded] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<DashboardAnime[]>([]);
@@ -271,8 +274,21 @@ export default function App() {
     };
   }, []);
   useEffect(() => {
-    window.scrollTo({ top: 0 });
+    if (view === "discover" && route.studioId) clearScroll("discover");
+  }, [route.studioId, view]);
+  useEffect(() => {
+    const section = scrollSection(view);
+    window.scrollTo({
+      top: section ? takeScroll(section) : 0,
+      // TS 4.9's DOM lib omits "instant", but browsers accept it for a jump
+      // without smooth scrolling (needed to override `scroll-behavior: smooth`).
+      behavior: "instant" as ScrollBehavior,
+    });
     setNavHidden(false);
+  }, [view, route.studioId]);
+  useEffect(() => {
+    if (view === "discover") setDiscoverVisited(true);
+    if (view === "my-list") setMyListVisited(true);
   }, [view]);
   useEffect(() => {
     if (!isSearchExpanded) return;
@@ -514,7 +530,6 @@ export default function App() {
         hidden={navHidden}
         onView={(next) => {
           navigate(sectionPaths[next] || "/");
-          window.scrollTo({ top: 0 });
           setNavHidden(false);
         }}
         onSearch={() => setIsSearchExpanded(true)}
@@ -728,22 +743,36 @@ export default function App() {
             />
           )}
 
-          {view === "my-list" && (
-            <MyList
-              accounts={accounts}
-              onSelect={onSelectMedia}
-              onConnect={() => setShowAccounts(true)}
-            />
+          {(view === "my-list" || myListVisited) && (
+            <div
+              className={
+                "apex-keep-alive" +
+                (view === "my-list" ? "" : " apex-section-hidden")
+              }
+            >
+              <MyList
+                accounts={accounts}
+                onSelect={onSelectMedia}
+                onConnect={() => setShowAccounts(true)}
+              />
+            </div>
           )}
-          {view === "discover" && (
-            <DiscoveryPage
-              key={route.studioId || "all-studios"}
-              studioId={route.studioId}
-              studioName={route.studioName}
-              onClearStudio={() => navigate("/discover")}
-              accounts={accounts}
-              onSelect={onSelectMedia}
-            />
+          {(view === "discover" || discoverVisited) && (
+            <div
+              className={
+                "apex-keep-alive" +
+                (view === "discover" ? "" : " apex-section-hidden")
+              }
+            >
+              <DiscoveryPage
+                key={route.studioId || "all-studios"}
+                studioId={route.studioId}
+                studioName={route.studioName}
+                onClearStudio={() => navigate("/discover")}
+                accounts={accounts}
+                onSelect={onSelectMedia}
+              />
+            </div>
           )}
           {view === "details" &&
             selectedAnime?.id === route.animeId &&

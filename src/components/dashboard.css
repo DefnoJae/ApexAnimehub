@@ -42,6 +42,9 @@ input:focus-visible {
 .apex-scroll {
   min-height: 100vh;
 }
+.apex-section-hidden {
+  display: none;
+}
 .apex-other-view {
   padding-top: 100px;
 }
