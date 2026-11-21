@@ -4,6 +4,7 @@ import { act } from "react-dom/test-utils";
 import App from "./App";
 import { AppErrorBoundary } from "./components/AppErrorBoundary";
 import { fetchAnilist } from "./utils/anilist";
+import { clearScroll } from "./utils/sectionScroll";
 jest.mock("./utils/anilist", () => ({ fetchAnilist: jest.fn() }));
 jest.mock("./hooks/useAccounts", () => ({
   useAccounts: () => ({
@@ -53,12 +54,15 @@ jest.mock("./components/VideoPlayer", () => ({
 jest.mock("./components/DiscoveryPage", () => {
   const R = require("react");
   return {
-    DiscoveryPage: () => {
+    DiscoveryPage: ({ onClearStudio }: any) => {
       const [count, setCount] = R.useState(0);
       return (
-        <button data-testid="discovery" onClick={() => setCount(count + 1)}>
-          discover {count}
-        </button>
+        <>
+          <button data-testid="discovery" onClick={() => setCount(count + 1)}>
+            discover {count}
+          </button>
+          <button onClick={onClearStudio}>Clear studio</button>
+        </>
       );
     },
   };
@@ -68,6 +72,8 @@ jest.mock("./components/MyList", () => ({
 }));
 beforeEach(() => {
   localStorage.clear();
+  clearScroll("discover");
+  clearScroll("my-list");
   (fetchAnilist as jest.Mock).mockImplementation(
     (query: string, variables: { id: number }) =>
       Promise.resolve(
@@ -322,6 +328,78 @@ test("My List starts at top, is remembered, and a studio deep link starts Discov
       window.history.replaceState({ apexIndex: 1 }, "", "/discover?studio=14");
       window.dispatchEvent(new PopStateEvent("popstate"));
     });
+    expect(scrollTo).toHaveBeenLastCalledWith({ top: 0, behavior: "instant" });
+  } finally {
+    act(() => root.unmount());
+    node.remove();
+    if (scrollYDescriptor)
+      Object.defineProperty(window, "scrollY", scrollYDescriptor);
+    else Reflect.deleteProperty(window, "scrollY");
+    scrollTo.mockRestore();
+    window.history.replaceState({}, "", "/");
+  }
+});
+
+test("leaving a studio Discover and returning to plain Discover starts at top without breaking plain scroll memory", async () => {
+  window.history.replaceState({}, "", "/discover?studio=14");
+  const scrollTo = jest.spyOn(window, "scrollTo").mockImplementation(() => {});
+  const scrollYDescriptor = Object.getOwnPropertyDescriptor(window, "scrollY");
+  const setY = (y: number) =>
+    Object.defineProperty(window, "scrollY", { value: y, configurable: true });
+  const node = document.createElement("div");
+  document.body.append(node);
+  const root = createRoot(node);
+  const clickNav = (label: string) => act(() => {
+    Array.from(node.querySelectorAll("button"))
+      .find((b) => b.textContent === label)!.click();
+  });
+  try {
+    await act(async () => root.render(<App />));
+    expect(scrollTo).toHaveBeenLastCalledWith({ top: 0, behavior: "instant" });
+
+    setY(450);
+    clickNav("Home");
+    expect(window.location.pathname).toBe("/");
+    expect(scrollTo).toHaveBeenLastCalledWith({ top: 0, behavior: "instant" });
+
+    clickNav("Discover");
+    expect(window.location.pathname).toBe("/discover");
+    expect(scrollTo).toHaveBeenLastCalledWith({ top: 0, behavior: "instant" });
+
+    // Same-studio / plain-to-plain transitions must still restore scroll.
+    setY(220);
+    clickNav("Home");
+    clickNav("Discover");
+    expect(scrollTo).toHaveBeenLastCalledWith({ top: 220, behavior: "instant" });
+  } finally {
+    act(() => root.unmount());
+    node.remove();
+    if (scrollYDescriptor)
+      Object.defineProperty(window, "scrollY", scrollYDescriptor);
+    else Reflect.deleteProperty(window, "scrollY");
+    scrollTo.mockRestore();
+    window.history.replaceState({}, "", "/");
+  }
+});
+
+test("clearing the studio filter from Discover starts the plain list at top", async () => {
+  window.history.replaceState({}, "", "/discover?studio=14");
+  const scrollTo = jest.spyOn(window, "scrollTo").mockImplementation(() => {});
+  const scrollYDescriptor = Object.getOwnPropertyDescriptor(window, "scrollY");
+  const setY = (y: number) =>
+    Object.defineProperty(window, "scrollY", { value: y, configurable: true });
+  const node = document.createElement("div");
+  document.body.append(node);
+  const root = createRoot(node);
+  try {
+    await act(async () => root.render(<App />));
+    setY(650);
+    act(() =>
+      Array.from(node.querySelectorAll("button"))
+        .find((b) => b.textContent === "Clear studio")!.click(),
+    );
+    expect(window.location.pathname).toBe("/discover");
+    expect(window.location.search).toBe("");
     expect(scrollTo).toHaveBeenLastCalledWith({ top: 0, behavior: "instant" });
   } finally {
     act(() => root.unmount());

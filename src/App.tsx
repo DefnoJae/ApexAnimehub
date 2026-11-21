@@ -68,6 +68,7 @@ export default function App() {
   const [detailError, setDetailError] = useState("");
   const [detailAttempt, setDetailAttempt] = useState(0);
   const previousPage = useRef<string>();
+  const previousStudioId = useRef(route.studioId);
   const detailCache = useRef(new Map<number, any>());
   const seeds = useRef(new Map<number, any>());
   const homeRequested = useRef(false);
@@ -274,7 +275,12 @@ export default function App() {
     };
   }, []);
   useEffect(() => {
-    if (view === "discover" && route.studioId) clearScroll("discover");
+    // Any studio-filter change (including set -> unset) remounts DiscoveryPage
+    // with different data, so its stored offset must not be replayed.
+    const studioChanged = previousStudioId.current !== route.studioId;
+    previousStudioId.current = route.studioId;
+    if (studioChanged || (view === "discover" && route.studioId))
+      clearScroll("discover");
   }, [route.studioId, view]);
   useEffect(() => {
     const section = scrollSection(view);
