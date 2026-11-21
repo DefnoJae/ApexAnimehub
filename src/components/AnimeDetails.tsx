@@ -20,6 +20,7 @@ import { DetailTitle } from "./DetailTitle";
 import { HeroBackdrop } from "./HeroBackdrop";
 import { PosterPersonalRating } from "./PosterPersonalRating";
 import { AnimeBadges } from "./AnimeBadges";
+import { PosterCaption } from "./PosterCaption";
 import { DetailEpisodes } from "./DetailEpisodes";
 import { QuickList } from "./HomeDashboard";
 import { ListEntryEditor } from "./ListEntryEditor";
@@ -27,6 +28,12 @@ import { getDubIndex } from "../utils/animeMetadata";
 import "./animeDetails.css";
 import "./watchOrder.css";
 const WatchOrder = lazy(() => import("./WatchOrder"));
+type CatalogAnime = DashboardAnime & {
+  type?: string;
+  isAdult?: boolean;
+  seasonYear?: number;
+  format?: string;
+};
 export interface DetailAnime extends DashboardAnime {
   trailer?: { id?: string | null; site?: string | null } | null;
   seasonYear?: number;
@@ -35,9 +42,7 @@ export interface DetailAnime extends DashboardAnime {
   genres?: string[];
   recommendations?: {
     nodes: Array<{
-      mediaRecommendation?:
-        | (DashboardAnime & { type?: string; isAdult?: boolean })
-        | null;
+      mediaRecommendation?: CatalogAnime | null;
     }>;
   };
   studios?: {
@@ -46,7 +51,7 @@ export interface DetailAnime extends DashboardAnime {
   relations?: {
     edges: Array<{
       relationType: string;
-      node: DashboardAnime & { type?: string };
+      node: CatalogAnime;
     }>;
   };
 }
@@ -167,7 +172,7 @@ export function AnimeDetails({
     anime.recommendations?.nodes
       .map((node) => node.mediaRecommendation)
       .filter(
-        (node): node is DashboardAnime & { type?: string; isAdult?: boolean } =>
+        (node): node is CatalogAnime =>
           !!node && node.type === "ANIME" && !node.isAdult,
       ) || [];
   const changeAudio = (value: "sub" | "dub") => {
@@ -431,15 +436,9 @@ export function AnimeDetails({
             >
               <div className="detail-poster-grid">
                 {(tab === "related"
-                  ? related.map((edge) => ({
-                      anime: edge.node,
-                      label: edge.relationType.replace(/_/g, " ").toLowerCase(),
-                    }))
-                  : recommendations.map((item) => ({
-                      anime: item,
-                      label: "Recommended",
-                    }))
-                ).map(({ anime: item, label }) => (
+                  ? related.map((edge) => edge.node)
+                  : recommendations
+                ).map((item) => (
                   <article className="poster-card" key={item.id}>
                     <div className="poster-art">
                       <button
@@ -453,10 +452,15 @@ export function AnimeDetails({
                           alt=""
                         />
                       </button>
+                      <PosterCaption
+                        title={getDisplayTitle(item)}
+                        year={item.seasonYear}
+                        format={item.format}
+                        episodes={item.episodes}
+                      />
                       <PosterPersonalRating anime={item} accounts={accounts} />
                       <QuickList anime={item} accounts={accounts} />
                     </div>
-                    <small>{label}</small>
                     <div className="detail-related-badges">
                       <AnimeBadges
                         id={item.id}
@@ -464,12 +468,6 @@ export function AnimeDetails({
                         averageScore={item.averageScore}
                       />
                     </div>
-                    <button
-                      className="poster-title"
-                      onClick={() => onSelect(item)}
-                    >
-                      {getDisplayTitle(item)}
-                    </button>
                   </article>
                 ))}
               </div>

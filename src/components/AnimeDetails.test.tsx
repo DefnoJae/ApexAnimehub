@@ -173,7 +173,14 @@ test("detail navigation contains only episodes, related anime and recommendation
       edges: [
         {
           relationType: "SEQUEL",
-          node: { id: 2, type: "ANIME", title: { english: "Sequel" } },
+          node: {
+            id: 2,
+            type: "ANIME",
+            title: { english: "Sequel" },
+            seasonYear: 2020,
+            format: "MOVIE",
+            episodes: 1,
+          },
         },
       ],
     },
@@ -184,6 +191,9 @@ test("detail navigation contains only episodes, related anime and recommendation
             id: 3,
             type: "ANIME",
             title: { english: "Similar anime" },
+            seasonYear: 2009,
+            format: "TV",
+            episodes: 175,
           },
         },
       ],
@@ -219,6 +229,10 @@ test("detail navigation contains only episodes, related anime and recommendation
   expect(node.querySelector('[role="tabpanel"]')?.textContent).toContain(
     "Sequel",
   );
+  expect(
+    node.querySelector(".detail-poster-grid .poster-caption small")?.textContent,
+  ).toBe("2020 MOVIE 1eps");
+  expect(node.querySelector(".detail-poster-grid .poster-title")).toBeNull();
   act(() =>
     (
       node.querySelector("#detail-tab-recommendations") as HTMLButtonElement
@@ -227,6 +241,10 @@ test("detail navigation contains only episodes, related anime and recommendation
   expect(node.querySelector('[role="tabpanel"]')?.textContent).toContain(
     "Similar anime",
   );
+  expect(
+    node.querySelector(".detail-poster-grid .poster-caption small")?.textContent,
+  ).toBe("2009 TV 175eps");
+  expect(node.querySelector(".detail-poster-grid .poster-title")).toBeNull();
   act(() =>
     (
       node.querySelector(
