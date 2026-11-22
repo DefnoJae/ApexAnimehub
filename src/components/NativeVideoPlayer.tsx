@@ -573,6 +573,7 @@ function EpisodePlayer(props: PlayerProps & {
           }
         }}
         onEnded={() => {
+          props.onCompleted?.(episode);
           persist(true);
           if (autoNext && props.canNext) chooseEpisode(episode + 1);
         }}

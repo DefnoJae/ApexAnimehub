@@ -32,7 +32,8 @@ test("Ani.pm uses explicit episode identity for 80% tracking and cleans up its S
   } as unknown as typeof window.AniPM;
   const watched = jest.fn(),
     changed = jest.fn(),
-    progress = jest.fn();
+    progress = jest.fn(),
+    completed = jest.fn();
   const props = {
     title: "Example",
     episode: 2,
@@ -42,6 +43,7 @@ test("Ani.pm uses explicit episode identity for 80% tracking and cleans up its S
     onPrevious: jest.fn(),
     onClose: jest.fn(),
     onWatched: watched,
+    onCompleted: completed,
     onEpisodeChange: changed,
     onProgress: progress,
     accounts: { autoSync: true },
@@ -76,6 +78,16 @@ test("Ani.pm uses explicit episode identity for 80% tracking and cleans up its S
     events.timeupdate({ currentTime: 81, duration: 100 });
     expect(watched).toHaveBeenCalledTimes(1);
     expect(watched).toHaveBeenLastCalledWith(2);
+    events.ended(player.state);
+    events.ended(player.state);
+    expect(completed).toHaveBeenCalledTimes(1);
+    expect(completed).toHaveBeenCalledWith(2);
+    expect(watched).toHaveBeenCalledTimes(1);
+    player.state.anilistId = 99;
+    player.state.episode = 4;
+    events.ended(player.state);
+    expect(completed).toHaveBeenCalledTimes(1);
+    player.state.anilistId = 1;
     player.state.episode = 3;
     events.episodechange(player.state);
     events.timeupdate({ currentTime: 80, duration: 100 });

@@ -17,6 +17,7 @@ export interface PlayerProps {
   onPrevious: () => void;
   onNext: () => void;
   onWatched: (episode?: number) => void;
+  onCompleted?: (episode?: number) => void;
   onProgress?: (position: number, duration: number, episode?: number) => void;
   onEpisodeChange?: (episode: number, lang: "sub" | "dub") => void;
   onClose: () => void;

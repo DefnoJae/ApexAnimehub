@@ -42,10 +42,11 @@ jest.mock("./components/AnimeDetails", () => ({
   ),
 }));
 jest.mock("./components/VideoPlayer", () => ({
-  VideoPlayer: ({ episode, onNext, onClose, onWatched }: any) => (
+  VideoPlayer: ({ episode, onNext, onClose, onWatched, onCompleted }: any) => (
     <div role="dialog">
       Episode {episode}
       <button onClick={() => onWatched(episode)}>Mark watched</button>
+      <button onClick={() => onCompleted?.(episode)}>Complete</button>
       <button onClick={onNext}>Next</button>
       <button onClick={onClose}>Close</button>
     </div>
@@ -69,6 +70,9 @@ jest.mock("./components/DiscoveryPage", () => {
 });
 jest.mock("./components/MyList", () => ({
   MyList: () => <div data-testid="mylist">my list</div>,
+}));
+jest.mock("./components/AccountSettings", () => ({
+  AccountSettings: () => <div data-testid="account-settings">accounts</div>,
 }));
 beforeEach(() => {
   localStorage.clear();
@@ -216,7 +220,38 @@ test.each(["setItem", "getItem"] as const)(
   },
 );
 
-test("watching the final episode removes the anime from Continue Watching storage", async () => {
+test.each(["/", "/?oauth=anilist&result=failed"])(
+  "loading %s keeps saved Continue Watching storage unchanged",
+  async (url) => {
+    window.history.replaceState({}, "", url);
+    const saved = JSON.stringify([
+      {
+        anime: { id: 1, title: { english: "Saved anime" } },
+        episode: 3,
+        timestamp: 1,
+      },
+    ]);
+    localStorage.setItem("videasy_history", saved);
+    const node = document.createElement("div");
+    document.body.append(node);
+    const root = createRoot(node);
+    let mounted = false;
+    try {
+      await act(async () => root.render(<App />));
+      mounted = true;
+      expect(localStorage.getItem("videasy_history")).toBe(saved);
+      act(() => root.unmount());
+      mounted = false;
+      expect(localStorage.getItem("videasy_history")).toBe(saved);
+    } finally {
+      if (mounted) act(() => root.unmount());
+      node.remove();
+      window.history.replaceState({}, "", "/");
+    }
+  },
+);
+
+test("watching the final episode at 80% keeps the anime in Continue Watching storage", async () => {
   window.history.replaceState({}, "", "/anime/1/episode/12");
   const node = document.createElement("div");
   document.body.append(node);
@@ -231,6 +266,28 @@ test("watching the final episode removes the anime from Continue Watching storag
         .find((button) => button.textContent === "Mark watched")!
         .click(),
     );
+    expect(JSON.parse(localStorage.getItem("videasy_history") || "[]")).toEqual([
+      expect.objectContaining({ episode: 12 }),
+    ]);
+  } finally {
+    act(() => root.unmount());
+    node.remove();
+    window.history.replaceState({}, "", "/");
+  }
+});
+
+test("completing the final episode removes the anime from Continue Watching storage", async () => {
+  window.history.replaceState({}, "", "/anime/1/episode/12");
+  const node = document.createElement("div");
+  document.body.append(node);
+  const root = createRoot(node);
+  try {
+    await act(async () => root.render(<App />));
+    act(() =>
+      Array.from(node.querySelectorAll("button"))
+        .find((button) => button.textContent === "Complete")!
+        .click(),
+    );
     expect(JSON.parse(localStorage.getItem("videasy_history") || "[]")).toEqual([]);
   } finally {
     act(() => root.unmount());
@@ -239,7 +296,7 @@ test("watching the final episode removes the anime from Continue Watching storag
   }
 });
 
-test("watching a non-final episode keeps the anime in Continue Watching", async () => {
+test("completing a non-final episode keeps the anime in Continue Watching", async () => {
   window.history.replaceState({}, "", "/anime/1/episode/3");
   const node = document.createElement("div");
   document.body.append(node);
@@ -248,12 +305,42 @@ test("watching a non-final episode keeps the anime in Continue Watching", async 
     await act(async () => root.render(<App />));
     act(() =>
       Array.from(node.querySelectorAll("button"))
-        .find((button) => button.textContent === "Mark watched")!
+        .find((button) => button.textContent === "Complete")!
         .click(),
     );
     expect(JSON.parse(localStorage.getItem("videasy_history") || "[]")).toEqual([
       expect.objectContaining({ episode: 3 }),
     ]);
+  } finally {
+    act(() => root.unmount());
+    node.remove();
+    window.history.replaceState({}, "", "/");
+  }
+});
+
+test("a 101st started title evicts only the oldest entry", async () => {
+  const seeded = Array.from({ length: 100 }, (_, index) => 100 - index);
+  localStorage.setItem(
+    "videasy_history",
+    JSON.stringify(
+      seeded.map((id) => ({
+        anime: { id, title: { english: `Anime ${id}` } },
+        episode: 1,
+        timestamp: id,
+      })),
+    ),
+  );
+  window.history.replaceState({}, "", "/anime/101/episode/1");
+  const node = document.createElement("div");
+  document.body.append(node);
+  const root = createRoot(node);
+  try {
+    await act(async () => root.render(<App />));
+    const history = JSON.parse(localStorage.getItem("videasy_history") || "[]");
+    expect(history).toHaveLength(100);
+    expect(history[0].anime.id).toBe(101);
+    expect(history.some((entry: any) => entry.anime.id === 1)).toBe(false);
+    expect(history.some((entry: any) => entry.anime.id === 2)).toBe(true);
   } finally {
     act(() => root.unmount());
     node.remove();

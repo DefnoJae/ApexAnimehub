@@ -22,6 +22,7 @@ export default function AniPmPlayer(props: PlayerProps) {
   const [reload, setReload] = useState(0);
   const [unresponsive, setUnresponsive] = useState(false);
   const recorded = useRef(new Set<number>());
+  const completed = useRef(new Set<number>());
   const pendingCommands = useRef<Array<(player: Player) => unknown>>([]);
   const recovery = useRef<{
     episode: number;
@@ -259,8 +260,17 @@ export default function AniPmPlayer(props: PlayerProps) {
             callbacks.current.onWatched(state.episode);
           }
         });
+        const complete = () => {
+          flush();
+          const state = player.state;
+          if (!active || !validAniPmState(state, id)) return;
+          const episodeNumber = state.episode;
+          if (completed.current.has(episodeNumber)) return;
+          completed.current.add(episodeNumber);
+          callbacks.current.onCompleted?.(episodeNumber);
+        };
         player.on("pause", flush);
-        player.on("ended", flush);
+        player.on("ended", complete);
         player.on("error", (data) => {
           if (active) {
             setUnresponsive(true);

@@ -28,6 +28,7 @@ test("native shortcuts navigate episodes and playback syncs once at 80%", async 
     onPrevious: jest.fn(),
     onEpisodeChange: jest.fn(),
     onWatched: jest.fn(),
+    onCompleted: jest.fn(),
     onClose: jest.fn(),
     accounts: { autoSync: true },
   } as unknown as PlayerProps;
@@ -91,6 +92,8 @@ test("native shortcuts navigate episodes and playback syncs once at 80%", async 
     expect(player.classList.contains("is-idle")).toBe(false);
     act(() => video.dispatchEvent(new Event("ended")));
     expect(props.onEpisodeChange).toHaveBeenCalledTimes(2);
+    expect(props.onCompleted).toHaveBeenCalledTimes(1);
+    expect(props.onCompleted).toHaveBeenCalledWith(2);
     await act(async () => root.render(<NativeVideoPlayer {...props} episode={3}
       stream={{ ...props.stream, url: "/api/playback?id=1&episode=3&audio=sub" }} />));
     expect(node.firstElementChild).toBe(host);

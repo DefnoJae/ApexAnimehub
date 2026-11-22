@@ -111,13 +111,19 @@ export default function App() {
     if (!selectedAnime) return Promise.resolve([]);
     const completed =
       !!selectedAnime.episodes && episode >= selectedAnime.episodes;
-    if (completed) removeFromHistory(selectedAnime.id);
     return accounts.sync(
       selectedAnime,
       completed ? "completed" : "watching",
       episode,
       automatic,
     );
+  };
+
+  const markCompleted = (episode = activeEpisode) => {
+    if (!selectedAnime) return;
+    if (!selectedAnime.episodes) return;
+    if (episode < selectedAnime.episodes) return;
+    removeFromHistory(selectedAnime.id);
   };
 
   useEffect(() => {
@@ -360,7 +366,7 @@ export default function App() {
           timestamp: Date.now(),
         },
         ...filtered,
-      ].slice(0, 15);
+      ].slice(0, 100);
       try {
         localStorage.setItem("videasy_history", JSON.stringify(newHistory));
       } catch {
@@ -571,6 +577,7 @@ export default function App() {
           onPrevious={() => changeEpisode("prev")}
           onNext={() => changeEpisode("next")}
           onWatched={(episode) => void markWatched(true, episode)}
+          onCompleted={(episode) => markCompleted(episode)}
           onEpisodeChange={(episode, lang) => {
             if (episode === activeEpisode && lang === route.audio) return;
             if (
