@@ -52,3 +52,35 @@ test("encrypted account cookies survive empty Vercel instances and reject tamper
     await new Promise((resolve) => server.close(resolve));
   }
 });
+
+test("implicit AniList pages survive the encrypted-cookie response wrapper", async () => {
+  const previous = {
+    ANILIST_CLIENT_ID: process.env.ANILIST_CLIENT_ID,
+    ANILIST_REDIRECT_URI: process.env.ANILIST_REDIRECT_URI,
+  };
+  const server = http.createServer(handler);
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  try {
+    const url = "http://127.0.0.1:" + server.address().port;
+    process.env.ANILIST_CLIENT_ID = "public-client";
+    process.env.ANILIST_REDIRECT_URI = url + "/api/oauth/anilist/callback";
+    sessions.clear();
+    const start = await fetch(url + "/api/oauth/anilist/implicit");
+    assert.equal(start.status, 200);
+    assert.match(start.headers.get("content-type"), /text\/html/);
+    assert.match(await start.text(), /apex_anilist_oauth_state_v1/);
+    assert.equal(start.headers.get("set-cookie"), null);
+    const callback = await fetch(url + "/api/oauth/anilist/callback");
+    assert.equal(callback.status, 200);
+    assert.match(callback.headers.get("content-type"), /text\/html/);
+    assert.match(await callback.text(), /apex_anilist_token_v1/);
+    assert.equal(callback.headers.get("set-cookie"), null);
+  } finally {
+    for (const [name, value] of Object.entries(previous)) {
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
+    }
+    server.closeAllConnections();
+    await new Promise((resolve) => server.close(resolve));
+  }
+});

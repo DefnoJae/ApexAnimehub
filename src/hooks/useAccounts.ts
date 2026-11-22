@@ -1,6 +1,7 @@
 import { fetchAnilist } from "../utils/anilist";
 import {
   clearAniListToken,
+  hasAniListToken,
   ANILIST_AUTH_INVALID_EVENT,
 } from "../utils/anilistAuth";
 import {
@@ -186,7 +187,7 @@ export function useAccounts() {
       if (!data.providers)
         throw new Error("Account backend is missing from this deployment");
       setConnected({
-        anilist: !!data.providers.anilist.connected,
+        anilist: !!data.providers.anilist.connected || hasAniListToken(),
         mal: !!data.providers.mal.connected,
       });
       setConfigured({

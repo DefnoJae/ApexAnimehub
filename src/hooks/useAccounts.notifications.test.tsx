@@ -3,7 +3,10 @@ import { createRoot } from "react-dom/client";
 import { act } from "react-dom/test-utils";
 import { useAccounts } from "./useAccounts";
 import { useLibrary } from "./useLibrary";
-import { ANILIST_AUTH_INVALID_EVENT } from "../utils/anilistAuth";
+import {
+  ANILIST_AUTH_INVALID_EVENT,
+  ANILIST_TOKEN_KEY,
+} from "../utils/anilistAuth";
 import {
   updateAniListEntry,
   removeAniListEntry,
@@ -172,6 +175,51 @@ test("invalid AniList token disconnects AniList locally without changing MAL", a
     });
     expect(accounts.connected).toEqual({ anilist: false, mal: true });
     expect(accounts.accountError).toContain("Reconnect AniList");
+  } finally {
+    act(() => root.unmount());
+    host.remove();
+  }
+});
+
+test("refresh marks AniList connected from a stored implicit token when the server session is absent", async () => {
+  localStorage.clear();
+  localStorage.setItem(ANILIST_TOKEN_KEY, JSON.stringify({
+    accessToken: "implicit-token",
+    expiresAt: Date.now() + 3600000,
+  }));
+  (useLibrary as jest.Mock).mockReturnValue({
+    lists: {},
+    libraryEntries: [],
+    libraryErrors: {},
+    refreshLibrary: jest.fn(),
+    record: jest.fn(),
+    removeRecord: jest.fn(),
+    getListStatus: jest.fn(),
+  });
+  global.fetch = jest.fn().mockImplementation(async (url) => {
+    if (url === "/api/accounts")
+      return {
+        ok: true,
+        json: async () => ({
+          providers: {
+            anilist: { connected: false, configured: true },
+            mal: { connected: false, configured: true },
+          },
+        }),
+      };
+    throw new Error("Unexpected fetch " + url);
+  });
+  let accounts!: ReturnType<typeof useAccounts>;
+  function Harness() {
+    accounts = useAccounts();
+    return null;
+  }
+  const host = document.createElement("div");
+  document.body.append(host);
+  const root = createRoot(host);
+  try {
+    await act(async () => root.render(<Harness />));
+    expect(accounts.connected).toEqual({ anilist: true, mal: false });
   } finally {
     act(() => root.unmount());
     host.remove();

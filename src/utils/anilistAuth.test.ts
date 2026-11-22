@@ -60,7 +60,7 @@ describe("AniList rate-limit detection", () => {
 test("getAniListToken rehydrates from the token endpoint and verifies Viewer identity", async () => {
   localStorage.setItem(ANILIST_TOKEN_KEY, JSON.stringify({
     accessToken: "old-token",
-    expiresAt: Date.now() + 3600000,
+    expiresAt: Date.now() - 1,
     identity: "1",
   }));
   global.fetch = jest.fn().mockResolvedValue({
@@ -157,7 +157,7 @@ test("anilistRequest invalidates on HTTP 401 or Invalid token GraphQL errors", a
   await expect(anilistRequest("query { Viewer { id } }")).rejects.toThrow(
     "AniList authorization expired. Please reconnect.",
   );
-  // Proves rehydration succeeded and the request reached the mocked GraphQL-error branch.
+  // Proves the stored token was verified and the request reached the mocked GraphQL-error branch.
   expect(fetchAnilist).toHaveBeenCalledTimes(2);
   expect(fetchAnilist).toHaveBeenNthCalledWith(
     2,
@@ -184,7 +184,7 @@ test("getAniListToken treats token-endpoint transport failures as retryable with
   (fetchAnilist as jest.Mock).mockResolvedValue({ Viewer: { id: 77, name: "Alice" } });
   localStorage.setItem(ANILIST_TOKEN_KEY, JSON.stringify({
     accessToken: "original-token",
-    expiresAt: Date.now() + 3600000,
+    expiresAt: Date.now() - 1,
     identity: "1",
   }));
   const listener = jest.fn();
@@ -225,7 +225,7 @@ test.each(verificationAuthFailures)(
     (fetchAnilist as jest.Mock).mockRejectedValueOnce(verificationError);
     localStorage.setItem(ANILIST_TOKEN_KEY, JSON.stringify({
       accessToken: "previous-token",
-      expiresAt: Date.now() + 3600000,
+      expiresAt: Date.now() - 1,
       identity: "1",
     }));
     const listener = jest.fn();
@@ -237,3 +237,56 @@ test.each(verificationAuthFailures)(
     window.removeEventListener(ANILIST_AUTH_INVALID_EVENT, listener);
   },
 );
+
+test("getAniListToken verifies a stored implicit token without calling the token endpoint", async () => {
+  localStorage.setItem(ANILIST_TOKEN_KEY, JSON.stringify({
+    accessToken: "implicit-token",
+    expiresAt: Date.now() + 3600000,
+  }));
+  global.fetch = jest.fn(() => {
+    throw new Error("Implicit login must not call the token endpoint");
+  });
+  (fetchAnilist as jest.Mock).mockResolvedValue({ Viewer: { id: 88, name: "Phone" } });
+
+  const token = await getAniListToken();
+
+  expect(token).toMatchObject({
+    accessToken: "implicit-token",
+    identity: "88",
+    name: "Phone",
+  });
+  expect(readAniListToken()).toMatchObject({
+    accessToken: "implicit-token",
+    identity: "88",
+    name: "Phone",
+  });
+  expect(global.fetch).not.toHaveBeenCalled();
+  expect(fetchAnilist).toHaveBeenCalledWith(
+    expect.stringContaining("Viewer{id name}"),
+    {},
+    undefined,
+    "implicit-token",
+  );
+});
+
+test("getAniListToken clears a rejected stored token without calling the token endpoint", async () => {
+  localStorage.setItem(ANILIST_TOKEN_KEY, JSON.stringify({
+    accessToken: "rejected-implicit-token",
+    expiresAt: Date.now() + 3600000,
+  }));
+  global.fetch = jest.fn(() => {
+    throw new Error("Implicit login must not call the token endpoint");
+  });
+  (fetchAnilist as jest.Mock).mockRejectedValue(
+    Object.assign(new Error("Unauthorized"), { status: 401 }),
+  );
+  const listener = jest.fn();
+  window.addEventListener(ANILIST_AUTH_INVALID_EVENT, listener);
+
+  await expect(getAniListToken()).rejects.toBeInstanceOf(AniListAuthError);
+
+  expect(readAniListToken()).toBeNull();
+  expect(global.fetch).not.toHaveBeenCalled();
+  expect(listener).toHaveBeenCalledTimes(1);
+  window.removeEventListener(ANILIST_AUTH_INVALID_EVENT, listener);
+});

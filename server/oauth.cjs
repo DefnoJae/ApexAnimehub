@@ -29,6 +29,98 @@ function cookie(res, id, age = SESSION_AGE) {
       (origin.startsWith("https:") ? "; Secure" : ""),
   );
 }
+// AniList's implicit grant returns the token in the URL fragment, which never
+// reaches this server. Tiny same-origin pages keep the login state in browser
+// storage, then transfer the token to that storage without any token exchange.
+const ANILIST_STATE_KEY = "apex_anilist_oauth_state_v1";
+function scriptString(value) {
+  return JSON.stringify(value).replace(/</g, "\\u003c");
+}
+function anilistImplicitStartPage(clientId) {
+  return `<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Connecting AniList…</title></head>
+<body>
+<p>Connecting AniList…</p>
+<script>
+(function () {
+  var bytes = new Uint8Array(24);
+  if (window.crypto && window.crypto.getRandomValues) {
+    window.crypto.getRandomValues(bytes);
+  } else {
+    for (var i = 0; i < bytes.length; i++) bytes[i] = Math.floor(Math.random() * 256);
+  }
+  var state = "";
+  for (var j = 0; j < bytes.length; j++) state += ("0" + bytes[j].toString(16)).slice(-2);
+  var params = new URLSearchParams({
+    client_id: ${scriptString(clientId)},
+    response_type: "token",
+    state: state
+  });
+  try {
+    localStorage.setItem(${JSON.stringify(ANILIST_STATE_KEY)}, JSON.stringify({
+      state: state,
+      expiresAt: Date.now() + 600000
+    }));
+  } catch (error) {
+    window.location.replace("/?oauth=anilist&result=failed");
+    return;
+  }
+  window.location.replace("https://anilist.co/api/v2/oauth/authorize?" + params);
+})();
+</script>
+</body>
+</html>`;
+}
+function anilistImplicitPage() {
+  return `<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Connecting AniList…</title></head>
+<body>
+<p>Connecting AniList…</p>
+<script>
+(function () {
+  var key = ${JSON.stringify(ANILIST_STATE_KEY)};
+  var params = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+  var marker = null;
+  var consumed = false;
+  function consume() {
+    if (consumed) return;
+    consumed = true;
+    try { localStorage.removeItem(key); } catch (error) {}
+  }
+  function finish(result) {
+    consume();
+    window.location.replace("/?oauth=anilist&result=" + result);
+  }
+  try {
+    marker = JSON.parse(localStorage.getItem(key) || "null");
+  } catch (error) {}
+  var validMarker = marker && typeof marker.state === "string" &&
+    /^[A-Za-z0-9._~-]{1,256}$/.test(marker.state) &&
+    Number(marker.expiresAt) > Date.now();
+  if (!validMarker) return finish("failed");
+  var fragmentState = params.get("state");
+  if (fragmentState && fragmentState !== marker.state) return finish("failed");
+  if (params.get("error")) return finish("denied");
+  var accessToken = params.get("access_token");
+  if (!accessToken || !/^[A-Za-z0-9._~-]{1,4096}$/.test(accessToken)) return finish("failed");
+  var seconds = Number(params.get("expires_in"));
+  if (!Number.isFinite(seconds) || seconds <= 0) seconds = 31536000;
+  try {
+    localStorage.setItem("apex_anilist_token_v1", JSON.stringify({
+      accessToken: accessToken,
+      expiresAt: Date.now() + seconds * 1000
+    }));
+  } catch (error) {
+    return finish("failed");
+  }
+  finish("connected");
+})();
+</script>
+</body>
+</html>`;
+}
 async function body(req) {
   if (req.body !== undefined) {
     const serialized =
@@ -155,7 +247,7 @@ function createServer() {
         return send(200, { providers: info });
       }
       const route =
-        /^\/api\/oauth\/(anilist|mal)\/(start|callback|session|logout|graphql|token)$/.exec(
+        /^\/api\/oauth\/(anilist|mal)\/(start|callback|session|logout|graphql|token|implicit)$/.exec(
           url.pathname,
         );
       if (route) {
@@ -163,6 +255,37 @@ function createServer() {
         const cfg = config(provider);
         if (action === "token" && provider === "mal")
           return send(404, { error: "Not found" });
+        if (action === "implicit" && provider !== "anilist")
+          return send(404, { error: "Not found" });
+        if (provider === "anilist" && action === "implicit" && req.method === "GET") {
+          if (
+            req.headers.host === "apexanime.vercel.app" &&
+            origin !== "https://apexanime.vercel.app"
+          ) {
+            res.writeHead(302, { Location: origin + url.pathname });
+            return res.end();
+          }
+          if (!cfg.clientId || !cfg.redirect)
+            return send(503, { error: "AniList OAuth server is not configured" });
+          res.writeHead(200, {
+            "Content-Type": "text/html; charset=utf-8",
+            "Cache-Control": "no-store",
+          });
+          return res.end(anilistImplicitStartPage(cfg.clientId));
+        }
+        if (
+          provider === "anilist" &&
+          action === "callback" &&
+          req.method === "GET" &&
+          !url.searchParams.has("code") &&
+          !url.searchParams.has("error")
+        ) {
+          res.writeHead(200, {
+            "Content-Type": "text/html; charset=utf-8",
+            "Cache-Control": "no-store",
+          });
+          return res.end(anilistImplicitPage());
+        }
         if (action === "start" && req.method === "GET") {
           // The short public alias uses the registered OAuth host for account sessions.
           if (

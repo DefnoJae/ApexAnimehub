@@ -46,6 +46,11 @@ export function readAniListToken(): AniListToken | null {
   }
 }
 
+export function hasAniListToken(): boolean {
+  const token = readAniListToken();
+  return !!token && token.expiresAt > Date.now() + 60000;
+}
+
 export function writeAniListToken(token: AniListToken): void {
   try {
     localStorage.setItem(ANILIST_TOKEN_KEY, JSON.stringify(token));
@@ -157,6 +162,31 @@ async function rehydrateToken(signal?: AbortSignal): Promise<AniListToken> {
   return token;
 }
 
+async function verifyStoredToken(
+  token: AniListToken,
+  signal?: AbortSignal,
+): Promise<AniListToken> {
+  let verified: { identity: string; name: string };
+  try {
+    verified = await verifyIdentity(token.accessToken, token.identity, signal);
+  } catch (error) {
+    if (error instanceof AniListAuthError || isAuthInvalidError(error)) {
+      invalidateAniListAuth();
+      if (error instanceof AniListAuthError) throw error;
+      throw new AniListAuthError("AniList connection required. Please reconnect.");
+    }
+    tokenPromise = null;
+    throw error;
+  }
+  const next: AniListToken = {
+    ...token,
+    identity: verified.identity,
+    name: verified.name,
+  };
+  writeAniListToken(next);
+  return next;
+}
+
 export async function getAniListToken(signal?: AbortSignal): Promise<AniListToken> {
   if (tokenPromise) {
     const token = await tokenPromise;
@@ -165,7 +195,11 @@ export async function getAniListToken(signal?: AbortSignal): Promise<AniListToke
     }
     tokenPromise = null;
   }
-  tokenPromise = rehydrateToken(signal);
+  const stored = readAniListToken();
+  tokenPromise =
+    stored && stored.expiresAt > Date.now() + 60000
+      ? verifyStoredToken(stored, signal)
+      : rehydrateToken(signal);
   try {
     return await tokenPromise;
   } catch (error) {

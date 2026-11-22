@@ -638,3 +638,145 @@ test("AniList token endpoint rejects missing or expired sessions", async () =>
     assert.equal(expired.status, 401);
     assert.deepEqual(await expired.json(), { error: "Not connected" });
   }));
+
+const { runInNewContext } = require("node:vm");
+const pageScript = (html) => html.match(/<script>([\s\S]*?)<\/script>/)[1];
+function memoryStorage(seed = {}, failWrite = false) {
+  const data = { ...seed };
+  return {
+    data,
+    getItem: (name) => (name in data ? data[name] : null),
+    setItem: (name, value) => {
+      if (failWrite) throw new Error("Storage unavailable");
+      data[name] = value;
+    },
+    removeItem: (name) => {
+      delete data[name];
+    },
+  };
+}
+
+test("AniList implicit connect page starts a state-bound token grant without a server secret", () =>
+  serve(async (base) => {
+    const previous = {
+      ANILIST_CLIENT_ID: process.env.ANILIST_CLIENT_ID,
+      ANILIST_CLIENT_SECRET: process.env.ANILIST_CLIENT_SECRET,
+      ANILIST_REDIRECT_URI: process.env.ANILIST_REDIRECT_URI,
+    };
+    process.env.ANILIST_CLIENT_ID = "public-client";
+    delete process.env.ANILIST_CLIENT_SECRET;
+    process.env.ANILIST_REDIRECT_URI = origin + "/api/oauth/anilist/callback";
+    try {
+      const response = await browserFetch(base + "/api/oauth/anilist/implicit");
+      assert.equal(response.status, 200);
+      assert.match(response.headers.get("content-type"), /text\/html/);
+      const storage = memoryStorage();
+      let redirect = "";
+      runInNewContext(pageScript(await response.text()), {
+        URLSearchParams,
+        Date,
+        JSON,
+        Math,
+        Uint8Array,
+        localStorage: storage,
+        window: {
+          crypto: {
+            getRandomValues: (bytes) => {
+              for (let i = 0; i < bytes.length; i++) bytes[i] = i + 1;
+              return bytes;
+            },
+          },
+          location: { replace: (url) => { redirect = url; } },
+        },
+      });
+      const marker = JSON.parse(storage.data.apex_anilist_oauth_state_v1);
+      assert.match(marker.state, /^[0-9a-f]{48}$/);
+      assert.ok(marker.expiresAt > Date.now() + 590000);
+      const authorize = new URL(redirect);
+      assert.equal(
+        authorize.origin + authorize.pathname,
+        "https://anilist.co/api/v2/oauth/authorize",
+      );
+      assert.equal(authorize.searchParams.get("response_type"), "token");
+      assert.equal(authorize.searchParams.get("client_id"), "public-client");
+      assert.equal(authorize.searchParams.has("redirect_uri"), false);
+      assert.equal(authorize.searchParams.get("state"), marker.state);
+      assert.equal(response.headers.get("set-cookie"), null);
+    } finally {
+      for (const [name, value] of Object.entries(previous)) {
+        if (value === undefined) delete process.env[name];
+        else process.env[name] = value;
+      }
+    }
+  }));
+
+test("AniList implicit callback only stores a fragment token after a matching local login state", () =>
+  serve(async (base) => {
+    global.fetch = async () => {
+      throw new Error("Implicit login must not call a token endpoint");
+    };
+    const response = await browserFetch(base + "/api/oauth/anilist/callback");
+    assert.equal(response.status, 200);
+    assert.match(response.headers.get("content-type"), /text\/html/);
+    const script = pageScript(await response.text());
+    const marker = JSON.stringify({ state: "state-123", expiresAt: Date.now() + 600000 });
+
+    function runFragment(hash, seed = { apex_anilist_oauth_state_v1: marker }, failWrite = false) {
+      const storage = memoryStorage(seed, failWrite);
+      let redirect = "";
+      runInNewContext(script, {
+        URLSearchParams,
+        Number,
+        Date,
+        JSON,
+        localStorage: storage,
+        window: { location: { hash, replace: (url) => { redirect = url; } } },
+      });
+      return { storage, redirect };
+    }
+
+    const before = Date.now();
+    const success = runFragment("#access_token=fragment-token&expires_in=3600&state=state-123");
+    const saved = JSON.parse(success.storage.data.apex_anilist_token_v1);
+    assert.equal(saved.accessToken, "fragment-token");
+    assert.ok(saved.expiresAt > before + 3590000);
+    assert.ok(saved.expiresAt < Date.now() + 3601000);
+    assert.equal(success.redirect, "/?oauth=anilist&result=connected");
+    assert.equal(success.storage.data.apex_anilist_oauth_state_v1, undefined);
+
+    const fallback = runFragment("#access_token=fallback-token&expires_in=abc&state=state-123");
+    const fallbackSaved = JSON.parse(fallback.storage.data.apex_anilist_token_v1);
+    assert.equal(fallbackSaved.accessToken, "fallback-token");
+    assert.ok(fallbackSaved.expiresAt > before + 31490000000);
+    assert.equal(fallback.redirect, "/?oauth=anilist&result=connected");
+
+    const absentState = runFragment("#access_token=absent-state-token&expires_in=3600");
+    const absentSaved = JSON.parse(absentState.storage.data.apex_anilist_token_v1);
+    assert.equal(absentSaved.accessToken, "absent-state-token");
+    assert.equal(absentState.redirect, "/?oauth=anilist&result=connected");
+    assert.equal(absentState.storage.data.apex_anilist_oauth_state_v1, undefined);
+
+    const noMarker = runFragment("#access_token=injected-token&expires_in=3600", {});
+    assert.equal(noMarker.storage.data.apex_anilist_token_v1, undefined);
+    assert.equal(noMarker.redirect, "/?oauth=anilist&result=failed");
+
+    const mismatched = runFragment("#access_token=injected-token&expires_in=3600&state=attacker");
+    assert.equal(mismatched.storage.data.apex_anilist_token_v1, undefined);
+    assert.equal(mismatched.redirect, "/?oauth=anilist&result=failed");
+    assert.equal(mismatched.storage.data.apex_anilist_oauth_state_v1, undefined);
+
+    const malformed = runFragment("#access_token=not%20a%20token&state=state-123");
+    assert.equal(malformed.storage.data.apex_anilist_token_v1, undefined);
+    assert.equal(malformed.redirect, "/?oauth=anilist&result=failed");
+
+    const denied = runFragment("#error=access_denied&state=state-123");
+    assert.equal(denied.storage.data.apex_anilist_token_v1, undefined);
+    assert.equal(denied.redirect, "/?oauth=anilist&result=denied");
+
+    const unwritable = runFragment(
+      "#access_token=fragment-token&expires_in=3600&state=state-123",
+      { apex_anilist_oauth_state_v1: marker },
+      true,
+    );
+    assert.equal(unwritable.redirect, "/?oauth=anilist&result=failed");
+  }));

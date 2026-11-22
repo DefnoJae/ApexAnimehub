@@ -58,7 +58,11 @@ export function AccountSettings({
             ) : accounts.configured[provider] ? (
               <a
                 className="bg-purple-600 px-4 py-2 rounded-xl"
-                href={"/api/oauth/" + provider + "/start"}
+                href={
+                  provider === "anilist"
+                    ? "/api/oauth/anilist/implicit"
+                    : "/api/oauth/" + provider + "/start"
+                }
               >
                 Connect
               </a>
