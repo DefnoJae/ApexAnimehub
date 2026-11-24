@@ -332,6 +332,7 @@ function HomePosterCard({ anime, accounts, onSelect }: {
             id={anime.id}
             idMal={anime.idMal}
             averageScore={anime.averageScore}
+            anilistScoreKnown={anime.averageScore != null}
           />
         </span>
       </button>

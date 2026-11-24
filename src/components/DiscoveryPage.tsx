@@ -442,6 +442,7 @@ export function DiscoveryPage({
               averageScore={
                 anime.anilistScore == null ? undefined : anime.anilistScore * 10
               }
+              anilistScoreKnown={anime.anilistScore !== undefined}
               providedScore={anime.malScore}
             />
           </article>

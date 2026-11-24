@@ -16,7 +16,10 @@ function anilistScore(id?: number, idMal?: number | null) {
         id ? { id } : { idMal },
       )
         .then((d) => (d.Media?.averageScore ? d.Media.averageScore / 10 : null))
-        .catch(() => null),
+        .catch((err) => {
+          pending.delete(key);
+          return null;
+        }),
     );
   }
   return pending.get(key)!;
@@ -29,6 +32,7 @@ export function RatingPills({
   active = true,
   asText = false,
   showBrand = true,
+  anilistScoreKnown = false,
 }: {
   id?: number;
   idMal?: number | null;
@@ -37,6 +41,7 @@ export function RatingPills({
   active?: boolean;
   asText?: boolean;
   showBrand?: boolean;
+  anilistScoreKnown?: boolean;
 }) {
   const [source] = useRatingSource(),
     [al, setAl] = useState<number | null>(
@@ -70,7 +75,12 @@ export function RatingPills({
     setAl(averageScore ? averageScore / 10 : null);
     setMal(malScore ?? (idMal ? getCachedMalScore(idMal) : null));
     if (active || nearby) {
-      if (source !== "mal" && !averageScore && (id || idMal))
+      if (
+        source !== "mal" &&
+        !averageScore &&
+        !anilistScoreKnown &&
+        (id || idMal)
+      )
         void anilistScore(id, idMal).then((v) => {
           if (live) setAl(v);
         });
@@ -82,7 +92,16 @@ export function RatingPills({
     return () => {
       live = false;
     };
-  }, [id, idMal, averageScore, malScore, active, nearby, source]);
+  }, [
+    id,
+    idMal,
+    averageScore,
+    malScore,
+    active,
+    nearby,
+    source,
+    anilistScoreKnown,
+  ]);
   const Tag = asText ? "span" : "a";
   return (
     <span

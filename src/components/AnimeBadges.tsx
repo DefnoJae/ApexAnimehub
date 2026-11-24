@@ -9,6 +9,7 @@ export function AnimeBadges({
   averageScore,
   showRatingBrand = false,
   showRating = providedScore !== null,
+  anilistScoreKnown = false,
 }: {
   idMal?: number | null;
   id?: number;
@@ -16,6 +17,7 @@ export function AnimeBadges({
   providedScore?: number | null;
   showRatingBrand?: boolean;
   showRating?: boolean;
+  anilistScoreKnown?: boolean;
 }) {
   const element = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(false);
@@ -71,6 +73,7 @@ export function AnimeBadges({
           malScore={providedScore}
           active={visible}
           showBrand={showRatingBrand}
+          anilistScoreKnown={anilistScoreKnown}
         />
       )}
       {dub && (

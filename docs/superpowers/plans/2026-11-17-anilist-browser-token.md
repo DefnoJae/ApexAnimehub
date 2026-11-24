@@ -796,3 +796,17 @@ In the browser verify:
 - [ ] **Step 6: Rollback gate**
 
 If any live AniList read/update path still fails with the original 502 behavior, revert the frontend commits, push the revert, and report the exact failing browser flow. The server token endpoint is additive and may remain unless the user asks otherwise.
+
+---
+
+## Follow-up (approved after live gate): AniList rate-limit gap
+
+Live verification confirmed the original 502 is gone, but exposed a separate pre-existing gap: AniList allows 30 requests/min/IP, and `readAniListList` used two GraphQL requests per page (`Viewer` + list), so a large list aborts around page 15 with `AniList rate limit reached. Please try again later.` The existing 65s auto-retry and the My List hint check the literal `"429"`, which that message does not contain, so the retry never fires. The controller approved a focused fix; execute it as Task 9 with a fresh TDD implementer and a separate fresh reviewer before redeploying.
+
+Amendments to earlier steps (these supersede the earlier wording only where they conflict):
+
+- Task 2 Step 4 (plan line 312): rehydration still performs exactly one authenticated `fetchAnilist` call, but it now requests `query{Viewer{id name}}` instead of `query{Viewer{id}}`. The verified `id` and `name` are stored in the token record so list reads do not need their own viewer request. Identity matching and all auth/abort behavior are unchanged.
+- Task 3 Step 1 / `readAniListList`: the list query string (`LIST_QUERY`) stays byte-for-byte identical for server parity; the separate per-page `VIEWER_QUERY` call is removed. `readAniListList` derives `identity` and `name` from the rehydrated token and issues exactly one `anilistRequest` per page with `{ user: Number(identity), page }`.
+- Task 8 gate: the rate-limit alert on a large AniList list is now a defect to fix, not an accepted limitation. Re-run the full local checks and the entire real-browser gate after the Task 9 deployment; the original 502 rollback gate remains unchanged.
+
+The existing `useLibrary` checkpoint resume (`complete === false` + valid `nextPage` + no pending confirmed changes + fresh `updatedAt`) is retained unchanged; with the 65s retry now firing, it resumes the import instead of restarting it.
