@@ -155,7 +155,21 @@ async function fetchHeroMedia(anilistId: number): Promise<CachedArtwork> {
 export async function fetchHeroArtwork(anilistId: number): Promise<string[]> {
   return (await fetchHeroMedia(anilistId)).logos;
 }
+// Verification loads TMDB images in the browser, so it is expensive to repeat
+// whenever HomeDashboard remounts after navigating back home. The cache lives
+// for the lifetime of the document: a full site refresh clears it.
+const verifiedLogos = new Map<number, string | null>();
+export function getCachedVerifiedLogo(anilistId: number): string | null | undefined {
+  return verifiedLogos.get(anilistId);
+}
 export async function fetchVerifiedHeroLogo(anilistId: number): Promise<string | null> {
+  const cached = verifiedLogos.get(anilistId);
+  if (cached !== undefined) return cached;
+  const result = await verifyHeroLogo(anilistId);
+  verifiedLogos.set(anilistId, result);
+  return result;
+}
+async function verifyHeroLogo(anilistId: number): Promise<string | null> {
   for (const url of await fetchHeroArtwork(anilistId)) {
     if (!safeImage(url)) continue;
     const valid = await new Promise<boolean>((resolve) => {

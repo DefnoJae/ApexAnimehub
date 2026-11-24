@@ -1,8 +1,10 @@
+import * as heroArtwork from "./heroArtwork";
 import {
   artworkLogos,
   artworkBackdrops,
   fetchHeroArtwork,
   fetchHeroBackdrops,
+  fetchVerifiedHeroLogo,
   isTitleTreatment,
   isHeroBackdrop,
 } from "./heroArtwork";
@@ -115,6 +117,75 @@ test("an empty old lookup is rechecked instead of hiding an available logo", asy
   ]);
   expect(global.fetch).toHaveBeenCalledTimes(1);
 });
+test("a verified hero logo is checked once per AniList id so revisiting home reuses it", async () => {
+  const logo = "https://image.tmdb.org/t/p/original/verified-once.png";
+  localStorage.setItem(
+    "apex_tmdb_artwork_v8_48",
+    JSON.stringify({
+      logos: [logo],
+      backdrops: ["https://image.tmdb.org/t/p/original/backdrop.jpg"],
+      updatedAt: Date.now(),
+      match: "exact",
+    }),
+  );
+  let imageChecks = 0;
+  const originalImage = global.Image;
+  class TestImage {
+    onload: (() => void) | null = null;
+    onerror: (() => void) | null = null;
+    naturalWidth = 600;
+    naturalHeight = 200;
+    set src(_value: string) {
+      imageChecks++;
+      this.onload?.();
+    }
+  }
+  (global as unknown as { Image: typeof Image }).Image =
+    TestImage as unknown as typeof Image;
+  try {
+    expect(await fetchVerifiedHeroLogo(48)).toBe(logo);
+    expect(await fetchVerifiedHeroLogo(48)).toBe(logo);
+    expect(imageChecks).toBe(1);
+  } finally {
+    (global as unknown as { Image: typeof Image }).Image = originalImage;
+  }
+});
+
+test("a cached hero logo is readable on mount so returning home never paints a blank hero", async () => {
+  const logo = "https://image.tmdb.org/t/p/original/instant.png";
+  localStorage.setItem(
+    "apex_tmdb_artwork_v8_49",
+    JSON.stringify({
+      logos: [logo],
+      backdrops: [],
+      updatedAt: Date.now(),
+      match: "exact",
+    }),
+  );
+  const originalImage = global.Image;
+  class TestImage {
+    onload: (() => void) | null = null;
+    onerror: (() => void) | null = null;
+    naturalWidth = 600;
+    naturalHeight = 200;
+    set src(_value: string) {
+      this.onload?.();
+    }
+  }
+  (global as unknown as { Image: typeof Image }).Image =
+    TestImage as unknown as typeof Image;
+  try {
+    await fetchVerifiedHeroLogo(49);
+    const read = (heroArtwork as unknown as {
+      getCachedVerifiedLogo: (id: number) => string | null | undefined;
+    }).getCachedVerifiedLogo;
+    expect(read(49)).toBe(logo);
+    expect(read(999)).toBeUndefined();
+  } finally {
+    (global as unknown as { Image: typeof Image }).Image = originalImage;
+  }
+});
+
 test("a transient lookup miss never replaces a previously verified clear logo", async () => {
   const saved = {
     logos: ["https://image.tmdb.org/t/p/original/verified.png"],

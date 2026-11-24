@@ -17,7 +17,10 @@ import {
   X,
 } from "lucide-react";
 import { fetchAnilist } from "../utils/anilist";
-import { fetchVerifiedHeroLogo } from "../utils/heroArtwork";
+import {
+  fetchVerifiedHeroLogo,
+  getCachedVerifiedLogo,
+} from "../utils/heroArtwork";
 import { fetchDubRange } from "../utils/dubSchedule";
 import {
   currentReleaseWeek,
@@ -634,7 +637,14 @@ export function HomeDashboard({
       return "sub";
     }
   });
-  const [logos, setLogos] = useState<Record<number, string>>({});
+  const [logos, setLogos] = useState<Record<number, string>>(() => {
+    const initial: Record<number, string> = {};
+    for (const { id } of slides) {
+      const logo = getCachedVerifiedLogo(id);
+      if (logo) initial[id] = logo;
+    }
+    return initial;
+  });
   const hero = useRef<HTMLElement>(null);
   const [heroVisible, setHeroVisible] = useState(true);
   useEffect(() => {
