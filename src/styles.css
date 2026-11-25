@@ -13,6 +13,24 @@
   animation: fadeIn 0.8s ease-out forwards;
 }
 
+.apex-rate-limit-banner {
+  position: fixed;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 200;
+  padding: 8px 15px;
+  border: 1px solid rgba(251, 191, 36, 0.45);
+  border-radius: 999px;
+  background: rgba(24, 16, 12, 0.92);
+  color: #fcd34d;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(8px);
+}
+
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }

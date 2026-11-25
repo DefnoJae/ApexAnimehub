@@ -2,6 +2,7 @@ import { StyledSelect } from "./StyledSelect";
 import React, { useEffect, useReducer, useRef, useState } from "react";
 import { MinusCircle } from "lucide-react";
 import { isRateLimitError } from "../utils/anilist";
+import { useRateLimitCountdown } from "../hooks/useRateLimitCountdown";
 import type { useAccounts, ListStatus } from "../hooks/useAccounts";
 import { LibraryAnime } from "../hooks/useLibrary";
 import { QuickList } from "./HomeDashboard";
@@ -122,6 +123,7 @@ export function MyList({
     search,
     sort,
   ]);
+  const { secondsRemaining } = useRateLimitCountdown();
   const isWatchLaterStatus = status === "watch-later";
   const filtered = accounts.libraryEntries.filter(
     (e) =>
@@ -272,7 +274,9 @@ export function MyList({
         <p role="alert" key={p}>
           {p === "mal" ? "MyAnimeList" : "AniList"}: {error}{" "}
           {isRateLimitError(error) &&
-            "The provider is busy; automatically retrying in about a minute. "}{" "}
+            (secondsRemaining > 0
+              ? `retrying in ${secondsRemaining}s. `
+              : "The provider is busy; automatically retrying in about a minute. ")}{" "}
           Saved entries are kept when available. Retry with Refresh lists.
         </p>
       ))}

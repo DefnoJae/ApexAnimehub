@@ -20,6 +20,7 @@ import { VideoPlayer } from "./components/VideoPlayer";
 import { MyList } from "./components/MyList";
 
 import { DiscoveryPage } from "./components/DiscoveryPage";
+import { RateLimitBanner } from "./components/RateLimitBanner";
 import {
   animePage,
   episodePage,
@@ -544,6 +545,7 @@ export default function App() {
 
   return (
     <div className="apex-shell">
+      <RateLimitBanner />
       <FloatingNavigation
         accounts={accounts}
         onSelectAnime={onSelectMedia}

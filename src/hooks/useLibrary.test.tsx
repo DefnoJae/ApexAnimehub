@@ -5,6 +5,7 @@ import { createRoot, Root } from "react-dom/client";
 import { act } from "react-dom/test-utils";
 import { useLibrary } from "./useLibrary";
 import { readAniListList } from "../utils/sync/anilistList";
+import { setRateLimitRetryAt } from "../utils/rateLimitClock";
 let node: HTMLDivElement, root: Root, library: ReturnType<typeof useLibrary>;
 const original = global.fetch;
 const anime = { id: 1, idMal: 11, title: { english: "Example" } };
@@ -233,6 +234,55 @@ test("fresh first-page values replace old complete cache before a large import f
   expect(
     JSON.parse(localStorage.getItem("apex_library_v1_anilist_alice")!).entries,
   ).toHaveLength(2);
+});
+
+test("auto-retries at AniList's reset time instead of the fixed minute", async () => {
+  jest.useFakeTimers();
+  setRateLimitRetryAt(Date.now() + 30_000);
+  try {
+    localStorage.setItem(
+      "apex_library_v1_anilist_alice",
+      JSON.stringify({
+        identity: "alice",
+        name: "alice",
+        entries: [{ anime, status: "planning", progress: 0, updatedAt: 1 }],
+        complete: false,
+        nextPage: 30,
+        updatedAt: Date.now(),
+      }),
+    );
+    let failedPage30 = false;
+    setAniListPage((pageNumber) => {
+      if (pageNumber === 30) {
+        if (!failedPage30) {
+          failedPage30 = true;
+          throw new Error(
+            "AniList rate limit reached. Please try again later.",
+          );
+        }
+        return { ...page("alice", "planning", false), entries: [] };
+      }
+      return page("alice", "planning", false);
+    });
+    await act(async () => {
+      root.render(<Harness mal={false} />);
+    });
+    expect(library.libraryErrors.anilist).toBe(
+      "AniList rate limit reached. Please try again later.",
+    );
+    const callsAfterFailure = (readAniListList as jest.Mock).mock.calls.length;
+    await act(async () => {
+      jest.advanceTimersByTime(30_000);
+    });
+    expect(
+      (readAniListList as jest.Mock).mock.calls
+        .slice(callsAfterFailure)
+        .map(([pageNumber]) => pageNumber),
+    ).toContain(30);
+  } finally {
+    setRateLimitRetryAt(0);
+    jest.useRealTimers();
+  }
 });
 
 test("auto-retries an AniList rate limit from the saved checkpoint", async () => {

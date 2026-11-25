@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { act } from "react-dom/test-utils";
 import { MyList } from "./MyList";
 import type { useAccounts } from "../hooks/useAccounts";
+import { setRateLimitRetryAt } from "../utils/rateLimitClock";
 jest.mock("./AnimeBadges", () => ({ AnimeBadges: () => null }));
 jest.mock("./HomeDashboard", () => ({ QuickList: () => null }));
 
@@ -111,6 +112,41 @@ describe.each([
       host.remove();
     }
   });
+});
+
+test("shows the exact seconds remaining in the My List rate-limit alert", () => {
+  localStorage.clear();
+  setRateLimitRetryAt(Date.now() + 27_000);
+  const host = document.createElement("div");
+  document.body.append(host);
+  const root = createRoot(host);
+  try {
+    act(() =>
+      root.render(
+        <MyList
+          accounts={
+            {
+              connected: { anilist: true, mal: false },
+              libraryEntries: [],
+              libraryErrors: {
+                anilist: "AniList rate limit reached. Please try again later.",
+              },
+              lists: {},
+            } as unknown as ReturnType<typeof useAccounts>
+          }
+          onSelect={jest.fn()}
+          onConnect={jest.fn()}
+        />,
+      ),
+    );
+    const alert = host.querySelector('[role="alert"]');
+    expect(alert?.textContent).toContain("retrying in 27s");
+    expect(alert?.textContent).not.toContain("about a minute");
+  } finally {
+    setRateLimitRetryAt(0);
+    act(() => root.unmount());
+    host.remove();
+  }
 });
 
 test("restores and persists all four filters", () => {

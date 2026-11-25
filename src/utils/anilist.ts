@@ -1,3 +1,5 @@
+import { parseRateLimitHeaders, setRateLimitRetryAt } from "./rateLimitClock";
+
 export const ANILIST_RATE_LIMIT_MESSAGE = "AniList rate limit reached. Please try again later.";
 let publicRetryAt = 0;
 
@@ -37,7 +39,10 @@ export async function fetchAnilist<T>(query: string, variables: Record<string, u
       headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: 'Bearer ' + token } : {}) },
       body: JSON.stringify({ query, variables }),
     });
+    const resetAt = parseRateLimitHeaders(response.headers);
+    if (resetAt) setRateLimitRetryAt(resetAt);
     if (response.status === 429) {
+      if (!resetAt) setRateLimitRetryAt(Date.now() + 60000);
       if (!token) {
         const retry = response.headers?.get("Retry-After");
         const now = Date.now();

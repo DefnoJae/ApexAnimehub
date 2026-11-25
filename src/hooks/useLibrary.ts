@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { AccountProvider, ListAnime, ListStatus } from "./useAccounts";
 import { isRateLimitError } from "../utils/anilist";
+import { getRateLimitRetryAt } from "../utils/rateLimitClock";
 import {
   readAniListList,
   type AniListListPage,
@@ -352,7 +353,10 @@ export function useLibrary(connected: Record<AccountProvider, boolean>) {
       !Object.values(errors).some((error) => !!error && isRateLimitError(error))
     )
       return;
-    const timer = window.setTimeout(() => void refreshLibrary(), 65000);
+    const resetAt = getRateLimitRetryAt();
+    const delay =
+      resetAt > Date.now() ? Math.max(resetAt - Date.now(), 1000) : 65000;
+    const timer = window.setTimeout(() => void refreshLibrary(), delay);
     return () => window.clearTimeout(timer);
   }, [errors, refreshLibrary]);
   const record = (
