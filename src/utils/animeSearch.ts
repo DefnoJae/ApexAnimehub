@@ -59,7 +59,7 @@ function searchVariants(input: string) {
     ]),
   )
     .filter((value) => value.length >= 2)
-    .slice(0, 7);
+    .slice(0, 3);
 }
 
 function tokenScore(query: string, title: string) {
@@ -135,9 +135,43 @@ export function rankAnimeSearch(
     .map(({ anime }) => anime);
 }
 
+type SearchResults = ReturnType<typeof rankAnimeSearch>;
+interface SearchCacheEntry {
+  value: SearchResults;
+  expiresAt: number;
+}
+const SEARCH_CACHE_TTL = 300_000;
+const SEARCH_CACHE_MAX = 30;
+const searchCache = new Map<string, SearchCacheEntry>();
+function readSearchCache(key: string, signal?: AbortSignal): SearchResults | null {
+  if (signal?.aborted) return null;
+  const entry = searchCache.get(key);
+  if (!entry) return null;
+  if (Date.now() >= entry.expiresAt) {
+    searchCache.delete(key);
+    return null;
+  }
+  return entry.value;
+}
+function writeSearchCache(key: string, value: SearchResults) {
+  searchCache.delete(key);
+  searchCache.set(key, {
+    value: [...value],
+    expiresAt: Date.now() + SEARCH_CACHE_TTL,
+  });
+  while (searchCache.size > SEARCH_CACHE_MAX) {
+    const oldest = searchCache.keys().next().value;
+    if (oldest === undefined) break;
+    searchCache.delete(oldest);
+  }
+}
+
 export async function searchAnimeTitles(input: string, signal?: AbortSignal) {
-  const variants = searchVariants(input.trim().slice(0, 120));
+  const trimmed = input.trim().slice(0, 120);
+  const variants = searchVariants(trimmed);
   if (!variants.length) return [];
+  const cached = readSearchCache(normalize(trimmed), signal);
+  if (cached) return [...cached];
   const variables = Object.fromEntries(
     variants.map((value, index) => ["q" + index, value]),
   );
@@ -158,9 +192,11 @@ export async function searchAnimeTitles(input: string, signal?: AbortSignal) {
     variables,
     signal,
   );
-  return rankAnimeSearch(
+  const result = rankAnimeSearch(
     input,
     Object.values(data).flatMap((page) => page.media),
     new Set(data.q0.media.map((anime) => anime.id)),
   );
+  if (!signal?.aborted) writeSearchCache(normalize(trimmed), result);
+  return result;
 }

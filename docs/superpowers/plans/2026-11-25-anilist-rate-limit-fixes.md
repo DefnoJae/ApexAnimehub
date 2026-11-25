@@ -571,7 +571,7 @@ git commit -m "feat: cache Discovery pages and slow automatic loading"
 - Consumes: existing `fetchAnilist(query, variables, signal)`, `rankAnimeSearch`.
 - Produces: unchanged `searchAnimeTitles(input, signal?)` signature; successful final ranked results cached by normalized input for 300000 ms.
 
-- [ ] **Step 1: Write the failing search tests**
+- [x] **Step 1: Write the failing search tests**
 
 Create `src/utils/animeSearch.test.ts`:
 
@@ -632,12 +632,12 @@ test("does not cache failed searches", async () => {
 });
 ```
 
-- [ ] **Step 2: Run search tests to verify failure**
+- [x] **Step 2: Run search tests to verify failure**
 
 Run: `npm run test:ci -- src/utils/animeSearch.test.ts`
 Expected: FAIL because aliases are not capped and no cache exists.
 
-- [ ] **Step 3: Implement search changes**
+- [x] **Step 3: Implement search changes**
 
 In `src/utils/animeSearch.ts`:
 - Change `searchVariants(...).slice(0, 7)` to `.slice(0, 3)`.
@@ -645,12 +645,12 @@ In `src/utils/animeSearch.ts`:
 - Check `signal.aborted` before returning a cached value; return the cached ranked array copy.
 - Store the value returned by `rankAnimeSearch`, not raw candidates; do not store failures or aborted requests.
 
-- [ ] **Step 4: Run search tests to verify pass**
+- [x] **Step 4: Run search tests to verify pass**
 
 Run: `npm run test:ci -- src/utils/animeSearch.test.ts`
 Expected: PASS.
 
-- [ ] **Step 5: Run full gates and commit**
+- [x] **Step 5: Run full gates and commit**
 
 Run:
 
