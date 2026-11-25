@@ -1,5 +1,5 @@
 import { StyledSelect } from "./StyledSelect";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useReducer, useRef, useState } from "react";
 import { MinusCircle } from "lucide-react";
 import { isRateLimitError } from "../utils/anilist";
 import type { useAccounts, ListStatus } from "../hooks/useAccounts";
@@ -113,6 +113,7 @@ export function MyList({
   const [provider, setProvider] = useState(initial.provider);
   const [search, setSearch] = useState(initial.search);
   const [visibleCount, setVisibleCount] = useState(batchSize);
+  const [, refreshWatchLater] = useReducer((n: number) => n + 1, 0);
   const sentinel = useRef<HTMLDivElement>(null);
   const [sort, setSort] = useState(initial.sort);
   useEffect(() => saveFilters({ status, provider, search, sort }), [
@@ -325,10 +326,11 @@ export function MyList({
                 </button>
                 {inWatchLater ? (
                   <button
-                    className="quick-add glass"
+                    className="quick-add glass watch-later-remove"
                     style={{ position: "absolute", bottom: 10, left: 10 }}
                     onClick={() => {
                       removeFromWatchLater(entry);
+                      refreshWatchLater();
                       setVisibleCount(batchSize);
                     }}
                     aria-label={

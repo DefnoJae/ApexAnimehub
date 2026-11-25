@@ -280,3 +280,66 @@ test("storage failures do not crash", () => {
     host.remove();
   }
 });
+
+test("removing a watch later entry hides its card immediately without a remount", () => {
+  localStorage.clear();
+  localStorage.setItem(
+    FILTERS_KEY,
+    JSON.stringify({
+      status: "watch-later",
+      provider: "all",
+      search: "",
+      sort: "updated",
+    }),
+  );
+  localStorage.setItem(
+    "apex_watch_later_v1",
+    JSON.stringify([
+      {
+        id: 1,
+        title: { english: "First" },
+        coverImage: { extraLarge: "first.jpg" },
+        addedAt: 200,
+      },
+      {
+        id: 2,
+        title: { english: "Second" },
+        coverImage: { extraLarge: "second.jpg" },
+        addedAt: 100,
+      },
+    ]),
+  );
+  const host = document.createElement("div");
+  document.body.append(host);
+  const root = createRoot(host);
+  try {
+    act(() =>
+      root.render(
+        <MyList
+          accounts={makeAccounts()}
+          onSelect={jest.fn()}
+          onConnect={jest.fn()}
+        />,
+      ),
+    );
+    expect(host.querySelectorAll(".poster-title")).toHaveLength(2);
+    act(() => {
+      host
+        .querySelector<HTMLButtonElement>(
+          '[aria-label="Remove from Watch Later: First"]',
+        )!
+        .click();
+    });
+    expect(
+      Array.from(host.querySelectorAll(".poster-title")).map(
+        (node) => node.textContent,
+      ),
+    ).toEqual(["Second"]);
+    expect(
+      JSON.parse(localStorage.getItem("apex_watch_later_v1") || "[]"),
+    ).toHaveLength(1);
+  } finally {
+    act(() => root.unmount());
+    host.remove();
+  }
+});

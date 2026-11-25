@@ -488,6 +488,9 @@ input:focus-visible {
 .quick-add:hover {
   background: #8b5cf6;
 }
+.quick-add.watch-later-remove:hover {
+  background: #ef4444;
+}
 .status-popover {
   position: absolute;
   right: 0;
