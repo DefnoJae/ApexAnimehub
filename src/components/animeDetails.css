@@ -199,19 +199,17 @@
   text-decoration: underline;
 }
 .detail-watch-later {
+  width: 44px;
+  height: 44px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  border-radius: 12px;
-  color: #cfb3f6;
-  padding: 0 14px;
-  min-height: 48px;
-  border: 0;
-  background: transparent;
-  cursor: pointer;
+  border: 1px solid #ffffff20;
+  border-radius: 11px;
+  background: #29272b9c;
+  color: #e7e2ed;
 }
-.detail-watch-later.enabled {
+.detail-watch-later.enabled svg {
   color: #4ade80;
 }
 .detail-watch-later svg {
