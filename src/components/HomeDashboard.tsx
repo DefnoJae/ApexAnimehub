@@ -26,6 +26,10 @@ import {
   currentReleaseWeek,
   orderWeeklyReleases,
 } from "../utils/weeklyReleases";
+import {
+  isInWatchLater,
+  removeFromWatchLater,
+} from "../utils/watchLater";
 import { getDisplayTitle } from "../utils/schedule";
 import type { ListAnime, ListStatus, useAccounts } from "../hooks/useAccounts";
 import { useStoriesVisible } from "../hooks/useStoriesVisible";
@@ -239,6 +243,9 @@ export function QuickList({
       status,
       status === "completed" && anime.episodes ? anime.episodes : undefined,
     );
+    if (status === "completed") {
+      removeFromWatchLater(anime);
+    }
     setNotice(
       result.length && result.every((item) => item.success)
         ? "Saved"

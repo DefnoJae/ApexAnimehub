@@ -1,16 +1,21 @@
 import { StyledSelect } from "./StyledSelect";
 import React, { useEffect, useRef, useState } from "react";
+import { MinusCircle } from "lucide-react";
 import { isRateLimitError } from "../utils/anilist";
 import type { useAccounts, ListStatus } from "../hooks/useAccounts";
 import { LibraryAnime } from "../hooks/useLibrary";
 import { QuickList } from "./HomeDashboard";
 import { PersonalRating } from "./RatingPills";
 import { AnimeBadges } from "./AnimeBadges";
+import {
+  getWatchLater,
+  removeFromWatchLater,
+} from "../utils/watchLater";
 
 const batchSize = 50;
 
 type MyListFilters = {
-  status: ListStatus | "all";
+  status: string;
   provider: string;
   search: string;
   sort: string;
@@ -26,6 +31,7 @@ const validStatuses: string[] = [
   "completed",
   "paused",
   "dropped",
+  "watch-later",
 ];
 const validProviders: string[] = ["all", "anilist", "mal"];
 const validSorts: string[] = [
@@ -91,6 +97,7 @@ const labels = {
   completed: "Completed",
   paused: "On hold",
   dropped: "Dropped",
+  "watch-later": "Watch Later",
 };
 export function MyList({
   accounts,
@@ -102,7 +109,7 @@ export function MyList({
   onConnect: () => void;
 }) {
   const [initial] = useState(readFilters);
-  const [status, setStatus] = useState<ListStatus | "all">(initial.status);
+  const [status, setStatus] = useState<string>(initial.status);
   const [provider, setProvider] = useState(initial.provider);
   const [search, setSearch] = useState(initial.search);
   const [visibleCount, setVisibleCount] = useState(batchSize);
@@ -114,6 +121,7 @@ export function MyList({
     search,
     sort,
   ]);
+  const isWatchLaterStatus = status === "watch-later";
   const filtered = accounts.libraryEntries.filter(
     (e) =>
       (provider === "all" || provider === e.provider) &&
@@ -129,9 +137,17 @@ export function MyList({
     const key = keyFor(entry.anime);
     grouped.set(key, [...(grouped.get(key) || []), entry]);
   });
-  const unique = Array.from(
-    new Map(filtered.map((entry) => [keyFor(entry.anime), entry])).values(),
-  );
+  let unique: LibraryAnime[];
+  if (isWatchLaterStatus) {
+    unique = getWatchLater()
+      .slice()
+      .sort((a, b) => b.addedAt - a.addedAt)
+      .map((entry) => entry as LibraryAnime);
+  } else {
+    unique = Array.from(
+      new Map(filtered.map((entry) => [keyFor(entry.anime), entry])).values(),
+    ).map((entry) => entry.anime);
+  }
   const entriesFor = (anime: LibraryAnime) =>
     (grouped.get(keyFor(anime)) || []).filter(
       (entry) => provider === "all" || entry.provider === provider,
@@ -150,21 +166,21 @@ export function MyList({
     Math.max(0, ...entriesFor(anime).map((entry) => entry.updatedAt));
   unique.sort((a, b) =>
     sort === "highest"
-      ? scoreFor(b.anime) - scoreFor(a.anime)
+      ? scoreFor(b) - scoreFor(a)
       : sort === "lowest"
-        ? (scoreFor(a.anime) || Infinity) - (scoreFor(b.anime) || Infinity)
+        ? (scoreFor(a) || Infinity) - (scoreFor(b) || Infinity)
         : sort === "progress"
-          ? Math.max(0, ...entriesFor(b.anime).map((entry) => entry.progress)) -
-            Math.max(0, ...entriesFor(a.anime).map((entry) => entry.progress))
+          ? Math.max(0, ...entriesFor(b).map((entry) => entry.progress)) -
+            Math.max(0, ...entriesFor(a).map((entry) => entry.progress))
           : sort === "title"
             ? (
-                a.anime.title?.english ||
-                a.anime.title?.romaji ||
+                a.title?.english ||
+                a.title?.romaji ||
                 ""
               ).localeCompare(
-                b.anime.title?.english || b.anime.title?.romaji || "",
+                b.title?.english || b.title?.romaji || "",
               )
-            : updated(b.anime) - updated(a.anime),
+            : updated(b) - updated(a),
   );
   const hasMore = visibleCount < unique.length;
   const canObserve = typeof IntersectionObserver !== "undefined";
@@ -279,35 +295,36 @@ export function MyList({
       )}
       <div className="library-grid">
         {unique.slice(0, visibleCount).map((entry) => {
-          const entries = entriesFor(entry.anime);
+          const entries = entriesFor(entry);
           const inProgress = entries.filter((item) =>
             (item.status === "watching" || item.status === "paused") &&
             (status === "all" || item.status === status),
           );
           const watched = Math.max(0, ...inProgress.map((item) => item.progress));
-          const total = entry.anime.episodes || entries.find((item) => item.anime.episodes)?.anime.episodes;
+          const total = entry.episodes || entries.find((item) => item.anime.episodes)?.anime.episodes;
+          const inWatchLater = isWatchLaterStatus;
           return (
             <article
               className="poster-card"
-              key={entry.anime.id || "mal-" + entry.anime.idMal}
+              key={entry.id || "mal-" + entry.idMal}
             >
               <div className="poster-art">
                 <button
                   className="poster-open"
-                  onClick={() => onSelect(entry.anime)}
+                  onClick={() => onSelect(entry)}
                   aria-label={
                     "View details: " +
-                    (entry.anime.title?.english || entry.anime.title?.romaji)
+                    (entry.title?.english || entry.title?.romaji)
                   }
                 >
                   <img
                     loading="lazy"
-                    src={entry.anime.coverImage?.extraLarge}
+                    src={entry.coverImage?.extraLarge}
                     alt=""
                   />
                 </button>
                 <PersonalRating
-                  score={scoreFor(entry.anime)}
+                  score={scoreFor(entry)}
                   className="my-list-score"
                 />
                 {inProgress.length > 0 && (
@@ -315,32 +332,49 @@ export function MyList({
                     {watched}/{total || "?"}
                   </span>
                 )}
-                <QuickList
-                  anime={{ ...entry.anime, title: entry.anime.title || {} }}
-                  accounts={accounts}
-                />
+                {inWatchLater ? (
+                  <button
+                    className="quick-add glass"
+                    onClick={() => {
+                      removeFromWatchLater(entry);
+                      setVisibleCount(batchSize);
+                    }}
+                    aria-label={
+                      "Remove from Watch Later: " +
+                      (entry.title?.english || entry.title?.romaji)
+                    }
+                    title="Remove from Watch Later"
+                  >
+                    <MinusCircle size={19} />
+                  </button>
+                ) : (
+                  <QuickList
+                    anime={{ ...entry, title: entry.title || {} }}
+                    accounts={accounts}
+                  />
+                )}
               </div>
               <button
                 className="poster-title"
-                onClick={() => onSelect(entry.anime)}
+                onClick={() => onSelect(entry)}
               >
-                {entry.anime.title?.english || entry.anime.title?.romaji}
+                {entry.title?.english || entry.title?.romaji}
               </button>
               <div className="library-card-badges">
                 <AnimeBadges
                   id={
-                    (grouped.get(keyFor(entry.anime)) || []).find(
+                    (grouped.get(keyFor(entry)) || []).find(
                       (e) => e.anime.id,
                     )?.anime.id
                   }
-                  idMal={entry.anime.idMal}
+                  idMal={entry.idMal}
                   averageScore={
-                    (grouped.get(keyFor(entry.anime)) || []).find(
+                    (grouped.get(keyFor(entry)) || []).find(
                       (e) => e.anime.averageScore,
                     )?.anime.averageScore
                   }
                   providedScore={
-                    (grouped.get(keyFor(entry.anime)) || []).find(
+                    (grouped.get(keyFor(entry)) || []).find(
                       (e) => e.anime.malScore,
                     )?.anime.malScore || undefined
                   }

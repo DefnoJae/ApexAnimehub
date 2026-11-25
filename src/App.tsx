@@ -30,6 +30,10 @@ import {
   AudioLanguage,
 } from "./hooks/usePageRoute";
 import { detailQuery, fetchFallbackAnimeDetails } from "./utils/detailQuery";
+import {
+  isInWatchLater,
+  removeFromWatchLater,
+} from "./utils/watchLater";
 import { fetchHomeCatalog, HomeRow, pickHeroSlides } from "./utils/homeRows";
 import { clearScroll, scrollSection, takeScroll } from "./utils/sectionScroll";
 
@@ -111,12 +115,18 @@ export default function App() {
     if (!selectedAnime) return Promise.resolve([]);
     const completed =
       !!selectedAnime.episodes && episode >= selectedAnime.episodes;
-    return accounts.sync(
+    const syncResult = accounts.sync(
       selectedAnime,
       completed ? "completed" : "watching",
       episode,
       automatic,
     );
+    return Promise.resolve(syncResult).then(() => {
+      if (completed) {
+        removeFromWatchLater(selectedAnime);
+      }
+      return syncResult;
+    });
   };
 
   const markCompleted = (episode = activeEpisode) => {

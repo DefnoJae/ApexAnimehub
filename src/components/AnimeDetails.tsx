@@ -5,6 +5,7 @@ import {
   ArrowLeft,
   Bookmark,
   CheckCircle2,
+  Clock,
   ListOrdered,
   Play,
   Star,
@@ -24,6 +25,11 @@ import { PosterCaption } from "./PosterCaption";
 import { DetailEpisodes } from "./DetailEpisodes";
 import { QuickList } from "./HomeDashboard";
 import { ListEntryEditor } from "./ListEntryEditor";
+import {
+  isInWatchLater,
+  removeFromWatchLater,
+  toggleWatchLater,
+} from "../utils/watchLater";
 import { getDubIndex } from "../utils/animeMetadata";
 import "./animeDetails.css";
 import "./watchOrder.css";
@@ -165,6 +171,8 @@ export function AnimeDetails({
   );
   const finished = !!anime.episodes && progress >= total;
   const savedStatus = accounts.getListStatus(anime);
+  const inWatchLater = isInWatchLater(anime);
+  const [watchLater, setWatchLater] = useState(inWatchLater);
   const synopsis = descriptionText(anime.description);
   const related =
     anime.relations?.edges.filter((edge) => edge.node.type === "ANIME") || [];
@@ -189,13 +197,21 @@ export function AnimeDetails({
     }
     if (status === "remove") {
       void accounts.remove(anime);
+      removeFromWatchLater(anime);
+      setWatchLater(false);
       return;
     }
-    void accounts.sync(
+    const syncResult = accounts.sync(
       anime,
       status as ListStatus,
       status === "completed" && anime.episodes ? anime.episodes : undefined,
     );
+    Promise.resolve(syncResult).then(() => {
+      if (status === "completed") {
+        removeFromWatchLater(anime);
+        setWatchLater(false);
+      }
+    });
   };
   return (
     <article className="anime-detail-page">
@@ -323,6 +339,33 @@ export function AnimeDetails({
                   onClick={() => setOrderAnime(orderAnime ? null : anime)}
                 >
                   <ListOrdered size={21} aria-hidden="true" />
+                </button>
+                <button
+                  className={`detail-watch-later${watchLater ? " enabled" : ""}`}
+                  aria-label={
+                    watchLater
+                      ? "Remove from Watch Later"
+                      : "Add to Watch Later"
+                  }
+                  title={
+                    watchLater
+                      ? "Remove from Watch Later"
+                      : "Add to Watch Later"
+                  }
+                  onClick={() => {
+                    const next = toggleWatchLater(anime);
+                    setWatchLater(
+                      next.some(
+                        (entry) =>
+                          (anime.id && entry.id && anime.id === entry.id) ||
+                          (anime.idMal &&
+                            entry.idMal &&
+                            anime.idMal === entry.idMal),
+                      ),
+                    );
+                  }}
+                >
+                  <Clock size={20} />
                 </button>
               </div>
               <div className="detail-account-status">

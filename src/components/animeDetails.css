@@ -191,13 +191,31 @@
 }
 .detail-account-status .has-entry {
   color: #91d8b3;
-}
-.detail-account-status button {
+}.detail-account-status button {
   background: none;
   border: 0;
   color: #ba92ee;
   font-size: 10px;
   text-decoration: underline;
+}
+.detail-watch-later {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: 12px;
+  color: #cfb3f6;
+  padding: 0 14px;
+  min-height: 48px;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.detail-watch-later.enabled {
+  color: #4ade80;
+}
+.detail-watch-later svg {
+  color: inherit;
 }
 .detail-body {
   display: grid;
