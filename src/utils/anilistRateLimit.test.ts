@@ -28,7 +28,19 @@ test("publishes the reset time from an authenticated 429 so the UI can count dow
   expect(getRateLimitRetryAt()).toBe(1_800_000_000_000 + 25_000);
 });
 
-test("publishes the reset time from a response received during the cooldown", async () => {
+test("blocks every caller while the shared cooldown is active", async () => {
+  jest.spyOn(Date, "now").mockReturnValue(1_800_000_000_000);
+  setRateLimitRetryAt(1_800_000_000_000 + 30_000);
+  global.fetch = jest.fn() as jest.Mock;
+  await expect(
+    fetchAnilist("query {}", {}, undefined, "token-from-session"),
+  ).rejects.toThrow(ANILIST_RATE_LIMIT_MESSAGE);
+  expect(global.fetch).not.toHaveBeenCalled();
+});
+
+test("a successful response leaves the shared cooldown untouched", async () => {
+  const now = 1_800_000_000_000;
+  jest.spyOn(Date, "now").mockReturnValue(now);
   global.fetch = jest.fn().mockResolvedValue({
     ok: true,
     status: 200,
@@ -36,5 +48,5 @@ test("publishes the reset time from a response received during the cooldown", as
     json: async () => ({ data: {} }),
   } as unknown as Response);
   await fetchAnilist("query {}", {}, undefined, "token-from-session");
-  expect(getRateLimitRetryAt()).toBe(1_800_000_000_000 + 12_000);
+  expect(getRateLimitRetryAt()).toBe(0);
 });

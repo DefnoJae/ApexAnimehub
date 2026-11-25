@@ -1,7 +1,7 @@
-import { parseRateLimitHeaders, setRateLimitRetryAt } from "./rateLimitClock";
+import { acquireAniListRequest } from "./anilistBudget";
+import { getRateLimitRetryAt, parseRateLimitHeaders, setRateLimitRetryAt } from "./rateLimitClock";
 
 export const ANILIST_RATE_LIMIT_MESSAGE = "AniList rate limit reached. Please try again later.";
-let publicRetryAt = 0;
 
 export function isRateLimitError(value: unknown): boolean {
   if (typeof value === "string") return isRateLimitMessage(value);
@@ -27,7 +27,9 @@ export class AniListRequestError extends Error {
 }
 
 export async function fetchAnilist<T>(query: string, variables: Record<string, unknown> = {}, signal?: AbortSignal, token?: string): Promise<T> {
-  if (!token && Date.now() < publicRetryAt) throw new AniListRequestError(ANILIST_RATE_LIMIT_MESSAGE, 429);
+  if (getRateLimitRetryAt() > Date.now()) throw new AniListRequestError(ANILIST_RATE_LIMIT_MESSAGE, 429);
+  await acquireAniListRequest(signal);
+  if (getRateLimitRetryAt() > Date.now()) throw new AniListRequestError(ANILIST_RATE_LIMIT_MESSAGE, 429);
   const controller = new AbortController();
   const abort = () => controller.abort();
   signal?.addEventListener('abort', abort);
@@ -39,16 +41,9 @@ export async function fetchAnilist<T>(query: string, variables: Record<string, u
       headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: 'Bearer ' + token } : {}) },
       body: JSON.stringify({ query, variables }),
     });
-    const resetAt = parseRateLimitHeaders(response.headers);
-    if (resetAt) setRateLimitRetryAt(resetAt);
     if (response.status === 429) {
-      if (!resetAt) setRateLimitRetryAt(Date.now() + 60000);
-      if (!token) {
-        const retry = response.headers?.get("Retry-After");
-        const now = Date.now();
-        const next = retry && /^\d+$/.test(retry) ? now + Number(retry) * 1000 : Date.parse(retry || "");
-        publicRetryAt = Math.max(publicRetryAt, next > now ? next : now + 60000);
-      }
+      const resetAt = parseRateLimitHeaders(response.headers);
+      setRateLimitRetryAt(resetAt ?? Date.now() + 60000);
       throw new AniListRequestError(ANILIST_RATE_LIMIT_MESSAGE, 429);
     }
     if (!response.ok) {

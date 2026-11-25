@@ -2,6 +2,7 @@ import { webcrypto } from 'crypto';
 Object.defineProperty(globalThis, 'crypto', { value: webcrypto, configurable: true });
 import { mondayOffset, getWeekStart } from './schedule';
 import { fetchAnilist } from './anilist';
+import { setRateLimitRetryAt } from './rateLimitClock';
 import { fetchDubSchedule } from './dubSchedule';
 import { beginOAuth, validateOAuth } from './sync/oauth';
 import { MALClient } from './sync/malClient';
@@ -24,6 +25,7 @@ test('AniList rejects HTTP, GraphQL and missing-data failures', async () => {
   const mock = global.fetch as jest.Mock;
   mock.mockResolvedValueOnce(response({}, 429));
   await expect(fetchAnilist('query {}')).rejects.toThrow('rate limit');
+  setRateLimitRetryAt(0);
   mock.mockResolvedValueOnce(response({ errors: [{ message: 'Bad query' }] }));
   await expect(fetchAnilist('query {}', {}, undefined, 'token-from-session')).rejects.toThrow('Bad query');
   mock.mockResolvedValueOnce(response({}));
