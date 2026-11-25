@@ -6,6 +6,8 @@ import { act } from "react-dom/test-utils";
 import { useLibrary } from "./useLibrary";
 import { readAniListList } from "../utils/sync/anilistList";
 import { setRateLimitRetryAt } from "../utils/rateLimitClock";
+import { writeAniListToken } from "../utils/anilistAuth";
+jest.setTimeout(15000);
 let node: HTMLDivElement, root: Root, library: ReturnType<typeof useLibrary>;
 const original = global.fetch;
 const anime = { id: 1, idMal: 11, title: { english: "Example" } };
@@ -35,6 +37,7 @@ beforeEach(() => {
 });
 afterEach(() => {
   act(() => root.unmount());
+  setRateLimitRetryAt(0);
   global.fetch = original;
 });
 test("imports every page, retains successful provider when another fails, and records only confirmed updates", async () => {
@@ -46,7 +49,7 @@ test("imports every page, retains successful provider when another fails, and re
     root.render(<Harness />);
   });
   await act(async () => {
-    await new Promise((resolve) => setTimeout(resolve, 2400));
+    await library.refreshLibrary();
   });
   expect(readAniListList).toHaveBeenCalledWith(2, undefined);
   expect(global.fetch).toHaveBeenCalledWith(
@@ -87,10 +90,19 @@ test("an account change cannot expose a previous account cache", async () => {
   await act(async () => {
     root.render(<Harness mal={false} />);
   });
+  await act(async () => {
+    await library.refreshLibrary();
+  });
   expect(library.libraryEntries).toHaveLength(0);
   expect(library.lists.anilist?.identity).toBe("bob");
 });
-test("resumes a verified account checkpoint instead of restarting a large import", async () => {
+test("resume import verifies page 1 then resumes the checkpoint instead of restarting a large import", async () => {
+  writeAniListToken({
+    accessToken: "token-from-session",
+    expiresAt: Date.now() + 3600000,
+    identity: "alice",
+    name: "alice",
+  });
   localStorage.setItem(
     "apex_library_v1_anilist_alice",
     JSON.stringify({
@@ -110,7 +122,12 @@ test("resumes a verified account checkpoint instead of restarting a large import
   await act(async () => {
     root.render(<Harness mal={false} />);
   });
-  expect(readAniListList).toHaveBeenCalledWith(30, undefined);
+  await act(async () => {
+    await library.refreshLibrary("resume");
+  });
+  expect((readAniListList as jest.Mock).mock.calls.map(([p]) => p)).toEqual([
+    1, 30,
+  ]);
   expect(library.libraryEntries).toHaveLength(1);
   expect(library.lists.anilist?.complete).toBe(true);
 });
@@ -118,6 +135,9 @@ test("resumes a verified account checkpoint instead of restarting a large import
 test("confirmed status, progress and rating survive stale reimports and reload", async () => {
   setAniListPage(() => page("alice", "planning"));
   await act(async () => root.render(<Harness mal={false} />));
+  await act(async () => {
+    await library.refreshLibrary();
+  });
   act(() =>
     library.record("anilist", anime, "completed", 12, {
       manualProgress: true,
@@ -142,6 +162,12 @@ test("confirmed status, progress and rating survive stale reimports and reload",
     JSON.stringify({ ...page("alice", "planning"), complete: true }),
   );
   act(() => root.unmount());
+  writeAniListToken({
+    accessToken: "token-from-session",
+    expiresAt: Date.now() + 3600000,
+    identity: "alice",
+    name: "alice",
+  });
   root = createRoot(node);
   await act(async () => root.render(<Harness mal={false} />));
   expect(library.libraryEntries[0]).toMatchObject({
@@ -193,6 +219,9 @@ test("a newer external edit supersedes a stale confirmed change", async () => {
     ],
   }));
   await act(async () => root.render(<Harness mal={false} />));
+  await act(async () => {
+    await library.refreshLibrary();
+  });
   expect(library.libraryEntries[0]).toMatchObject({
     status: "paused",
     progress: 3,
@@ -205,6 +234,9 @@ test("a newer external edit supersedes a stale confirmed change", async () => {
 test("confirmed removals cannot be resurrected by stale imports", async () => {
   setAniListPage(() => page("alice", "planning"));
   await act(async () => root.render(<Harness mal={false} />));
+  await act(async () => {
+    await library.refreshLibrary();
+  });
   act(() => library.removeRecord("anilist", anime));
   await act(async () => {
     await library.refreshLibrary();
@@ -225,8 +257,11 @@ test("fresh first-page values replace old complete cache before a large import f
       ],
     }),
   );
-  setAniListPage(() => page("alice", "completed", true));
+  setAniListPage((pageNumber) => page("alice", "completed", pageNumber === 1));
   await act(async () => root.render(<Harness mal={false} />));
+  await act(async () => {
+    void library.refreshLibrary();
+  });
   expect(library.getListStatus(anime)).toBe("completed");
   expect(library.libraryEntries.some((entry) => entry.anime.id === 2)).toBe(
     true,
@@ -236,119 +271,89 @@ test("fresh first-page values replace old complete cache before a large import f
   ).toHaveLength(2);
 });
 
-test("auto-retries at AniList's reset time instead of the fixed minute", async () => {
+test("does not import on mount but hydrates the matching AniList cache", async () => {
+  writeAniListToken({
+    accessToken: "token-from-session",
+    expiresAt: Date.now() + 3600000,
+    identity: "alice",
+    name: "alice",
+  });
+  localStorage.setItem(
+    "apex_library_v1_anilist_alice",
+    JSON.stringify({
+      identity: "alice",
+      name: "alice",
+      complete: true,
+      entries: [{ anime, status: "planning", progress: 0, updatedAt: 1 }],
+      updatedAt: Date.now(),
+    }),
+  );
+  await act(async () => root.render(<Harness mal={false} />));
+  expect(readAniListList).not.toHaveBeenCalled();
+  expect(library.libraryEntries).toHaveLength(1);
+});
+
+test("resume mode verifies page 1 then stops on a complete cache", async () => {
+  writeAniListToken({
+    accessToken: "token-from-session",
+    expiresAt: Date.now() + 3600000,
+    identity: "alice",
+    name: "alice",
+  });
+  localStorage.setItem(
+    "apex_library_v1_anilist_alice",
+    JSON.stringify({
+      identity: "alice",
+      name: "alice",
+      complete: true,
+      entries: [{ anime, status: "planning", progress: 0, updatedAt: 1 }],
+      updatedAt: Date.now(),
+    }),
+  );
+  setAniListPage(() => ({ ...page("alice", "planning"), hasNextPage: true }));
+  await act(async () => root.render(<Harness mal={false} />));
+  await act(async () => {
+    await library.refreshLibrary("resume");
+  });
+  expect((readAniListList as jest.Mock).mock.calls.map(([p]) => p)).toEqual([1]);
+});
+
+test("resume mode verifies page 1 then jumps to an incomplete checkpoint", async () => {
   jest.useFakeTimers();
-  setRateLimitRetryAt(Date.now() + 30_000);
   try {
+    writeAniListToken({
+      accessToken: "token-from-session",
+      expiresAt: Date.now() + 3600000,
+      identity: "alice",
+      name: "alice",
+    });
     localStorage.setItem(
       "apex_library_v1_anilist_alice",
       JSON.stringify({
         identity: "alice",
         name: "alice",
-        entries: [{ anime, status: "planning", progress: 0, updatedAt: 1 }],
         complete: false,
         nextPage: 30,
+        entries: [{ anime, status: "planning", progress: 0, updatedAt: 1 }],
         updatedAt: Date.now(),
       }),
     );
-    let failedPage30 = false;
-    setAniListPage((pageNumber) => {
-      if (pageNumber === 30) {
-        if (!failedPage30) {
-          failedPage30 = true;
-          throw new Error(
-            "AniList rate limit reached. Please try again later.",
-          );
-        }
-        return { ...page("alice", "planning", false), entries: [] };
-      }
-      return page("alice", "planning", false);
+    setAniListPage((pageNumber) => ({
+      ...page("alice", "planning", pageNumber === 1),
+      entries: [],
+    }));
+    await act(async () => root.render(<Harness mal={false} />));
+    await act(async () => {
+      void library.refreshLibrary("resume");
     });
     await act(async () => {
-      root.render(<Harness mal={false} />);
+      jest.advanceTimersByTime(4000);
     });
-    expect(library.libraryErrors.anilist).toBe(
-      "AniList rate limit reached. Please try again later.",
-    );
-    const callsAfterFailure = (readAniListList as jest.Mock).mock.calls.length;
-    await act(async () => {
-      jest.advanceTimersByTime(30_000);
-    });
-    expect(
-      (readAniListList as jest.Mock).mock.calls
-        .slice(callsAfterFailure)
-        .map(([pageNumber]) => pageNumber),
-    ).toContain(30);
-  } finally {
-    setRateLimitRetryAt(0);
-    jest.useRealTimers();
-  }
-});
-
-test("auto-retries an AniList rate limit from the saved checkpoint", async () => {
-  jest.useFakeTimers();
-  try {
-    localStorage.setItem(
-      "apex_library_v1_anilist_alice",
-      JSON.stringify({
-        identity: "alice",
-        name: "alice",
-        entries: [{ anime, status: "planning", progress: 0, updatedAt: 1 }],
-        complete: false,
-        nextPage: 30,
-        updatedAt: Date.now(),
-      }),
-    );
-    let failedPage30 = false;
-    setAniListPage((pageNumber) => {
-      if (pageNumber === 30) {
-        if (!failedPage30) {
-          failedPage30 = true;
-          throw new Error(
-            "AniList rate limit reached. Please try again later.",
-          );
-        }
-        return {
-          ...page("alice", "planning", false),
-          entries: [
-            {
-              anime: { id: 2, idMal: 22, title: { english: "Resumed" } },
-              status: "planning",
-              progress: 3,
-              updatedAt: 2,
-            },
-          ],
-        };
-      }
-      return page("alice", "planning", false);
-    });
-    await act(async () => {
-      root.render(<Harness mal={false} />);
-    });
-    expect(library.libraryErrors.anilist).toBe(
-      "AniList rate limit reached. Please try again later.",
-    );
-    const callsAfterFailure = (readAniListList as jest.Mock).mock.calls.length;
-    expect(
-      (readAniListList as jest.Mock).mock.calls
-        .slice(0, callsAfterFailure)
-        .map(([pageNumber]) => pageNumber),
-    ).toContain(30);
-
-    await act(async () => {
-      jest.advanceTimersByTime(65000);
-    });
-
-    const retryPages = (readAniListList as jest.Mock).mock.calls
-      .slice(callsAfterFailure)
-      .map(([pageNumber]) => pageNumber);
-    expect(retryPages).toContain(30);
-    expect(library.libraryErrors.anilist).toBeUndefined();
-    expect(library.lists.anilist?.complete).toBe(true);
-    expect(library.libraryEntries.map((entry) => entry.anime.id).sort()).toEqual(
-      [1, 2],
-    );
+    expect((readAniListList as jest.Mock).mock.calls.map(([p]) => p)).toEqual([
+      1, 30,
+    ]);
   } finally {
     jest.useRealTimers();
   }
 });
+

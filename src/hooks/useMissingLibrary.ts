@@ -70,7 +70,7 @@ export function useMissingLibrary(accounts: ReturnType<typeof useAccounts>) {
     notice,
     error: failed || !!state.error,
     retry: () => {
-      if (failed) void accounts.refreshLibrary();
+      if (failed) void accounts.refreshLibrary("resume");
       else setAttempt((value) => value + 1);
     },
     connected,

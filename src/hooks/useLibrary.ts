@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { AccountProvider, ListAnime, ListStatus } from "./useAccounts";
-import { isRateLimitError } from "../utils/anilist";
-import { getRateLimitRetryAt } from "../utils/rateLimitClock";
+import { readAniListToken } from "../utils/anilistAuth";
 import {
   readAniListList,
   type AniListListPage,
@@ -151,7 +150,8 @@ export function useLibrary(connected: Record<AccountProvider, boolean>) {
     changes.current.set(changeKey(provider, identity), next);
     saveChanges(provider, identity, next);
   };
-  const refreshLibrary = useCallback(async () => {
+  const refreshLibrary = useCallback(
+    async (mode: "full" | "resume" = "full") => {
     const run = ++generation.current;
     setLoading(true);
     setErrors({});
@@ -209,6 +209,7 @@ export function useLibrary(connected: Record<AccountProvider, boolean>) {
                     cached?.identity === identity &&
                     Array.isArray(cached.entries)
                   ) {
+                    const providerChanges = confirmed(provider, identity);
                     setLists((previous) => ({
                       ...previous,
                       [provider]:
@@ -218,21 +219,34 @@ export function useLibrary(connected: Record<AccountProvider, boolean>) {
                               ...cached,
                               entries: mergeConfirmed(
                                 cached.entries,
-                                confirmed(provider, identity),
+                                providerChanges,
                               ),
                             },
                     }));
-                    if (
-                      cached.complete === false &&
-                      confirmed(provider, identity).length === 0 &&
-                      Number.isSafeInteger(cached.nextPage) &&
-                      cached.nextPage > 1 &&
-                      cached.nextPage <= 10000 &&
-                      Date.now() - cached.updatedAt < 3600000
-                    ) {
-                      entries = cached.entries;
-                      page = cached.nextPage;
-                      continue;
+                    if (mode === "resume" && providerChanges.length === 0) {
+                      if (cached.complete === true) {
+                        entries = [
+                          ...cached.entries.filter(
+                            (entry: LibraryEntry) =>
+                              !data.entries.some((fresh) =>
+                                sameAnime(entry.anime, fresh.anime),
+                              ),
+                          ),
+                          ...data.entries,
+                        ];
+                        break;
+                      }
+                      if (
+                        cached.complete === false &&
+                        Number.isSafeInteger(cached.nextPage) &&
+                        cached.nextPage > 1 &&
+                        cached.nextPage <= 10000 &&
+                        Date.now() - cached.updatedAt < 3600000
+                      ) {
+                        entries = cached.entries;
+                        page = cached.nextPage;
+                        continue;
+                      }
                     }
                   }
                 } catch {}
@@ -282,7 +296,9 @@ export function useLibrary(connected: Record<AccountProvider, boolean>) {
                 return { ...previous, [provider]: next };
               });
               if (!data.hasNextPage) break;
-              await new Promise((resolve) => setTimeout(resolve, 2200));
+              await new Promise((resolve) =>
+                setTimeout(resolve, provider === "anilist" ? 4000 : 2200),
+              );
               if (run !== generation.current) return;
               page++;
               if (page > 10000)
@@ -340,25 +356,46 @@ export function useLibrary(connected: Record<AccountProvider, boolean>) {
           }
         }),
     );
-    if (run === generation.current) setLoading(false);
+      if (run === generation.current) setLoading(false);
+    },
+    [connected.anilist, connected.mal, confirmed],
+  );
+  useEffect(() => {
+    setLists((previous) =>
+      Object.fromEntries(
+        Object.entries(previous).filter(
+          ([provider]) => connected[provider as AccountProvider],
+        ),
+      ),
+    );
+    if (!connected.anilist) return;
+    // Hydrate only the token owner's snapshot; never import from mount.
+    const identity = readAniListToken()?.identity;
+    if (!identity) return;
+    try {
+      const cached = JSON.parse(
+        localStorage.getItem("apex_library_v1_anilist_" + identity) || "null",
+      );
+      if (cached?.identity === identity && Array.isArray(cached.entries)) {
+        setLists((previous) => ({
+          ...previous,
+          anilist: {
+            ...cached,
+            entries: mergeConfirmed(
+              cached.entries,
+              confirmed("anilist", identity),
+            ),
+          },
+        }));
+      }
+    } catch {}
   }, [connected.anilist, connected.mal, confirmed]);
-  useEffect(() => {
-    void refreshLibrary();
-    return () => {
+  useEffect(
+    () => () => {
       generation.current++;
-    };
-  }, [refreshLibrary]);
-  useEffect(() => {
-    if (
-      !Object.values(errors).some((error) => !!error && isRateLimitError(error))
-    )
-      return;
-    const resetAt = getRateLimitRetryAt();
-    const delay =
-      resetAt > Date.now() ? Math.max(resetAt - Date.now(), 1000) : 65000;
-    const timer = window.setTimeout(() => void refreshLibrary(), delay);
-    return () => window.clearTimeout(timer);
-  }, [errors, refreshLibrary]);
+    },
+    [],
+  );
   const record = (
     provider: AccountProvider,
     anime: ListAnime,

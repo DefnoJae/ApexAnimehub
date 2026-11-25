@@ -13,6 +13,7 @@ function makeAccounts() {
   return {
     connected: { anilist: true, mal: true },
     libraryEntries: [],
+    refreshLibrary: jest.fn(),
     libraryErrors: {},
     lists: {},
   } as unknown as ReturnType<typeof useAccounts>;
@@ -43,6 +44,7 @@ test("My List sorts by real entry updates and personal score, with compact score
         updatedAt: 200,
       },
     ],
+    refreshLibrary: jest.fn(),
     libraryErrors: {},
     lists: {},
   } as unknown as ReturnType<typeof useAccounts>;
@@ -89,6 +91,7 @@ describe.each([
     const accounts = {
       connected: { anilist: true, mal: false },
       libraryEntries: [],
+      refreshLibrary: jest.fn(),
       libraryErrors: { anilist: error },
       lists: {},
     } as unknown as ReturnType<typeof useAccounts>;
@@ -128,6 +131,7 @@ test("shows the exact seconds remaining in the My List rate-limit alert", () => 
             {
               connected: { anilist: true, mal: false },
               libraryEntries: [],
+              refreshLibrary: jest.fn(),
               libraryErrors: {
                 anilist: "AniList rate limit reached. Please try again later.",
               },
@@ -377,5 +381,69 @@ test("removing a watch later entry hides its card immediately without a remount"
   } finally {
     act(() => root.unmount());
     host.remove();
+  }
+});
+
+test("starts a resume import when My List opens", async () => {
+  const host = document.createElement("div");
+  document.body.append(host);
+  const root = createRoot(host);
+  const accounts = {
+    ...makeAccounts(),
+    connected: { anilist: true, mal: false },
+  } as ReturnType<typeof useAccounts>;
+  try {
+    await act(async () =>
+      root.render(
+        <MyList
+          accounts={accounts}
+          onSelect={jest.fn()}
+          onConnect={jest.fn()}
+        />,
+      ),
+    );
+    expect(accounts.refreshLibrary).toHaveBeenCalledWith("resume");
+  } finally {
+    act(() => root.unmount());
+    host.remove();
+  }
+});
+
+test("retries a rate limit from My List only after the reset", async () => {
+  jest.useFakeTimers();
+  setRateLimitRetryAt(Date.now() + 30_000);
+  try {
+    const host = document.createElement("div");
+    document.body.append(host);
+    const root = createRoot(host);
+    const accounts = {
+      ...makeAccounts(),
+      connected: { anilist: true, mal: false },
+      libraryErrors: {
+        anilist: "AniList rate limit reached. Please try again later.",
+      },
+    } as unknown as ReturnType<typeof useAccounts>;
+    try {
+      await act(async () =>
+        root.render(
+          <MyList
+            accounts={accounts}
+            onSelect={jest.fn()}
+            onConnect={jest.fn()}
+          />,
+        ),
+      );
+      expect(accounts.refreshLibrary).not.toHaveBeenCalledWith("resume");
+      await act(async () => {
+        jest.advanceTimersByTime(30_000);
+      });
+      expect(accounts.refreshLibrary).toHaveBeenCalledWith("resume");
+    } finally {
+      act(() => root.unmount());
+      host.remove();
+    }
+  } finally {
+    setRateLimitRetryAt(0);
+    jest.useRealTimers();
   }
 });

@@ -259,7 +259,7 @@ git commit -m "feat: share one browser AniList request budget"
 - Consumes: `readAniListList(page, signal?)`, `readAniListToken()`, `getRateLimitRetryAt()`, `isRateLimitError()`.
 - Produces: `refreshLibrary(mode?: "full" | "resume"): Promise<void>` on `useLibrary`/`useAccounts`; default mode is `"full"`. Existing no-argument calls keep full-import behavior.
 
-- [ ] **Step 1: Write the failing library tests**
+- [x] **Step 1: Write the failing library tests**
 
 Update `src/hooks/useLibrary.test.tsx`:
 - Add `import { writeAniListToken } from "../utils/anilistAuth";` and keep `setRateLimitRetryAt` imported.
@@ -393,12 +393,12 @@ test("retries a rate limit from My List only after the reset", async () => {
 });
 ```
 
-- [ ] **Step 2: Run library tests to verify failure**
+- [x] **Step 2: Run library tests to verify failure**
 
 Run: `npm run test:ci -- src/hooks/useLibrary.test.tsx src/components/MyList.test.tsx`
 Expected: FAIL because `refreshLibrary` has no mode, mount import still fires, and My List has no resume/retry effects.
 
-- [ ] **Step 3: Implement library changes**
+- [x] **Step 3: Implement library changes**
 
 In `src/hooks/useLibrary.ts`:
 - Accept `mode: "full" | "resume" = "full"` in `refreshLibrary`.
@@ -415,12 +415,12 @@ In `src/components/MyList.tsx`:
 
 In `src/hooks/useMissingLibrary.ts`, change `accounts.refreshLibrary()` in `retry()` to `accounts.refreshLibrary("resume")`.
 
-- [ ] **Step 4: Run library tests to verify pass**
+- [x] **Step 4: Run library tests to verify pass**
 
 Run: `npm run test:ci -- src/hooks/useLibrary.test.tsx src/components/MyList.test.tsx`
 Expected: PASS.
 
-- [ ] **Step 5: Run full gates and commit**
+- [x] **Step 5: Run full gates and commit**
 
 Run:
 

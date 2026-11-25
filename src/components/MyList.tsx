@@ -2,6 +2,7 @@ import { StyledSelect } from "./StyledSelect";
 import React, { useEffect, useReducer, useRef, useState } from "react";
 import { MinusCircle } from "lucide-react";
 import { isRateLimitError } from "../utils/anilist";
+import { getRateLimitRetryAt } from "../utils/rateLimitClock";
 import { useRateLimitCountdown } from "../hooks/useRateLimitCountdown";
 import type { useAccounts, ListStatus } from "../hooks/useAccounts";
 import { LibraryAnime } from "../hooks/useLibrary";
@@ -124,6 +125,32 @@ export function MyList({
     sort,
   ]);
   const { secondsRemaining } = useRateLimitCountdown();
+  const connected = !!(accounts.connected?.anilist || accounts.connected?.mal);
+  const connectionKey = `${!!accounts.connected?.anilist}:${!!accounts.connected?.mal}`;
+  const rateLimitedError = Object.entries(accounts.libraryErrors || {}).find(
+    ([, error]) => !!error && isRateLimitError(error),
+  );
+  const rateLimitedKey = rateLimitedError
+    ? `${rateLimitedError[0]}:${rateLimitedError[1]}`
+    : "";
+  const startedImport = useRef("");
+  useEffect(() => {
+    if (!connected || startedImport.current === connectionKey) return;
+    startedImport.current = connectionKey;
+    if (rateLimitedKey) return;
+    void accounts.refreshLibrary("resume");
+  }, [connectionKey, rateLimitedKey, accounts.refreshLibrary]);
+  useEffect(() => {
+    if (!rateLimitedKey) return;
+    const resetAt = getRateLimitRetryAt();
+    const delay =
+      resetAt > Date.now() ? Math.max(resetAt - Date.now(), 1000) : 65000;
+    const timer = window.setTimeout(
+      () => void accounts.refreshLibrary("resume"),
+      delay,
+    );
+    return () => window.clearTimeout(timer);
+  }, [rateLimitedKey, accounts.refreshLibrary]);
   const isWatchLaterStatus = status === "watch-later";
   const filtered = accounts.libraryEntries.filter(
     (e) =>
