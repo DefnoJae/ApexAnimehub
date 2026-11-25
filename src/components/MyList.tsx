@@ -323,18 +323,10 @@ export function MyList({
                     alt=""
                   />
                 </button>
-                <PersonalRating
-                  score={scoreFor(entry)}
-                  className="my-list-score"
-                />
-                {inProgress.length > 0 && (
-                  <span className="my-list-progress" aria-label={total ? `${watched} of ${total} episodes watched` : `${watched} episodes watched, total unknown`}>
-                    {watched}/{total || "?"}
-                  </span>
-                )}
                 {inWatchLater ? (
                   <button
                     className="quick-add glass"
+                    style={{ position: "absolute", bottom: 10, left: 10 }}
                     onClick={() => {
                       removeFromWatchLater(entry);
                       setVisibleCount(batchSize);
@@ -347,12 +339,20 @@ export function MyList({
                   >
                     <MinusCircle size={19} />
                   </button>
+                ) : inProgress.length > 0 ? (
+                  <span className="my-list-progress" aria-label={total ? `${watched} of ${total} episodes watched` : `${watched} episodes watched, total unknown`}>
+                    {watched}/{total || "?"}
+                  </span>
                 ) : (
                   <QuickList
                     anime={{ ...entry, title: entry.title || {} }}
                     accounts={accounts}
                   />
                 )}
+                <PersonalRating
+                  score={scoreFor(entry)}
+                  className="my-list-score"
+                />
               </div>
               <button
                 className="poster-title"
