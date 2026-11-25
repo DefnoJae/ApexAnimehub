@@ -817,7 +817,7 @@ git commit -m "feat: lengthen AniList polls and reuse cached scores"
 - Consumes: the commit created in Task 5.
 - Produces: production deployment at `https://apexanime.pages.dev/` from `main` with no tokens in command output.
 
-- [ ] **Step 1: Re-run all gates on the final tree**
+- [x] **Step 1: Re-run all gates on the final tree**
 
 Run:
 
@@ -830,7 +830,7 @@ npm run build
 
 Expected: all PASS; report exact suite/test counts.
 
-- [ ] **Step 2: Push to `main`**
+- [x] **Step 2: Push to `main`**
 
 Run:
 
@@ -840,7 +840,7 @@ git push origin main
 
 Expected: push succeeds; record the pushed short hash with `git rev-parse --short HEAD`.
 
-- [ ] **Step 3: Deploy the same hash**
+- [x] **Step 3: Deploy the same hash**
 
 From `cloudflare-pages`, run the established deploy command with the recorded hash and commit message:
 
@@ -850,7 +850,7 @@ npx -y wrangler@4.166.0 pages deploy ../build --project-name=apexanime --branch=
 
 Expected: deployment URL is `https://apexanime.pages.dev/`.
 
-- [ ] **Step 4: Verify live behavior in Edge**
+- [x] **Step 4: Verify live behavior in Edge**
 
 In the user's Edge browser, check:
 - Opening My List loads from cache/immediately and any import resumes without restarting at page 1.
@@ -859,6 +859,6 @@ In the user's Edge browser, check:
 - The countdown pill still sits 12 px from the top and 16 px from the left and ticks in exact seconds.
 - No AniList 429 occurs during a short Search → Discovery → My List walkthrough.
 
-- [ ] **Step 5: Report**
+- [x] **Step 5: Report**
 
 Report the commit hash, deployment URL, gate results, and any remaining server-only approximate countdown text. Never include tokens or header values from live traffic.
