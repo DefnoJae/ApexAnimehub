@@ -200,7 +200,9 @@ async function search(id, episode) {
           .filter(
             (e) =>
               Number(e.anidb_eid) === eid &&
-              (!e.status || e.status === "complete"),
+              (!e.status ||
+                e.status === "complete" ||
+                e.status === "unknown"),
           )
           .sort(
             (a, b) =>
@@ -227,15 +229,15 @@ async function search(id, episode) {
                 season,
               ).slice(0, 8)) {
                 const meta = a.info || {},
-                  label = String(meta.name || meta.title || "English");
-                if (
-                  !/^(eng|en|english)$/i.test(
-                    String(
-                      meta.lang || meta.language_code || meta.language || "",
-                    ),
-                  ) &&
-                  !/\benglish\b/i.test(label)
-                )
+                  label = String(meta.name || meta.title || "English"),
+                  lang = String(
+                    meta.lang || meta.language_code || meta.language || "",
+                  ),
+                  // Only exclude tracks explicitly tagged as another language.
+                  // Fansub releases frequently omit language tags, so an
+                  // untagged track is still a candidate; englishScore ranks it.
+                  isNonEnglish = lang && !/^(eng|en|english)$/i.test(lang);
+                if (isNonEnglish && !/\benglish\b/i.test(label))
                   continue;
                 const n = Number(a.id);
                 if (!Number.isSafeInteger(n) || n <= 0) continue;

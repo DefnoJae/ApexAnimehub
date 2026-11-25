@@ -110,6 +110,90 @@ test("search reuses exact episode results and decodes styled signs without expos
     global.fetch = before;
   }
 });
+test("an AniTosho release with unknown status still yields its signs/songs subtitles", async () => {
+  const before = global.fetch;
+  global.fetch = async (raw) => {
+    const u = new URL(raw);
+    if (u.hostname === "api.ani.zip")
+      return Response.json({
+        mappings: { anilist_id: 2034 },
+        episodes: { "1": { anidbEid: 71648, seasonNumber: 1 } },
+      });
+    if (u.searchParams.get("eid"))
+      return Response.json([
+        { id: 56839, anidb_eid: 71648, status: "unknown", title: "LC - 01" },
+      ]);
+    if (u.searchParams.get("show"))
+      return Response.json({
+        files: [
+          {
+            filename: "Lovely Complex - 01.mkv",
+            attachments: [
+              {
+                id: 292002,
+                type: "subtitle",
+                info: { format: "ASS", name: "Styled Subtitles" },
+                url: "https://storage.animetosho.net/attachments/0000a/936.xz",
+              },
+            ],
+          },
+        ],
+      });
+    if (u.hostname === "storage.animetosho.net") return new Response(ass);
+    return new Response("not found", { status: 404 });
+  };
+  try {
+    const result = await search(2034, 1);
+    assert.equal(result.tracks.length, 1);
+    assert.equal(result.tracks[0].id, "292002");
+    assert.equal(result.tracks[0].cues.length, 1);
+  } finally {
+    global.fetch = before;
+  }
+});
+test("a subtitle track explicitly tagged as a non-English language is excluded", async () => {
+  const before = global.fetch;
+  global.fetch = async (raw) => {
+    const u = new URL(raw);
+    if (u.hostname === "api.ani.zip")
+      return Response.json({
+        mappings: { anilist_id: 987655 },
+        episodes: { "1": { anidbEid: 99999, seasonNumber: 1 } },
+      });
+    if (u.searchParams.get("eid"))
+      return Response.json([
+        { id: 55555, anidb_eid: 99999, status: "complete", title: "LC - 01" },
+      ]);
+    if (u.searchParams.get("show"))
+      return Response.json({
+        files: [
+          {
+            filename: "LC - 01.mkv",
+            attachments: [
+              {
+                id: 292003,
+                type: "subtitle",
+                info: {
+                  language_code: "rus",
+                  format: "ASS",
+                  name: "Russian Signs",
+                },
+                url: "https://storage.animetosho.net/attachments/0000b/937.xz",
+              },
+            ],
+          },
+        ],
+      });
+    if (u.hostname === "storage.animetosho.net") return new Response(ass);
+    return new Response("not found", { status: 404 });
+  };
+  try {
+    const result = await search(987655, 1);
+    assert.equal(result.tracks.length, 0);
+  } finally {
+    global.fetch = before;
+  }
+});
 test("invalid requests fail without contacting providers", async () => {
   let body = "";
   const res = {
