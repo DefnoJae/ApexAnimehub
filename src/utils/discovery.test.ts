@@ -1,4 +1,9 @@
-import { defaultFilters, discoveryParams, fetchDiscovery } from "./discovery";
+import {
+  defaultFilters,
+  discoveryParams,
+  fetchDiscovery,
+  fetchDiscoveryOptions,
+} from "./discovery";
 import { getDubIndex } from "./animeMetadata";
 import { fetchAnilist } from "./anilist";
 jest.mock("./anilist", () => ({ fetchAnilist: jest.fn() }));
@@ -142,12 +147,88 @@ test("list filters match either provider by shared IDs and exclude all listed st
   expect(matchesListStatus(anime, entries, "")).toBe(true);
 });
 
-test("studio catalog is ID-based, paginated and retains genre filters", async () => {
- (fetchAnilist as jest.Mock).mockReset().mockResolvedValueOnce({Studio:{name:"Studio",media:{pageInfo:{hasNextPage:true},nodes:[{id:1,type:"ANIME",title:{english:"Anime"},genres:["Action"],averageScore:80},{id:2,type:"MANGA",title:{english:"Manga"}}]}}}).mockResolvedValueOnce({Studio:{name:"Studio",media:{pageInfo:{hasNextPage:false},nodes:[]}}});
- const result=await fetchDiscovery({...defaultFilters,studioId:14,genres:["name:Action"]},1,new AbortController().signal);
- expect(result.items.map(item=>item.id)).toEqual([1]);
- expect(result.items[0].anilistScore).toBe(8);
- expect(result.nextPage).toBeNull();
- expect(fetchAnilist).toHaveBeenNthCalledWith(1,expect.stringContaining("Studio(id:$id)"),expect.objectContaining({id:14,page:1}),expect.anything());
- expect(fetchAnilist).toHaveBeenNthCalledWith(2,expect.any(String),expect.objectContaining({id:14,page:2}),expect.anything());
+test("reuses a successful AniList page for ten minutes", async () => {
+  jest.useFakeTimers();
+  try {
+    (fetchAnilist as jest.Mock).mockReset().mockResolvedValue({
+      Page: { pageInfo: { hasNextPage: false }, media: [] },
+    });
+    const filters = { ...defaultFilters, search: "cache-window" };
+    await fetchDiscovery(filters, 1, new AbortController().signal, "anilist");
+    await fetchDiscovery(filters, 1, new AbortController().signal, "anilist");
+    expect(fetchAnilist).toHaveBeenCalledTimes(1);
+    jest.advanceTimersByTime(600_000);
+    await fetchDiscovery(filters, 1, new AbortController().signal, "anilist");
+    expect(fetchAnilist).toHaveBeenCalledTimes(2);
+  } finally {
+    jest.useRealTimers();
+  }
+});
+
+test("does not cache failed or aborted Discovery pages", async () => {
+  (fetchAnilist as jest.Mock)
+    .mockReset()
+    .mockRejectedValueOnce(new Error("offline"))
+    .mockResolvedValue({
+      Page: { pageInfo: { hasNextPage: false }, media: [] },
+    });
+  const filters = { ...defaultFilters, search: "cache-failure" };
+  await expect(
+    fetchDiscovery(filters, 1, new AbortController().signal, "anilist"),
+  ).rejects.toThrow("offline");
+  await fetchDiscovery(filters, 1, new AbortController().signal, "anilist");
+  expect(fetchAnilist).toHaveBeenCalledTimes(2);
+});
+
+test("reuses Discovery options for thirty minutes", async () => {
+  jest.useFakeTimers();
+  try {
+    (fetchAnilist as jest.Mock).mockReset().mockResolvedValue({
+      GenreCollection: ["Action"],
+      MediaTagCollection: [{ name: "Super Power", isAdult: false }],
+    });
+    await fetchDiscoveryOptions(new AbortController().signal);
+    await fetchDiscoveryOptions(new AbortController().signal);
+    expect(fetchAnilist).toHaveBeenCalledTimes(1);
+    jest.advanceTimersByTime(1_800_000);
+    await fetchDiscoveryOptions(new AbortController().signal);
+    expect(fetchAnilist).toHaveBeenCalledTimes(2);
+  } finally {
+    jest.useRealTimers();
+  }
+});
+
+test("studio catalog uses one ID-based page of fifty and retains genre filters", async () => {
+  (fetchAnilist as jest.Mock).mockReset().mockResolvedValue({
+    Studio: {
+      name: "Studio",
+      media: {
+        pageInfo: { hasNextPage: false },
+        nodes: [
+          {
+            id: 1,
+            type: "ANIME",
+            title: { english: "Anime" },
+            genres: ["Action"],
+            averageScore: 80,
+          },
+          { id: 2, type: "MANGA", title: { english: "Manga" } },
+        ],
+      },
+    },
+  });
+  const result = await fetchDiscovery(
+    { ...defaultFilters, studioId: 14, genres: ["name:Action"] },
+    1,
+    new AbortController().signal,
+  );
+  expect(result.items.map((item) => item.id)).toEqual([1]);
+  expect(result.items[0].anilistScore).toBe(8);
+  expect(result.nextPage).toBeNull();
+  expect(fetchAnilist).toHaveBeenCalledTimes(1);
+  expect(fetchAnilist).toHaveBeenCalledWith(
+    expect.stringContaining("perPage:50"),
+    expect.objectContaining({ id: 14, page: 1, sort: ["POPULARITY_DESC"] }),
+    expect.anything(),
+  );
 });

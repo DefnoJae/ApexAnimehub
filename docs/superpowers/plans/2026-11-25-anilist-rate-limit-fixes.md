@@ -454,7 +454,7 @@ git commit -m "feat: make AniList library import on demand and resumable"
 - Consumes: existing `fetchDiscovery(filters, page, signal, preferred?)`, `fetchDiscoveryOptions(signal)`, `fetchStudioDiscovery`.
 - Produces: unchanged public signatures; successful results are cached internally by `preferred + ":" + JSON.stringify(filters) + ":" + page`; options cached by module singleton.
 
-- [ ] **Step 1: Write the failing Discovery tests**
+- [x] **Step 1: Write the failing Discovery tests**
 
 Add `fetchDiscoveryOptions` to the existing import from `./discovery` in `src/utils/discovery.test.ts`, then add these tests:
 
@@ -515,12 +515,12 @@ Update the existing studio test `studio catalog is ID-based, paginated and retai
 
 Update `src/components/DiscoveryPage.test.tsx` test `loads 50 posters, keeps quick list controls, and appends on near-bottom intersection`: after the initial render, assert `fetchDiscovery` was called once; after calling `intersect(...)`, advance timers by 599 ms and assert the last call is still page 1, then advance 1 ms and assert page 2.
 
-- [ ] **Step 2: Run Discovery tests to verify failure**
+- [x] **Step 2: Run Discovery tests to verify failure**
 
 Run: `npm run test:ci -- src/utils/discovery.test.ts src/components/DiscoveryPage.test.tsx`
 Expected: FAIL because caches and the debounce do not exist and studio still makes two calls.
 
-- [ ] **Step 3: Implement Discovery changes**
+- [x] **Step 3: Implement Discovery changes**
 
 In `src/utils/discovery.ts`:
 - Add in-memory maps with TTLs and a small max size (24 pages, 8 option entries); evict oldest entries.
@@ -534,12 +534,12 @@ In `src/components/DiscoveryPage.tsx`:
 - In the observer callback, start a 600 ms `setTimeout` before `setPage(nextPage)`; clear it on effect cleanup.
 - Do not add any eager page loading beyond the existing page-1 effect.
 
-- [ ] **Step 4: Run Discovery tests to verify pass**
+- [x] **Step 4: Run Discovery tests to verify pass**
 
 Run: `npm run test:ci -- src/utils/discovery.test.ts src/components/DiscoveryPage.test.tsx`
 Expected: PASS.
 
-- [ ] **Step 5: Run full gates and commit**
+- [x] **Step 5: Run full gates and commit**
 
 Run:
 

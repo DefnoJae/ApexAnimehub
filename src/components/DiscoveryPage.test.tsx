@@ -61,10 +61,11 @@ afterEach(() => {
   jest.useRealTimers();
   jest.clearAllMocks();
 });
-test("loads 50 posters, keeps quick list controls, and appends on near-bottom intersection", async () => {
+test("loads 50 posters, keeps quick list controls, and appends after a debounced near-bottom intersection", async () => {
   await act(async () =>
     root.render(<DiscoveryPage accounts={accounts} onSelect={jest.fn()} />),
   );
+  expect(fetchDiscovery).toHaveBeenCalledTimes(1);
   expect(node.querySelectorAll(".poster-card")).toHaveLength(50);
   expect(
     node.querySelector(".poster-card .poster-caption small")?.textContent,
@@ -79,6 +80,18 @@ test("loads 50 posters, keeps quick list controls, and appends on near-bottom in
       {} as IntersectionObserver,
     ),
   );
+  await act(async () => {
+    jest.advanceTimersByTime(599);
+  });
+  expect(fetchDiscovery).toHaveBeenLastCalledWith(
+    expect.anything(),
+    1,
+    expect.anything(),
+    "anilist",
+  );
+  await act(async () => {
+    jest.advanceTimersByTime(1);
+  });
   expect(node.querySelectorAll(".poster-card")).toHaveLength(100);
   expect(fetchDiscovery).toHaveBeenLastCalledWith(
     expect.anything(),

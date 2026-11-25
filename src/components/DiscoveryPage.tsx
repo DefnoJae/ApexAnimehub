@@ -222,6 +222,7 @@ export function DiscoveryPage({
       JSON.stringify(draft) !== JSON.stringify(applied)
     )
       return;
+    let debounce: ReturnType<typeof setTimeout> | undefined;
     const observer = new IntersectionObserver(
       (entries) => {
         if (
@@ -229,13 +230,16 @@ export function DiscoveryPage({
           !loadLock.current
         ) {
           loadLock.current = true;
-          setPage(nextPage);
+          debounce = setTimeout(() => setPage(nextPage), 600);
         }
       },
-      { rootMargin: "800px 0px" },
+      { rootMargin: "160px 0px" },
     );
     observer.observe(sentinel.current);
-    return () => observer.disconnect();
+    return () => {
+      if (debounce) clearTimeout(debounce);
+      observer.disconnect();
+    };
   }, [loading, error, nextPage, draft, applied, listUnavailable]);
   const change = (key: keyof DiscoveryFilters, value: string) =>
     setDraft((p) => ({ ...p, [key]: value }));

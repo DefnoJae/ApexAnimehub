@@ -49,6 +49,61 @@ export interface DiscoveryAnime extends DashboardAnime {
   year?: number;
   format?: string;
 }
+interface DiscoveryResult {
+  items: DiscoveryAnime[];
+  nextPage: number | null;
+  scanned: number;
+  source: "mal" | "anilist";
+}
+interface DiscoveryOptions {
+  genres: string[];
+  tags: string[];
+}
+interface CacheEntry<T> {
+  value: T;
+  expiresAt: number;
+}
+const PAGE_CACHE_TTL = 600_000;
+const OPTIONS_CACHE_TTL = 1_800_000;
+const PAGE_CACHE_MAX = 24;
+const OPTIONS_CACHE_MAX = 8;
+const pageCache = new Map<string, CacheEntry<DiscoveryResult>>();
+const optionsCache = new Map<string, CacheEntry<DiscoveryOptions>>();
+function readCache<T>(
+  cache: Map<string, CacheEntry<T>>,
+  key: string,
+  signal: AbortSignal,
+): T | null {
+  if (signal.aborted) return null;
+  const entry = cache.get(key);
+  if (!entry) return null;
+  if (Date.now() >= entry.expiresAt) {
+    cache.delete(key);
+    return null;
+  }
+  return entry.value;
+}
+function writeCache<T>(
+  cache: Map<string, CacheEntry<T>>,
+  key: string,
+  value: T,
+  ttl: number,
+  max: number,
+) {
+  cache.delete(key);
+  cache.set(key, { value, expiresAt: Date.now() + ttl });
+  while (cache.size > max) {
+    const oldest = cache.keys().next().value;
+    if (oldest === undefined) break;
+    cache.delete(oldest);
+  }
+}
+function copyResult(result: DiscoveryResult): DiscoveryResult {
+  return { ...result, items: [...result.items] };
+}
+function copyOptions(options: DiscoveryOptions): DiscoveryOptions {
+  return { genres: [...options.genres], tags: [...options.tags] };
+}
 interface JikanAnime {
   mal_id: number;
   title: string;
@@ -319,55 +374,45 @@ async function fetchStudioDiscovery(
     }[filters.sort] || "POPULARITY_DESC";
   const dub = filters.audio === "dub" ? await getDubIndex() : null;
   const dubbed = new Set([...(dub?.dubbed || []), ...(dub?.partial || [])]);
-  const items: DiscoveryAnime[] = [];
-  let more = false;
-  // Studio connections allow 25 per page; two pages preserve Discovery's 50-item batches.
-  for (let offset = 0; offset < 2; offset++) {
-    const data = await fetchAnilist<{
-      Studio: {
-        name: string;
-        media: { pageInfo: { hasNextPage: boolean }; nodes: StudioMedia[] };
-      } | null;
-    }>(
-      "query($id:Int!,$page:Int!,$sort:[MediaSort]){Studio(id:$id){name media(page:$page,perPage:25,sort:$sort){pageInfo{hasNextPage} nodes{id idMal type isAdult title{english romaji} coverImage{extraLarge} bannerImage episodes averageScore startDate{year} season status format genres tags{name}}}}}",
-      { id: filters.studioId, page: (page - 1) * 2 + 1 + offset, sort: [sort] },
-      signal,
+  const data = await fetchAnilist<{
+    Studio: {
+      name: string;
+      media: { pageInfo: { hasNextPage: boolean }; nodes: StudioMedia[] };
+    } | null;
+  }>(
+    "query($id:Int!,$page:Int!,$sort:[MediaSort]){Studio(id:$id){name media(page:$page,perPage:50,sort:$sort){pageInfo{hasNextPage} nodes{id idMal type isAdult title{english romaji} coverImage{extraLarge} bannerImage episodes averageScore startDate{year} season status format genres tags{name}}}}}",
+    { id: filters.studioId, page, sort: [sort] },
+    signal,
+  );
+  if (!data.Studio)
+    throw new Error(
+      "This studio is unavailable. Remove the studio filter and try again.",
     );
-    if (!data.Studio)
-      throw new Error(
-        "This studio is unavailable. Remove the studio filter and try again.",
-      );
-    items.push(
-      ...data.Studio.media.nodes
-        .filter(
-          (anime) =>
-            matchesStudioFilters(anime, filters) &&
-            (filters.audio !== "dub" ||
-              (!!anime.idMal && dubbed.has(anime.idMal))),
-        )
-        .map((anime) => ({
-          ...anime,
-          malScore: null,
-          anilistScore: anime.averageScore ? anime.averageScore / 10 : null,
-          year: anime.startDate?.year,
-        })),
-    );
-    more = data.Studio.media.pageInfo.hasNextPage;
-    if (!more) break;
-  }
+  const items = data.Studio.media.nodes
+    .filter(
+      (anime) =>
+        matchesStudioFilters(anime, filters) &&
+        (filters.audio !== "dub" || (!!anime.idMal && dubbed.has(anime.idMal))),
+    )
+    .map((anime) => ({
+      ...anime,
+      malScore: null,
+      anilistScore: anime.averageScore ? anime.averageScore / 10 : null,
+      year: anime.startDate?.year,
+    }));
   return {
     items,
-    nextPage: more ? page + 1 : null,
+    nextPage: data.Studio.media.pageInfo.hasNextPage ? page + 1 : null,
     scanned: 1,
     source: "anilist" as const,
   };
 }
-export async function fetchDiscovery(
+async function fetchDiscoveryUncached(
   filters: DiscoveryFilters,
   page: number,
   signal: AbortSignal,
   preferred: "mal" | "anilist" = "mal",
-) {
+): Promise<DiscoveryResult> {
   if (filters.from && filters.to && Number(filters.from) > Number(filters.to))
     throw new Error("Start year must be before or equal to end year.");
   if (filters.studioId) return fetchStudioDiscovery(filters, page, signal);
@@ -383,6 +428,22 @@ export async function fetchDiscovery(
     if (!(error instanceof CatalogUnavailable) || signal.aborted) throw error;
     return fetchAniDiscovery(filters, 1, signal);
   }
+}
+export async function fetchDiscovery(
+  filters: DiscoveryFilters,
+  page: number,
+  signal: AbortSignal,
+  preferred: "mal" | "anilist" = "mal",
+): Promise<DiscoveryResult> {
+  if (filters.from && filters.to && Number(filters.from) > Number(filters.to))
+    throw new Error("Start year must be before or equal to end year.");
+  const key = preferred + ":" + JSON.stringify(filters) + ":" + page;
+  const cached = readCache(pageCache, key, signal);
+  if (cached) return copyResult(cached);
+  const result = await fetchDiscoveryUncached(filters, page, signal, preferred);
+  if (!signal.aborted)
+    writeCache(pageCache, key, copyResult(result), PAGE_CACHE_TTL, PAGE_CACHE_MAX);
+  return result;
 }
 export async function fetchGenres(
   signal: AbortSignal,
@@ -408,15 +469,28 @@ export async function fetchGenres(
   }
 }
 
-export async function fetchDiscoveryOptions(signal: AbortSignal) {
+export async function fetchDiscoveryOptions(
+  signal: AbortSignal,
+): Promise<DiscoveryOptions> {
+  const cached = readCache(optionsCache, "options", signal);
+  if (cached) return copyOptions(cached);
   const data = await fetchAnilist<{
     GenreCollection: string[];
     MediaTagCollection: Array<{ name: string; isAdult: boolean }>;
   }>("query{GenreCollection MediaTagCollection{name isAdult}}", {}, signal);
-  return {
+  const result = {
     genres: data.GenreCollection,
     tags: data.MediaTagCollection.filter((tag) => !tag.isAdult)
       .map((tag) => tag.name)
       .sort(),
   };
+  if (!signal.aborted)
+    writeCache(
+      optionsCache,
+      "options",
+      copyOptions(result),
+      OPTIONS_CACHE_TTL,
+      OPTIONS_CACHE_MAX,
+    );
+  return result;
 }
