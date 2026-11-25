@@ -16,8 +16,7 @@
 .apex-rate-limit-banner {
   position: fixed;
   top: 12px;
-  left: 50%;
-  transform: translateX(-50%);
+  left: 16px;
   z-index: 200;
   padding: 8px 15px;
   border: 1px solid rgba(251, 191, 36, 0.45);
