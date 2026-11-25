@@ -93,7 +93,7 @@ export function FollowingStories({
   }, [identity, connected, checking, retry]);
   useEffect(() => {
     if (open) return;
-    const timer = setInterval(() => setRetry((value) => value + 1), 300000);
+    const timer = setInterval(() => setRetry((value) => value + 1), 900000);
     return () => clearInterval(timer);
   }, [open]);
   const activeGroups = valid ? groups : [];

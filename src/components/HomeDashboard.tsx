@@ -416,7 +416,7 @@ export function LatestEpisodes({
   useEffect(() => {
     const timer = window.setInterval(
       () => setRetry((value) => value + 1),
-      60000,
+      300000,
     );
     return () => window.clearInterval(timer);
   }, []);

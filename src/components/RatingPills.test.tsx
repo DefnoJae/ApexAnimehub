@@ -166,3 +166,38 @@ test("does not cache rate-limit failures; retries on re-mount", async () => {
     jest.clearAllMocks();
   }
 });
+
+test("reuses a successful AniList score for thirty minutes", async () => {
+  jest.useFakeTimers();
+  localStorage.setItem("apex_rating_source_v1", "anilist");
+  (fetchAnilist as jest.Mock)
+    .mockReset()
+    .mockResolvedValue({ Media: { averageScore: 85 } });
+  const renderOnce = async () => {
+    const host = document.createElement("div");
+    document.body.append(host);
+    const root = createRoot(host);
+    try {
+      await act(async () => root.render(<RatingPills id={77} idMal={78} />));
+    } finally {
+      act(() => root.unmount());
+      host.remove();
+    }
+  };
+  try {
+    await renderOnce();
+    expect(fetchAnilist).toHaveBeenCalledTimes(1);
+    await renderOnce();
+    expect(fetchAnilist).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      jest.advanceTimersByTime(1_800_000);
+    });
+    await renderOnce();
+    expect(fetchAnilist).toHaveBeenCalledTimes(2);
+  } finally {
+    localStorage.clear();
+    jest.clearAllMocks();
+    jest.useRealTimers();
+  }
+});
+

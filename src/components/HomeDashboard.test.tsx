@@ -409,3 +409,33 @@ test("Home refresh renders saved Continue Watching before hero data arrives and 
       ?.getAttribute("aria-label"),
   ).toBe("Your rating: 9/10");
 });
+
+test("Latest Episodes polls every five minutes", async () => {
+  jest.useFakeTimers();
+  try {
+    (fetchAnilist as jest.Mock).mockReset().mockResolvedValue({
+      Page: { pageInfo: { hasNextPage: false }, airingSchedules: [] },
+    });
+    await act(async () =>
+      root.render(
+        <LatestEpisodes
+          language="sub"
+          setLanguage={jest.fn()}
+          onSelect={jest.fn()}
+          onCalendar={jest.fn()}
+        />,
+      ),
+    );
+    expect(fetchAnilist).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      jest.advanceTimersByTime(299_999);
+    });
+    expect(fetchAnilist).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      jest.advanceTimersByTime(1);
+    });
+    expect(fetchAnilist).toHaveBeenCalledTimes(2);
+  } finally {
+    jest.useRealTimers();
+  }
+});

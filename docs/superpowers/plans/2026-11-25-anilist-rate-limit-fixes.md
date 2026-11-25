@@ -686,7 +686,7 @@ git commit -m "feat: cap and cache AniList title search"
 - Consumes: existing `fetchAnilist` score query and component props.
 - Produces: no public signature changes; RatingPills reuses successful scores for 1800000 ms while keeping in-flight deduplication.
 
-- [ ] **Step 1: Write the failing interval and score tests**
+- [x] **Step 1: Write the failing interval and score tests**
 
 Add to `src/components/HomeDashboard.test.tsx`:
 
@@ -764,12 +764,12 @@ test("reuses a successful AniList score for thirty minutes", async () => {
 });
 ```
 
-- [ ] **Step 2: Run poll/rating tests to verify failure**
+- [x] **Step 2: Run poll/rating tests to verify failure**
 
 Run: `npm run test:ci -- src/components/HomeDashboard.test.tsx src/components/FollowingStories.test.tsx src/components/RatingPills.test.tsx`
 Expected: FAIL because intervals are still 60000/300000 and successful scores have no TTL cache.
 
-- [ ] **Step 3: Implement poll and rating changes**
+- [x] **Step 3: Implement poll and rating changes**
 
 In `src/components/HomeDashboard.tsx`, change the `LatestEpisodes` interval from `60000` to `300000`.
 
@@ -781,12 +781,12 @@ In `src/components/RatingPills.tsx`:
 - On a cache hit, return the cached `number | null` without calling `fetchAnilist`.
 - Store only successful values; delete in-flight entries on failure and never cache rate-limit errors.
 
-- [ ] **Step 4: Run poll/rating tests to verify pass**
+- [x] **Step 4: Run poll/rating tests to verify pass**
 
 Run: `npm run test:ci -- src/components/HomeDashboard.test.tsx src/components/FollowingStories.test.tsx src/components/RatingPills.test.tsx`
 Expected: PASS.
 
-- [ ] **Step 5: Run full gates and commit**
+- [x] **Step 5: Run full gates and commit**
 
 Run:
 

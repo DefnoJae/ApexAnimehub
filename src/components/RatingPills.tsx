@@ -5,8 +5,35 @@ import { getMalScore, getCachedMalScore } from "../utils/animeMetadata";
 import { fetchAnilist } from "../utils/anilist";
 import "./ratingPills.css";
 const pending = new Map<string, Promise<number | null>>();
+interface CachedScore {
+  value: number | null;
+  expiresAt: number;
+}
+const scores = new Map<string, CachedScore>();
+const SCORE_CACHE_TTL = 1_800_000;
+const SCORE_CACHE_MAX = 500;
+function readScore(key: string): number | null | undefined {
+  const entry = scores.get(key);
+  if (!entry) return undefined;
+  if (Date.now() >= entry.expiresAt) {
+    scores.delete(key);
+    return undefined;
+  }
+  return entry.value;
+}
+function writeScore(key: string, value: number | null) {
+  scores.delete(key);
+  scores.set(key, { value, expiresAt: Date.now() + SCORE_CACHE_TTL });
+  while (scores.size > SCORE_CACHE_MAX) {
+    const oldest = scores.keys().next().value;
+    if (oldest === undefined) break;
+    scores.delete(oldest);
+  }
+}
 function anilistScore(id?: number, idMal?: number | null) {
   const key = id + ":" + idMal;
+  const cached = readScore(key);
+  if (cached !== undefined) return Promise.resolve(cached);
   if (!pending.has(key)) {
     if (pending.size >= 500) pending.delete(pending.keys().next().value!);
     pending.set(
@@ -15,10 +42,14 @@ function anilistScore(id?: number, idMal?: number | null) {
         "query($id:Int,$idMal:Int){Media(id:$id,idMal:$idMal,type:ANIME){averageScore}}",
         id ? { id } : { idMal },
       )
-        .then((d) => (d.Media?.averageScore ? d.Media.averageScore / 10 : null))
-        .catch((err) => {
+        .then((d) => {
+          const value = d.Media?.averageScore ? d.Media.averageScore / 10 : null;
+          writeScore(key, value);
+          return value;
+        })
+        .catch(() => null)
+        .finally(() => {
           pending.delete(key);
-          return null;
         }),
     );
   }

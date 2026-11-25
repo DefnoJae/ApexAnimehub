@@ -233,3 +233,22 @@ test("reopening starts at the oldest remaining unseen entry without waiting for 
   ).toEqual([1, 2, 3]);
   expect(trigger.className).not.toContain("has-new");
 });
+
+test("Following Stories polls every fifteen minutes", () => {
+  const spy = jest.spyOn(window, "setInterval");
+  try {
+    act(() =>
+      root.render(
+        <FollowingStories
+          connected={false}
+          identity={undefined}
+          onConnect={jest.fn()}
+        />,
+      ),
+    );
+    const delays = spy.mock.calls.map(([, delay]) => delay);
+    expect(delays).toContain(900_000);
+  } finally {
+    spy.mockRestore();
+  }
+});
