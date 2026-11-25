@@ -209,8 +209,16 @@
   background: #29272b9c;
   color: #e7e2ed;
 }
+.detail-watch-later:hover {
+  background: #4ade802e;
+  border-color: #4ade8088;
+  color: #86efac;
+}
 .detail-watch-later.enabled svg {
   color: #4ade80;
+}
+.detail-watch-later.enabled:hover svg {
+  color: #86efac;
 }
 .detail-watch-later svg {
   color: inherit;
