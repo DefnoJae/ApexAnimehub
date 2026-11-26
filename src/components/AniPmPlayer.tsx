@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { ListVideo, Maximize, X } from "lucide-react";
+import { Maximize, X } from "lucide-react";
 import type { PlayerProps } from "./VideoPlayer";
 import type { Player, PlayerState } from "../utils/anipm-sdk";
 import { loadAniPmSdk, validAniPmState } from "../utils/anipm";
@@ -430,7 +430,20 @@ export default function AniPmPlayer(props: PlayerProps) {
           aria-label="Episodes"
           title="Episodes"
         >
-          <ListVideo size={18} aria-hidden="true" />
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 18 18"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.75"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <rect x="1" y="1" width="10" height="10" rx="2" />
+            <rect x="4" y="4" width="10" height="10" rx="2" />
+          </svg>
         </button>
         <SignSync
           key={`${id}:${playingEntry.episode}:${playingEntry.lang}`}
