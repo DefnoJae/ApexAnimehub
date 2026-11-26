@@ -3,7 +3,32 @@ import { createRoot } from "react-dom/client";
 import { act } from "react-dom/test-utils";
 import AniPmPlayer from "./AniPmPlayer";
 import { aniPmUrl, validAniPmState } from "../utils/anipm";
+import { fetchEpisodeMetadata } from "../utils/episodeMetadata";
 import type { PlayerProps } from "./VideoPlayer";
+
+jest.mock("../utils/episodeMetadata", () => ({
+  ...jest.requireActual("../utils/episodeMetadata"),
+  fetchEpisodeMetadata: jest.fn(),
+}));
+
+const fetchMetadata = fetchEpisodeMetadata as jest.MockedFunction<
+  typeof fetchEpisodeMetadata
+>;
+const originalScrollTo = HTMLElement.prototype.scrollTo;
+const originalMatchMedia = window.matchMedia;
+beforeEach(() => {
+  fetchMetadata.mockReset();
+  fetchMetadata.mockResolvedValue({});
+  HTMLElement.prototype.scrollTo = jest.fn() as unknown as typeof HTMLElement.prototype.scrollTo;
+  window.matchMedia = jest.fn().mockReturnValue({
+    matches: false,
+  }) as unknown as typeof window.matchMedia;
+});
+afterEach(() => {
+  HTMLElement.prototype.scrollTo = originalScrollTo;
+  window.matchMedia = originalMatchMedia;
+});
+
 test("Ani.pm uses explicit episode identity for 80% tracking and cleans up its SDK", async () => {
   localStorage.clear();
   const node = document.createElement("div");
@@ -353,6 +378,179 @@ test("fullscreen cycles preserve the frame, and an unresponsive frame can reload
     window.AniPM = original;
     node.remove();
     jest.useRealTimers();
+    localStorage.clear();
+  }
+});
+
+test("Ani.pm shows the Apex Player carousel from a button left of SignSync", async () => {
+  localStorage.clear();
+  fetchMetadata.mockResolvedValue({
+    2: { title: "Episode 2" },
+    3: { title: "The Rookie", image: "/ep3.jpg" },
+  });
+  const node = document.createElement("div");
+  document.body.append(node);
+  const root = createRoot(node);
+  const events: Record<string, (data: any) => void> = {};
+  const player = {
+    iframe: document.createElement("iframe"),
+    state: { anilistId: 1, episode: 2, lang: "dub" },
+    on: (event: string, cb: (data: any) => void) => {
+      events[event] = cb;
+    },
+    destroy: jest.fn(),
+    loadEpisode: jest.fn().mockResolvedValue({}),
+    seekBy: jest.fn().mockResolvedValue({}),
+  };
+  player.iframe.allow = "autoplay; fullscreen";
+  const original = window.AniPM;
+  window.AniPM = {
+    Player: jest.fn().mockImplementation((mount: HTMLElement) => {
+      mount.appendChild(player.iframe);
+      return player;
+    }),
+  } as unknown as typeof window.AniPM;
+  const props = {
+    title: "Example",
+    episode: 2,
+    episodeCount: 3,
+    watchedThrough: 2,
+    stream: { name: "Ani.pm (Dub)", url: aniPmUrl(1, 2, "dub") },
+    canNext: true,
+    onNext: jest.fn(),
+    onPrevious: jest.fn(),
+    onClose: jest.fn(),
+    onWatched: jest.fn(),
+    onCompleted: jest.fn(),
+    onEpisodeChange: jest.fn(),
+    onProgress: jest.fn(),
+    accounts: { autoSync: true },
+  } as unknown as PlayerProps;
+  try {
+    await act(async () => root.render(<AniPmPlayer {...props} />));
+    const buttons = Array.from(node.querySelectorAll("button"));
+    const episodesButton = buttons.find(
+      (button) => button.getAttribute("aria-label") === "Episodes",
+    )!;
+    const syncButton = buttons.find(
+      (button) =>
+        button.getAttribute("aria-label") === "SignSync subtitle tools",
+    )!;
+    expect(episodesButton).toBeDefined();
+    expect(syncButton).toBeDefined();
+    expect(buttons.indexOf(episodesButton)).toBe(buttons.indexOf(syncButton) - 1);
+
+    await act(async () => episodesButton.click());
+    const panel = node.querySelector(
+      'section[aria-label="Episodes"]',
+    ) as HTMLElement;
+    expect(panel).not.toBeNull();
+    expect(document.activeElement).toBe(panel);
+    expect(fetchMetadata).toHaveBeenCalledWith(1, 3);
+    expect(
+      node.querySelector('[aria-label="Episode 3 · The Rookie"]'),
+    ).not.toBeNull();
+    expect(
+      node.querySelector('[aria-label="Episode 2, watched"]'),
+    ).not.toBeNull();
+    expect(node.querySelectorAll(".apex-carousel-card")).toHaveLength(3);
+    act(() => root.unmount());
+  } finally {
+    window.AniPM = original;
+    node.remove();
+    localStorage.clear();
+  }
+});
+
+test("Ani.pm overlay closes on X/Escape, ignores player shortcuts, and preserves the resume prompt", async () => {
+  localStorage.clear();
+  fetchMetadata.mockResolvedValue({});
+  const node = document.createElement("div");
+  document.body.append(node);
+  const root = createRoot(node);
+  const original = window.AniPM;
+  const player = {
+    iframe: document.createElement("iframe"),
+    state: { anilistId: 9, episode: 2, lang: "sub" },
+    on: jest.fn(),
+    destroy: jest.fn(),
+    loadEpisode: jest.fn().mockResolvedValue({}),
+    seekBy: jest.fn().mockResolvedValue({}),
+  };
+  player.iframe.allow = "autoplay; fullscreen";
+  window.AniPM = {
+    Player: jest.fn().mockImplementation((mount: HTMLElement) => {
+      mount.appendChild(player.iframe);
+      return player;
+    }),
+  } as unknown as typeof window.AniPM;
+  const changed = jest.fn();
+  const props = {
+    title: "Resume anime",
+    episode: 2,
+    episodeCount: 3,
+    watchedThrough: 1,
+    stream: { name: "Ani.pm", url: aniPmUrl(9, 2, "sub") },
+    resume: { position: 50, duration: 100 },
+    accounts: { autoSync: true },
+    onEpisodeChange: changed,
+    onProgress: jest.fn(),
+    onWatched: jest.fn(),
+    onClose: jest.fn(),
+    onNext: jest.fn(),
+    onPrevious: jest.fn(),
+    canNext: true,
+  } as unknown as PlayerProps;
+  const openEpisodes = async () => {
+    const button = Array.from(node.querySelectorAll("button")).find(
+      (button) => button.getAttribute("aria-label") === "Episodes",
+    )!;
+    await act(async () => button.click());
+  };
+  try {
+    await act(async () => root.render(<AniPmPlayer {...props} />));
+    const dialog = node.querySelector('[role="dialog"]') as HTMLDivElement;
+    expect(node.textContent).toContain("Continue from 0:50");
+    expect(window.AniPM.Player).not.toHaveBeenCalled();
+
+    await act(async () => openEpisodes());
+    const panel = node.querySelector(
+      'section[aria-label="Episodes"]',
+    ) as HTMLElement;
+    expect(document.activeElement).toBe(panel);
+    await act(async () =>
+      panel.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }),
+      ),
+    );
+    expect(player.seekBy).not.toHaveBeenCalled();
+    expect(changed).not.toHaveBeenCalled();
+
+    await act(async () =>
+      panel.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "x", bubbles: true }),
+      ),
+    );
+    expect(node.querySelector('section[aria-label="Episodes"]')).toBeNull();
+    expect(document.activeElement).toBe(dialog);
+
+    await act(async () => openEpisodes());
+    const reopened = node.querySelector(
+      'section[aria-label="Episodes"]',
+    ) as HTMLElement;
+    await act(async () =>
+      reopened.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+      ),
+    );
+    expect(node.querySelector('section[aria-label="Episodes"]')).toBeNull();
+    expect(document.activeElement).toBe(dialog);
+    expect(node.textContent).toContain("Continue from 0:50");
+    expect(window.AniPM.Player).not.toHaveBeenCalled();
+    act(() => root.unmount());
+  } finally {
+    window.AniPM = original;
+    node.remove();
     localStorage.clear();
   }
 });

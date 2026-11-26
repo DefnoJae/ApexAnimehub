@@ -1,8 +1,12 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Maximize, X } from "lucide-react";
+import { ListVideo, Maximize, X } from "lucide-react";
 import type { PlayerProps } from "./VideoPlayer";
 import type { Player, PlayerState } from "../utils/anipm-sdk";
 import { loadAniPmSdk, validAniPmState } from "../utils/anipm";
+import {
+  fetchEpisodeMetadata,
+  type EpisodeMetadata,
+} from "../utils/episodeMetadata";
 import {
   readEpisodeProgress,
   saveEpisodeProgress,
@@ -10,7 +14,9 @@ import {
   playbackTime,
 } from "../utils/playbackResume";
 import "./nativeVideoPlayer.css";
+import "./apexPlayer.css";
 import { SignSync } from "./SignSync";
+import { PlayerEpisodeCarousel } from "./PlayerEpisodeCarousel";
 import { usePlayerKeyboard } from "../hooks/usePlayerKeyboard";
 export default function AniPmPlayer(props: PlayerProps) {
   const host = useRef<HTMLDivElement>(null),
@@ -54,6 +60,34 @@ export default function AniPmPlayer(props: PlayerProps) {
     episode: number;
     lang: "sub" | "dub";
   }>({ episode, lang });
+  const [episodesOpen, setEpisodesOpen] = useState(false);
+  const [episodes, setEpisodes] = useState<Record<string, EpisodeMetadata>>({});
+  useEffect(() => {
+    let active = true;
+    void fetchEpisodeMetadata(id, props.episodeCount).then((items) => {
+      if (active) setEpisodes(items);
+    });
+    return () => {
+      active = false;
+    };
+  }, [id, props.episodeCount]);
+  const episodeNumbers = Array.from(
+    {
+      length: Math.min(
+        props.episodeCount || Math.max(episode, ...Object.keys(episodes).map(Number)),
+        2000,
+      ),
+    },
+    (_, index) => index + 1,
+  );
+  const closeEpisodes = () => {
+    setEpisodesOpen(false);
+    dialog.current?.focus({ preventScroll: true });
+  };
+  const chooseEpisode = (number: number) => {
+    closeEpisodes();
+    callbacks.current.onEpisodeChange?.(number, playingEntry.lang || lang);
+  };
   const savedResume = resumeSeconds(
     readEpisodeProgress(id, episode) || props.resume,
   );
@@ -366,11 +400,34 @@ export default function AniPmPlayer(props: PlayerProps) {
       aria-modal="true"
       aria-label="Anime video player"
       className="apex-native-player anipm-player fixed inset-0 z-[500] bg-black text-white flex flex-col"
+      onKeyDown={(event) => {
+        if (
+          episodesOpen &&
+          (event.key === "Escape" ||
+            (event.key.toLowerCase() === "x" &&
+              !event.ctrlKey &&
+              !event.metaKey &&
+              !event.altKey))
+        ) {
+          event.preventDefault();
+          event.stopPropagation();
+          closeEpisodes();
+        }
+      }}
     >
       <div className="native-player-header shrink-0 flex items-center gap-2 px-4 py-2 text-sm">
         <span className="flex-1 min-w-0 truncate">
           {props.title} · Episode {props.episode} · {props.stream.name}
         </span>
+        <button
+          type="button"
+          className="player-header-icon"
+          onClick={() => setEpisodesOpen(true)}
+          aria-label="Episodes"
+          title="Episodes"
+        >
+          <ListVideo size={18} aria-hidden="true" />
+        </button>
         <SignSync
           key={`${id}:${playingEntry.episode}:${playingEntry.lang}`}
           animeId={id}
@@ -428,6 +485,16 @@ export default function AniPmPlayer(props: PlayerProps) {
             </button>
           </div>
         </div>
+      )}
+      {episodesOpen && (
+        <PlayerEpisodeCarousel
+          episode={playingEntry.episode}
+          numbers={episodeNumbers}
+          episodes={episodes}
+          watchedThrough={props.watchedThrough}
+          onSelect={chooseEpisode}
+          onClose={closeEpisodes}
+        />
       )}
       <div ref={host} className="anipm-player-stage" />
     </div>
