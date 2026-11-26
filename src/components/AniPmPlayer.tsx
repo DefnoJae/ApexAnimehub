@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { ListVideo, Maximize, X } from "lucide-react";
 import type { PlayerProps } from "./VideoPlayer";
 import type { Player, PlayerState } from "../utils/anipm-sdk";
@@ -84,10 +84,6 @@ export default function AniPmPlayer(props: PlayerProps) {
     setEpisodesOpen(false);
     dialog.current?.focus({ preventScroll: true });
   };
-  const chooseEpisode = (number: number) => {
-    closeEpisodes();
-    callbacks.current.onEpisodeChange?.(number, playingEntry.lang || lang);
-  };
   const savedResume = resumeSeconds(
     readEpisodeProgress(id, episode) || props.resume,
   );
@@ -100,6 +96,21 @@ export default function AniPmPlayer(props: PlayerProps) {
     position: number;
     duration: number;
   }>();
+  const flushProgress = useCallback((): void => {
+    const value = latest.current;
+    if (!value) return;
+    saveEpisodeProgress(id, value.episode, value.position, value.duration);
+    callbacks.current.onProgress?.(
+      value.position,
+      value.duration,
+      value.episode,
+    );
+  }, [id]);
+  const chooseEpisode = (number: number) => {
+    flushProgress();
+    closeEpisodes();
+    callbacks.current.onEpisodeChange?.(number, playingEntry.lang || lang);
+  };
   const command = (action: (player: Player) => unknown) => {
     if (startChoice === null) return;
     if (instance.current) return action(instance.current);
@@ -167,13 +178,6 @@ export default function AniPmPlayer(props: PlayerProps) {
         : null;
     let waitingForRestart = restartRequested.current && !recovery.current;
     let restartInFlight = false;
-    const report = callbacks.current.onProgress;
-    const flush = () => {
-      const value = latest.current;
-      if (!value) return;
-      saveEpisodeProgress(id, value.episode, value.position, value.duration);
-      report?.(value.position, value.duration, value.episode);
-    };
     let active = true,
       last = 0;
     const watched = recorded.current;
@@ -295,7 +299,7 @@ export default function AniPmPlayer(props: PlayerProps) {
           }
         });
         const complete = () => {
-          flush();
+          flushProgress();
           const state = player.state;
           if (!active || !validAniPmState(state, id)) return;
           const episodeNumber = state.episode;
@@ -303,7 +307,7 @@ export default function AniPmPlayer(props: PlayerProps) {
           completed.current.add(episodeNumber);
           callbacks.current.onCompleted?.(episodeNumber);
         };
-        player.on("pause", flush);
+        player.on("pause", flushProgress);
         player.on("ended", complete);
         player.on("error", (data) => {
           if (active) {
@@ -360,23 +364,23 @@ export default function AniPmPlayer(props: PlayerProps) {
     };
     const probe = window.setInterval(() => void check(), 20000);
     const changed = () => {
-      flush();
+      flushProgress();
       void check();
     };
     document.addEventListener("fullscreenchange", changed);
-    window.addEventListener("pagehide", flush);
+    window.addEventListener("pagehide", flushProgress);
 
     return () => {
-      flush();
+      flushProgress();
       active = false;
-      window.removeEventListener("pagehide", flush);
+      window.removeEventListener("pagehide", flushProgress);
       instance.current?.destroy();
       instance.current = undefined;
       clearInterval(probe);
       document.removeEventListener("fullscreenchange", changed);
     };
     // Episode/language changes use the SDK without remounting the iframe.
-  }, [id, startChoice, reload]);
+  }, [id, startChoice, reload, flushProgress]);
   useEffect(() => {
     const player = instance.current;
     if (

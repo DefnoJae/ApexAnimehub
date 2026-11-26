@@ -554,3 +554,99 @@ test("Ani.pm overlay closes on X/Escape, ignores player shortcuts, and preserves
     localStorage.clear();
   }
 });
+
+test("Ani.pm episode selection flushes progress and loads the chosen episode without remounting", async () => {
+  localStorage.clear();
+  fetchMetadata.mockResolvedValue({ 3: { title: "The Rookie" } });
+  const node = document.createElement("div");
+  document.body.append(node);
+  const root = createRoot(node);
+  const events: Record<string, (data: any) => void> = {};
+  const player = {
+    iframe: document.createElement("iframe"),
+    state: { anilistId: 1, episode: 2, lang: "dub" },
+    on: (event: string, cb: (data: any) => void) => {
+      events[event] = cb;
+    },
+    destroy: jest.fn(),
+    loadEpisode: jest.fn().mockResolvedValue({}),
+  };
+  player.iframe.allow = "autoplay; fullscreen";
+  const original = window.AniPM;
+  window.AniPM = {
+    Player: jest.fn().mockImplementation((mount: HTMLElement) => {
+      mount.appendChild(player.iframe);
+      return player;
+    }),
+  } as unknown as typeof window.AniPM;
+  const onProgress = jest.fn();
+  const changed = jest.fn();
+  const props = {
+    title: "Example",
+    episode: 2,
+    episodeCount: 4,
+    watchedThrough: 2,
+    stream: { name: "Ani.pm (Dub)", url: aniPmUrl(1, 2, "dub") },
+    accounts: { autoSync: true },
+    onProgress,
+    onEpisodeChange: changed,
+    onWatched: jest.fn(),
+    onCompleted: jest.fn(),
+    onClose: jest.fn(),
+    onNext: jest.fn(),
+    onPrevious: jest.fn(),
+    canNext: true,
+  } as unknown as PlayerProps;
+  const openEpisodes = async () => {
+    const button = Array.from(node.querySelectorAll("button")).find(
+      (button) => button.getAttribute("aria-label") === "Episodes",
+    )!;
+    await act(async () => button.click());
+  };
+  try {
+    await act(async () => root.render(<AniPmPlayer {...props} />));
+    await act(async () => events.ready(player.state));
+    await act(async () => events.timeupdate({ currentTime: 1, duration: 100 }));
+    await act(async () => events.timeupdate({ currentTime: 42, duration: 100 }));
+    expect(
+      JSON.parse(localStorage.getItem("apex_episode_progress_v1")!)["1:2"]
+        .position,
+    ).toBe(1);
+
+    await act(async () => openEpisodes());
+    await act(async () =>
+      node
+        .querySelector('[aria-label="Episode 3 · The Rookie"]')!
+        .dispatchEvent(new MouseEvent("click", { bubbles: true })),
+    );
+
+    expect(onProgress).toHaveBeenLastCalledWith(42, 100, 2);
+    expect(
+      JSON.parse(localStorage.getItem("apex_episode_progress_v1")!)["1:2"]
+        .position,
+    ).toBe(42);
+    expect(changed).toHaveBeenCalledWith(3, "dub");
+    expect(node.querySelector('section[aria-label="Episodes"]')).toBeNull();
+
+    await act(async () =>
+      root.render(
+        <AniPmPlayer
+          {...props}
+          episode={3}
+          stream={{ ...props.stream, url: aniPmUrl(1, 3, "dub") }}
+        />,
+      ),
+    );
+    expect(player.loadEpisode).toHaveBeenCalledWith(3, {
+      lang: "dub",
+      start: 0,
+    });
+    expect(window.AniPM.Player).toHaveBeenCalledTimes(1);
+    expect(player.destroy).not.toHaveBeenCalled();
+    act(() => root.unmount());
+  } finally {
+    window.AniPM = original;
+    node.remove();
+    localStorage.clear();
+  }
+});
