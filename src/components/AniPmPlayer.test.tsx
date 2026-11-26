@@ -518,6 +518,8 @@ test("Ani.pm overlay closes on X/Escape, ignores player shortcuts, and preserves
       'section[aria-label="Episodes"]',
     ) as HTMLElement;
     expect(document.activeElement).toBe(panel);
+    expect(panel.querySelectorAll(".apex-carousel-card")).toHaveLength(3);
+    expect(panel.querySelector('[aria-label^="Episode 3"]')).not.toBeNull();
     await act(async () =>
       panel.dispatchEvent(
         new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }),
