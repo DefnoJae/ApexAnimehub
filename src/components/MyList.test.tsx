@@ -2,10 +2,13 @@ import React from "react";
 import { createRoot } from "react-dom/client";
 import { act } from "react-dom/test-utils";
 import { MyList } from "./MyList";
+import { QuickList } from "./HomeDashboard";
 import type { useAccounts } from "../hooks/useAccounts";
 import { setRateLimitRetryAt } from "../utils/rateLimitClock";
 jest.mock("./AnimeBadges", () => ({ AnimeBadges: () => null }));
-jest.mock("./HomeDashboard", () => ({ QuickList: () => null }));
+jest.mock("./HomeDashboard", () => ({
+  QuickList: jest.fn(() => null),
+}));
 
 const FILTERS_KEY = "apex_my_list_filters_v1";
 
@@ -403,6 +406,57 @@ test("starts a resume import when My List opens", async () => {
       ),
     );
     expect(accounts.refreshLibrary).toHaveBeenCalledWith("resume");
+  } finally {
+    act(() => root.unmount());
+    host.remove();
+  }
+});
+test("shows the list-status button overlay on every card so any status can be changed", () => {
+  localStorage.clear();
+  const host = document.createElement("div");
+  document.body.append(host);
+  const root = createRoot(host);
+  const accounts = {
+    connected: { anilist: true, mal: false },
+    libraryEntries: [
+      {
+        provider: "anilist",
+        anime: { id: 1, title: { english: "Watching now" } },
+        status: "watching",
+        progress: 3,
+        updatedAt: 1,
+      },
+      {
+        provider: "anilist",
+        anime: { id: 2, title: { english: "Planned later" } },
+        status: "planning",
+        progress: 0,
+        updatedAt: 2,
+      },
+    ],
+    refreshLibrary: jest.fn(),
+    libraryErrors: {},
+    lists: {},
+  } as unknown as ReturnType<typeof useAccounts>;
+  localStorage.setItem(
+    "apex_watch_later_v1",
+    JSON.stringify([
+      {
+        id: 2,
+        title: { english: "Planned later" },
+        coverImage: { extraLarge: "x.jpg" },
+        addedAt: 2,
+      },
+    ]),
+  );
+  (QuickList as jest.Mock).mockClear();
+  try {
+    act(() =>
+      root.render(
+        <MyList accounts={accounts} onSelect={jest.fn()} onConnect={jest.fn()} />,
+      ),
+    );
+    expect((QuickList as jest.Mock).mock.calls).toHaveLength(2);
   } finally {
     act(() => root.unmount());
     host.remove();

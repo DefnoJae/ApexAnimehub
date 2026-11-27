@@ -19,6 +19,7 @@ import {
   filterCalendar,
   monthGrid,
   readCalendarPreferences,
+  readCachedCalendarRange,
   ScheduleLanguage,
   sundayWeek,
 } from "../utils/animeSchedule";
@@ -155,19 +156,26 @@ export const DubScheduleView = ({
   const [monthOpen, setMonthOpen] = useState(false),
     [search, setSearch] = useState(""),
     [reload, setReload] = useState(0);
-  const [result, setResult] = useState<CalendarResult>({
-    entries: [],
-    warnings: [],
-    updatedAt: null,
-  });
-  const [loading, setLoading] = useState(true),
-    [notice, setNotice] = useState(""),
-    [now, setNow] = useState(Date.now());
-  const lastReload = useRef(0);
   const week = sundayWeek(selected),
     grid = monthGrid(month);
   const start = +(monthOpen ? grid.start : week.start),
     end = +(monthOpen ? grid.end : week.end);
+  const [result, setResult] = useState<CalendarResult>(() => {
+    const cached = readCachedCalendarRange(
+      new Date(start),
+      new Date(end),
+      preferences.language,
+    );
+    return {
+      entries: cached.entries,
+      warnings: [],
+      updatedAt: cached.updatedAt,
+    };
+  });
+  const [loading, setLoading] = useState(result.entries.length === 0),
+    [notice, setNotice] = useState(""),
+    [now, setNow] = useState(Date.now());
+  const lastReload = useRef(0);
   useEffect(() => {
     try {
       localStorage.setItem(
@@ -184,26 +192,46 @@ export const DubScheduleView = ({
     const controller = new AbortController();
     const force = reload !== lastReload.current;
     lastReload.current = reload;
-    setLoading(true);
-    setResult({ entries: [], warnings: [], updatedAt: null });
+    // Keep whatever is already painted (cached or previous) so the schedule
+    // never flashes to empty while a refresh is in flight.
+    if (result.entries.length === 0) setLoading(true);
     void fetchCalendarRange(
       new Date(start),
       new Date(end),
       preferences.language,
       controller.signal,
       force,
-      (entries) => setResult({ entries, warnings: [], updatedAt: null }),
+      (entries) => {
+        if (controller.signal.aborted) return;
+        setResult((previous) => {
+          const existing = new Map(previous.entries.map((release) => [release.key, release]));
+          for (const release of entries) existing.set(release.key, release);
+          return {
+            entries: Array.from(existing.values()),
+            warnings: [],
+            updatedAt: null,
+          };
+        });
+      },
     )
       .then((next) => {
-        if (!controller.signal.aborted) setResult(next);
+        if (!controller.signal.aborted)
+          setResult({
+            entries: next.entries,
+            warnings: next.warnings,
+            updatedAt: next.updatedAt,
+          });
       })
       .catch(() => {
         if (!controller.signal.aborted)
-          setResult({
-            entries: [],
-            warnings: ["The schedule could not load. Please retry."],
-            updatedAt: null,
-          });
+          setResult((previous) => ({
+            entries: previous.entries,
+            warnings: [
+              ...previous.warnings,
+              "The schedule could not be refreshed. Showing saved releases.",
+            ],
+            updatedAt: previous.updatedAt,
+          }));
       })
       .finally(() => {
         if (!controller.signal.aborted) setLoading(false);

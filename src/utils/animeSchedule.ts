@@ -1,5 +1,5 @@
 import { fetchAnilist } from "./anilist";
-import { fetchDubRange } from "./dubSchedule";
+import { fetchDubRange, isoWeek, validSchedule } from "./dubSchedule";
 import type { DashboardAnime } from "../components/HomeDashboard";
 import type { LibraryEntry } from "../hooks/useLibrary";
 import { sameAnime } from "../hooks/useLibrary";
@@ -130,7 +130,7 @@ function cachedAnime(anime: CalendarAnime) {
   );
   return value && Date.now() - value.at < 21600000 ? value.anime : undefined;
 }
-function readSubCache(key: string) {
+export function readSubCache(key: string) {
   try {
     const values = JSON.parse(
       localStorage.getItem("apex_calendar_sub_cache_v1") || "[]",
@@ -162,6 +162,75 @@ function readSubCache(key: string) {
     }
   } catch {}
   return undefined;
+}
+export function readCachedCalendarRange(
+  start: Date,
+  end: Date,
+  language: ScheduleLanguage,
+): { entries: CalendarRelease[]; updatedAt: number | null } {
+  const subKey = dateKey(start) + ":" + dateKey(end);
+  let entries: CalendarRelease[] = [];
+  let updatedAt: number | null = null;
+
+  if (language !== "dub") {
+    const saved = readSubCache(subKey);
+    if (saved) {
+      entries.push(...saved.entries);
+      updatedAt = saved.updatedAt;
+    }
+  }
+
+  if (language !== "sub") {
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+    const day = new Date(start);
+    day.setHours(0, 0, 0, 0);
+    while (day <= end) {
+      const week = isoWeek(day);
+      const cacheKey =
+        "apex_timetable_" + week.year + "-" + week.week + "_" + timezone;
+      try {
+        const saved = JSON.parse(localStorage.getItem(cacheKey) || "null");
+        if (
+          saved &&
+          validSchedule(saved.entries) &&
+          Number.isFinite(saved.updatedAt)
+        ) {
+          for (const entry of saved.entries) {
+            const at = Date.parse(entry.episodeDate);
+            if (at >= +start && at < +end) {
+              entries.push({
+                key:
+                  "dub:" +
+                  entry.route +
+                  ":" +
+                  entry.episodeNumber +
+                  ":" +
+                  entry.episodeDate,
+                anime: {
+                  ...(entry.media?.media || {
+                    id: 0,
+                    title: { english: entry.title },
+                  }),
+                  format: entry.format,
+                },
+                episode: entry.episodeNumber,
+                at,
+                language: "dub",
+                note: entry.airingStatus || undefined,
+              });
+            }
+          }
+          if (updatedAt === null || saved.updatedAt < updatedAt) {
+            updatedAt = saved.updatedAt;
+          }
+        }
+      } catch {}
+      day.setDate(day.getDate() + 1);
+    }
+  }
+
+  const unique = new Map(entries.map((entry) => [entry.key, entry]));
+  return { entries: Array.from(unique.values()), updatedAt };
 }
 async function subRange(
   start: Date,

@@ -2,7 +2,11 @@ import React from "react";
 import { createRoot } from "react-dom/client";
 import { act } from "react-dom/test-utils";
 import { DubScheduleView } from "./DubScheduleView";
-import { fetchCalendarRange, CalendarRelease } from "../utils/animeSchedule";
+import {
+  fetchCalendarRange,
+  CalendarRelease,
+  dateKey,
+} from "../utils/animeSchedule";
 import type { useAccounts } from "../hooks/useAccounts";
 jest.mock("../utils/animeSchedule", () => ({
   ...jest.requireActual("../utils/animeSchedule"),
@@ -124,4 +128,27 @@ test("Yours uses actual library IDs, is remembered, and a date opens a monthly r
   expect(document.querySelector(".calendar-month-modal")).toBeNull();
   expect(host.hasAttribute("inert")).toBe(false);
   expect(host.hasAttribute("aria-hidden")).toBe(false);
+});
+test("renders cached releases instantly before fetchCalendarRange resolves", async () => {
+  const start = new Date(2026, 10, 8);
+  const end = new Date(2026, 10, 15);
+  const key = dateKey(start) + ":" + dateKey(end);
+  localStorage.setItem(
+    "apex_calendar_sub_cache_v1",
+    JSON.stringify([
+      { key, updatedAt: Date.now() - 1000, entries: [entries[0]] },
+    ]),
+  );
+  // The fetch must never block the painted cache.
+  (fetchCalendarRange as jest.Mock).mockReturnValue(
+    new Promise(() => {}),
+  );
+  const select = jest.fn();
+  await act(async () =>
+    root.render(<DubScheduleView accounts={accounts} onSelectMedia={select} />),
+  );
+  expect(host.querySelectorAll(".calendar-release-card")).toHaveLength(1);
+  expect(
+    host.querySelector(".calendar-release-card")?.textContent,
+  ).toContain("Tuesday anime");
 });
