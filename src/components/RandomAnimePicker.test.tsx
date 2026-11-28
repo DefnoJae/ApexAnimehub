@@ -214,12 +214,13 @@ test("settles on time even when the parent re-renders mid-spin", () => {
   expect(host.querySelector<HTMLElement>(".random-picker-title")?.textContent).not.toBe("—");
 });
 
-test("renders the picker label as a heading", () => {
+test("keeps the close button as the only header control", () => {
   jest.useFakeTimers();
   renderPicker();
-  expect(host.querySelector<HTMLElement>("h1.random-picker-tag")?.textContent).toBe(
-    "Tonight, watch",
-  );
+  const header = host.querySelector<HTMLElement>(".random-picker-header")!;
+  expect(header.children.length).toBe(1);
+  expect(header.querySelector('[aria-label="Close picker"]')).not.toBeNull();
+  expect(header.querySelector("h1")).toBeNull();
 });
 
 test("Escape dismisses the picker", () => {

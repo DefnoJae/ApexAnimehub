@@ -202,7 +202,6 @@ export function RandomAnimePicker({
         onKeyDown={handleKeyDown}
       >
         <header className="random-picker-header">
-          <h1 className="random-picker-tag">Tonight, watch</h1>
           <button
             ref={closeButtonRef}
             type="button"
