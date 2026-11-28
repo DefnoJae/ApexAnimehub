@@ -37,7 +37,7 @@
 - Consumes: existing `Dice5` import from `lucide-react` and existing `MyList` props.
 - Produces: `Dice5 size={26}` on the button labeled `Pick a random anime from this list`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add to `src/components/MyList.test.tsx`:
 
@@ -82,12 +82,12 @@ test("renders the My List dice icon at 26px", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `npm run test:ci -- --testPathPattern=MyList.test.tsx -t "renders the My List dice icon at 26px"`
 Expected: FAIL with expected width/height `26`, received `20`.
 
-- [ ] **Step 3: Implement the icon size**
+- [x] **Step 3: Implement the icon size**
 
 In `src/components/MyList.tsx`, change the trigger icon from:
 
@@ -101,12 +101,12 @@ to:
 <Dice5 size={26} aria-hidden="true" />
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `npm run test:ci -- --testPathPattern=MyList.test.tsx`
 Expected: PASS, including the new 26px assertion and all existing My List tests.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/components/MyList.tsx src/components/MyList.test.tsx
