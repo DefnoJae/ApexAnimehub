@@ -502,6 +502,45 @@ test("retries a rate limit from My List only after the reset", async () => {
   }
 });
 
+test("renders the My List dice icon at 26px", () => {
+  localStorage.clear();
+  const host = document.createElement("div");
+  document.body.append(host);
+  const root = createRoot(host);
+  const accounts = {
+    ...makeAccounts(),
+    libraryEntries: [
+      {
+        provider: "anilist",
+        anime: { id: 1, title: { english: "Pick me" } },
+        status: "planning",
+        score: 8,
+        progress: 0,
+        updatedAt: 1,
+      },
+    ],
+  } as unknown as ReturnType<typeof useAccounts>;
+  try {
+    act(() =>
+      root.render(
+        <MyList
+          accounts={accounts}
+          onSelect={jest.fn()}
+          onConnect={jest.fn()}
+        />,
+      ),
+    );
+    const svg = host.querySelector(
+      '[aria-label="Pick a random anime from this list"] svg',
+    );
+    expect(svg?.getAttribute("width")).toBe("26");
+    expect(svg?.getAttribute("height")).toBe("26");
+  } finally {
+    act(() => root.unmount());
+    host.remove();
+  }
+});
+
 test("the dice button opens the random picker with the current list", () => {
   localStorage.clear();
   const host = document.createElement("div");

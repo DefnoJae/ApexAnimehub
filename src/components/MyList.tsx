@@ -305,7 +305,7 @@ export function MyList({
           onClick={() => setPickerOpen(true)}
           disabled={!!accounts.busy || !!accounts.checking || !unique.length}
         >
-          <Dice5 size={20} aria-hidden="true" />
+          <Dice5 size={26} aria-hidden="true" />
         </button>
       </div>
       {Object.entries(accounts.libraryErrors).map(([p, error]) => (
