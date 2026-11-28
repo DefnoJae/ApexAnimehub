@@ -243,7 +243,7 @@ async function readList(provider, account, page = 1) {
     account.identity = Viewer;
     const data = await graphql(
       account.accessToken,
-      "query($user:Int,$page:Int){Page(page:$page,perPage:50){pageInfo{hasNextPage} mediaList(userId:$user,type:ANIME,sort:UPDATED_TIME_DESC){status progress score(format:POINT_100) updatedAt media{id idMal averageScore episodes title{english romaji} coverImage{extraLarge} bannerImage}}}}",
+      "query($user:Int,$page:Int){Page(page:$page,perPage:50){pageInfo{hasNextPage} mediaList(userId:$user,type:ANIME,sort:UPDATED_TIME_DESC){status progress score(format:POINT_100) updatedAt media{id idMal averageScore episodes title{english romaji} coverImage{extraLarge} bannerImage startDate{year} format}}}}",
       { user: Viewer.id, page },
     );
     return {
@@ -251,7 +251,10 @@ async function readList(provider, account, page = 1) {
       name: Viewer.name,
       hasNextPage: data.Page.pageInfo.hasNextPage,
       entries: data.Page.mediaList.map((entry) => ({
-        anime: entry.media,
+        anime: {
+          ...entry.media,
+          startYear: entry.media.startDate?.year ?? undefined,
+        },
         status: reverse(entry.status),
         progress: entry.progress,
         score: (entry.score || 0) / 10,

@@ -49,7 +49,7 @@ const statusMap: Record<ListStatus, AniListStatus> = {
 };
 
 // Exact query strings from server/list.cjs.
-const LIST_QUERY = "query($user:Int,$page:Int){Page(page:$page,perPage:50){pageInfo{hasNextPage} mediaList(userId:$user,type:ANIME,sort:UPDATED_TIME_DESC){status progress score(format:POINT_100) updatedAt media{id idMal averageScore episodes title{english romaji} coverImage{extraLarge} bannerImage}}}}";
+const LIST_QUERY = "query($user:Int,$page:Int){Page(page:$page,perPage:50){pageInfo{hasNextPage} mediaList(userId:$user,type:ANIME,sort:UPDATED_TIME_DESC){status progress score(format:POINT_100) updatedAt media{id idMal averageScore episodes title{english romaji} coverImage{extraLarge} bannerImage startDate{year} format}}}}";
 const ENTRY_QUERY = "query($id:Int){Media(id:$id,type:ANIME){mediaListEntry{status progress score(format:POINT_100)}}}";
 const EXISTING_ENTRY_QUERY = "query($id:Int){Media(id:$id,type:ANIME){mediaListEntry{progress status}}}";
 const EXISTING_ENTRY_WITH_DATES_QUERY = "query($id:Int){Media(id:$id,type:ANIME){mediaListEntry{progress status startedAt{year month day} completedAt{year month day}}}}";
@@ -77,6 +77,8 @@ interface AniListMedia {
   title?: { english?: string; romaji?: string };
   coverImage?: { extraLarge?: string };
   bannerImage?: string;
+  startDate?: { year?: number | null };
+  format?: string;
 }
 
 interface AniListMediaListItem {
@@ -177,7 +179,10 @@ export async function readAniListList(
     name: token.name || identity,
     hasNextPage: data.Page.pageInfo.hasNextPage,
     entries: data.Page.mediaList.map((entry) => ({
-      anime: entry.media,
+      anime: {
+        ...entry.media,
+        startYear: entry.media.startDate?.year ?? undefined,
+      },
       status: reverseStatus(entry.status),
       progress: entry.progress,
       score: (entry.score || 0) / 10,

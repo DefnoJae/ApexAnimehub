@@ -10,6 +10,8 @@ export interface LibraryAnime extends ListAnime {
   bannerImage?: string;
   averageScore?: number;
   malScore?: number | null;
+  format?: string;
+  startYear?: number;
 }
 export interface LibraryEntry {
   anime: LibraryAnime;

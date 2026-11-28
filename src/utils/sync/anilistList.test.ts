@@ -48,6 +48,37 @@ test("readAniListList uses the verified token and makes one list request per pag
   expect(getAniListToken).toHaveBeenCalledWith(controller.signal);
 });
 
+test("readAniListList carries format and start year from the media fields", async () => {
+  (getAniListToken as jest.Mock).mockResolvedValue({
+    accessToken: "t",
+    expiresAt: Date.now() + 3600000,
+    identity: "2",
+    name: "Alice",
+  });
+  (anilistRequest as jest.Mock).mockResolvedValue({
+    Page: {
+      pageInfo: { hasNextPage: false },
+      mediaList: [{
+        status: "PLANNING", progress: 0, score: 0, updatedAt: 10,
+        media: {
+          id: 3,
+          title: { english: "Example" },
+          format: "TV_SHORT",
+          startDate: { year: 2019 },
+        },
+      }],
+    },
+  });
+  const page = await readAniListList(1);
+  expect(page.entries[0].anime).toMatchObject({
+    format: "TV_SHORT",
+    startYear: 2019,
+  });
+  const query = (anilistRequest as jest.Mock).mock.calls[0][0] as string;
+  expect(query).toContain("format");
+  expect(query).toContain("startDate{year}");
+});
+
 test.each([
   ["missing", undefined],
   ["non-numeric", "abc"],
