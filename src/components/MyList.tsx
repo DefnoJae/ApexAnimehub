@@ -1,6 +1,6 @@
 import { StyledSelect } from "./StyledSelect";
 import React, { useEffect, useReducer, useRef, useState } from "react";
-import { MinusCircle } from "lucide-react";
+import { Dice5, MinusCircle } from "lucide-react";
 import { isRateLimitError } from "../utils/anilist";
 import { getRateLimitRetryAt } from "../utils/rateLimitClock";
 import { useRateLimitCountdown } from "../hooks/useRateLimitCountdown";
@@ -9,6 +9,7 @@ import { LibraryAnime } from "../hooks/useLibrary";
 import { QuickList } from "./HomeDashboard";
 import { PersonalRating } from "./RatingPills";
 import { AnimeBadges } from "./AnimeBadges";
+import { RandomAnimePicker } from "./RandomAnimePicker";
 import {
   getWatchLater,
   removeFromWatchLater,
@@ -118,6 +119,7 @@ export function MyList({
   const [, refreshWatchLater] = useReducer((n: number) => n + 1, 0);
   const sentinel = useRef<HTMLDivElement>(null);
   const [sort, setSort] = useState(initial.sort);
+  const [pickerOpen, setPickerOpen] = useState(false);
   useEffect(() => saveFilters({ status, provider, search, sort }), [
     status,
     provider,
@@ -296,6 +298,15 @@ export function MyList({
           <option value="progress">Most watched</option>
           <option value="title">Title A–Z</option>
         </StyledSelect>
+        <button
+          type="button"
+          aria-label="Pick a random anime from this list"
+          title="Pick a random anime"
+          onClick={() => setPickerOpen(true)}
+          disabled={!unique.length}
+        >
+          <Dice5 size={20} aria-hidden="true" />
+        </button>
       </div>
       {Object.entries(accounts.libraryErrors).map(([p, error]) => (
         <p role="alert" key={p}>
@@ -427,6 +438,19 @@ export function MyList({
           Load more
         </button>
       ))}
+      <RandomAnimePicker
+        anime={unique}
+        open={pickerOpen}
+        onPlay={(anime) => {
+          onSelect(anime);
+          setPickerOpen(false);
+        }}
+        onSelect={(anime) => {
+          onSelect(anime);
+          setPickerOpen(false);
+        }}
+        onClose={() => setPickerOpen(false)}
+      />
     </section>
   );
 }

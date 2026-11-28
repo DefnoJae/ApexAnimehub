@@ -501,3 +501,77 @@ test("retries a rate limit from My List only after the reset", async () => {
     jest.useRealTimers();
   }
 });
+
+test("the dice button opens the random picker with the current list", () => {
+  localStorage.clear();
+  const host = document.createElement("div");
+  document.body.append(host);
+  const root = createRoot(host);
+  const accounts = {
+    connected: { anilist: true, mal: false },
+    libraryEntries: [
+      {
+        provider: "anilist",
+        anime: {
+          id: 1,
+          title: { english: "Pick me" },
+          coverImage: { extraLarge: "https://example.com/pick.jpg" },
+        },
+        status: "planning",
+        score: 8,
+        progress: 0,
+        updatedAt: 1,
+      },
+    ],
+    refreshLibrary: jest.fn(),
+    libraryErrors: {},
+    lists: {},
+  } as unknown as ReturnType<typeof useAccounts>;
+  try {
+    act(() =>
+      root.render(
+        <MyList
+          accounts={accounts}
+          onSelect={jest.fn()}
+          onConnect={jest.fn()}
+        />,
+      ),
+    );
+    const dice = host.querySelector<HTMLButtonElement>(
+      '[aria-label="Pick a random anime from this list"]',
+    )!;
+    expect(dice).not.toBeNull();
+    act(() => dice.click());
+    expect(host.querySelector('[role="dialog"]')?.textContent).toContain(
+      "Tonight, watch",
+    );
+  } finally {
+    act(() => root.unmount());
+    host.remove();
+  }
+});
+
+test("the dice button is disabled when the list is empty", () => {
+  localStorage.clear();
+  const host = document.createElement("div");
+  document.body.append(host);
+  const root = createRoot(host);
+  try {
+    act(() =>
+      root.render(
+        <MyList
+          accounts={makeAccounts()}
+          onSelect={jest.fn()}
+          onConnect={jest.fn()}
+        />,
+      ),
+    );
+    const dice = host.querySelector<HTMLButtonElement>(
+      '[aria-label="Pick a random anime from this list"]',
+    );
+    expect(dice?.disabled).toBe(true);
+  } finally {
+    act(() => root.unmount());
+    host.remove();
+  }
+});
