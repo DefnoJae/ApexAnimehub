@@ -2347,6 +2347,20 @@ input:focus-visible {
   color: #aab0c0;
   font-size: 15px;
   font-weight: 600;
+  white-space: normal;
+}
+
+.random-picker-dub {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: #b887ff26;
+  color: #dfcaff;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  vertical-align: middle;
 }
 
 .random-picker-actions {

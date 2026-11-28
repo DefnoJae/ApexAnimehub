@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Dice5, Info, Play, X } from "lucide-react";
 import type { LibraryAnime } from "../hooks/useLibrary";
+import { getDubIndex } from "../utils/animeMetadata";
 import { getDisplayTitle } from "../utils/schedule";
 
 interface RandomAnimePickerProps {
@@ -43,6 +44,7 @@ export function RandomAnimePicker({
   const [spinning, setSpinning] = useState(false);
   const [selected, setSelected] = useState<LibraryAnime | null>(null);
   const [spinIndex, setSpinIndex] = useState(0);
+  const [dub, setDub] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
@@ -171,6 +173,27 @@ export function RandomAnimePicker({
     }
   };
 
+  useEffect(() => {
+    let active = true;
+    setDub(false);
+    const idMal = selected?.idMal;
+    if (open && idMal) {
+      void (async () => {
+        try {
+          const index = await getDubIndex();
+          if (active) {
+            setDub(index.dubbed.includes(idMal) || index.partial.includes(idMal));
+          }
+        } catch {
+          // Dub availability is optional metadata.
+        }
+      })();
+    }
+    return () => {
+      active = false;
+    };
+  }, [open, selected?.idMal]);
+
   if (!open || filtered.length === 0) return null;
 
   const poster = spinning
@@ -225,7 +248,22 @@ export function RandomAnimePicker({
         <h2 className="random-picker-title">
           {selected ? getDisplayTitle(selected) : "—"}
         </h2>
-        {subtitle && <p className="random-picker-subtitle">{subtitle}</p>}
+        {subtitle && (
+          <p className="random-picker-subtitle">
+            {subtitle}
+            {dub && (
+              <>
+                <span className="random-picker-dot"> · </span>
+                <span
+                  className="random-picker-dub"
+                  title="English dub available · MyDubList"
+                >
+                  Dub
+                </span>
+              </>
+            )}
+          </p>
+        )}
         <div className="random-picker-actions">
           <button
             type="button"

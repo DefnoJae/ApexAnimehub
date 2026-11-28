@@ -3,6 +3,9 @@ import { createRoot } from "react-dom/client";
 import { act } from "react-dom/test-utils";
 import { RandomAnimePicker, SPIN_DURATION_MS } from "./RandomAnimePicker";
 import type { LibraryAnime } from "../hooks/useLibrary";
+import { getDubIndex } from "../utils/animeMetadata";
+
+jest.mock("../utils/animeMetadata", () => ({ getDubIndex: jest.fn() }));
 
 const base: LibraryAnime[] = [
   {
@@ -25,6 +28,8 @@ const base: LibraryAnime[] = [
 let host: HTMLDivElement, root: ReturnType<typeof createRoot>;
 
 beforeEach(() => {
+  (getDubIndex as jest.Mock).mockReset();
+  (getDubIndex as jest.Mock).mockResolvedValue({ dubbed: [], partial: [] });
   localStorage.clear();
   host = document.createElement("div");
   host.id = "root";
@@ -127,6 +132,88 @@ test("omits unknown metadata instead of printing placeholders", () => {
   advance(SPIN_DURATION_MS + 200);
   const subtitle = host.querySelector<HTMLElement>(".random-picker-subtitle")?.textContent || "";
   expect(subtitle).not.toMatch(/Anime|undefined|NaN/);
+});
+
+test("shows a Dub pill after the rating when the MAL id is dubbed", async () => {
+  jest.useFakeTimers();
+  (getDubIndex as jest.Mock).mockResolvedValue({ dubbed: [42], partial: [] });
+  const item: LibraryAnime = {
+    id: 9,
+    idMal: 42,
+    title: { english: "Example" },
+    coverImage: { extraLarge: "https://example.com/example.jpg" },
+    format: "TV",
+    startYear: 2019,
+    averageScore: 78,
+  };
+  renderPicker({ anime: [item] });
+  await act(async () => {
+    jest.advanceTimersByTime(SPIN_DURATION_MS + 200);
+    await Promise.resolve();
+  });
+  expect(host.querySelector<HTMLElement>(".random-picker-subtitle")?.textContent).toBe(
+    "TV · 2019 · ★ 7.8 · Dub",
+  );
+  expect(host.querySelector(".random-picker-dub")).not.toBeNull();
+});
+
+test("shows the Dub pill for a partial dub", async () => {
+  jest.useFakeTimers();
+  (getDubIndex as jest.Mock).mockResolvedValue({ dubbed: [], partial: [44] });
+  const item: LibraryAnime = {
+    id: 12,
+    idMal: 44,
+    title: { english: "Partial" },
+    coverImage: { extraLarge: "https://example.com/partial.jpg" },
+    averageScore: 70,
+  };
+  renderPicker({ anime: [item] });
+  await act(async () => {
+    jest.advanceTimersByTime(SPIN_DURATION_MS + 200);
+    await Promise.resolve();
+  });
+  expect(host.querySelector<HTMLElement>(".random-picker-subtitle")?.textContent).toBe(
+    "★ 7.0 · Dub",
+  );
+});
+
+test("does not show a Dub pill when the MAL id has no dub", async () => {
+  jest.useFakeTimers();
+  const item: LibraryAnime = {
+    id: 13,
+    idMal: 45,
+    title: { english: "Sub only" },
+    coverImage: { extraLarge: "https://example.com/sub.jpg" },
+    format: "TV",
+    startYear: 2019,
+    averageScore: 78,
+  };
+  renderPicker({ anime: [item] });
+  await act(async () => {
+    jest.advanceTimersByTime(SPIN_DURATION_MS + 200);
+    await Promise.resolve();
+  });
+  expect(host.querySelector<HTMLElement>(".random-picker-subtitle")?.textContent).toBe(
+    "TV · 2019 · ★ 7.8",
+  );
+  expect(host.querySelector(".random-picker-dub")).toBeNull();
+});
+
+test("does not show a Dub pill without a MAL id", async () => {
+  jest.useFakeTimers();
+  const item: LibraryAnime = {
+    id: 14,
+    title: { english: "No MAL" },
+    coverImage: { extraLarge: "https://example.com/nomal.jpg" },
+    averageScore: 80,
+  };
+  renderPicker({ anime: [item] });
+  await act(async () => {
+    jest.advanceTimersByTime(SPIN_DURATION_MS + 200);
+    await Promise.resolve();
+  });
+  expect(host.querySelector(".random-picker-dub")).toBeNull();
+  expect(getDubIndex).not.toHaveBeenCalled();
 });
 
 test("settles on the only entry when the list has one item", () => {
