@@ -199,6 +199,29 @@ test("does not show a Dub pill when the MAL id has no dub", async () => {
   expect(host.querySelector(".random-picker-dub")).toBeNull();
 });
 
+test("keeps the subtitle clean when the dub index fails", async () => {
+  jest.useFakeTimers();
+  (getDubIndex as jest.Mock).mockRejectedValue(new Error("Dub source unavailable"));
+  const item: LibraryAnime = {
+    id: 16,
+    idMal: 46,
+    title: { english: "Dub lookup fails" },
+    coverImage: { extraLarge: "https://example.com/dub-failure.jpg" },
+    format: "TV",
+    startYear: 2019,
+    averageScore: 78,
+  };
+  renderPicker({ anime: [item] });
+  await act(async () => {
+    jest.advanceTimersByTime(SPIN_DURATION_MS + 200);
+    await Promise.resolve();
+  });
+  expect(host.querySelector<HTMLElement>(".random-picker-subtitle")?.textContent).toBe(
+    "TV · 2019 · ★ 7.8",
+  );
+  expect(host.querySelector(".random-picker-dub")).toBeNull();
+});
+
 test("does not show a Dub pill without a MAL id", async () => {
   jest.useFakeTimers();
   const item: LibraryAnime = {
@@ -229,7 +252,7 @@ test("uses the picked poster as the blurred glow source", async () => {
     await Promise.resolve();
   });
   const glow = host.querySelector<HTMLElement>(".random-picker-poster-glow")!;
-  expect(glow.style.backgroundImage).toContain("https://example.com/glow.jpg");
+  expect(glow.style.backgroundImage).toBe("url(https://example.com/glow.jpg)");
   expect(glow.getAttribute("aria-hidden")).toBe("true");
 });
 
