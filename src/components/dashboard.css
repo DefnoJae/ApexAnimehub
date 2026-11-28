@@ -2272,6 +2272,7 @@ input:focus-visible {
 }
 
 .random-picker-tag {
+  margin: 0;
   color: #f0a43a;
   font-size: 13px;
   font-weight: 600;

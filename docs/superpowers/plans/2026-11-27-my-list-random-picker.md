@@ -41,30 +41,30 @@
 - Consumes: existing `readAniListList(page, signal): Promise<AniListListPage>`, which maps `anime: entry.media` verbatim.
 - Produces: `LibraryAnime.format?: string` and `LibraryAnime.startYear?: number`; AniList entries carry them after a normal list load.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 In `src/utils/sync/anilistList.test.ts`, add a test that mocks `anilistRequest` with one media list entry whose `media` has `format: "TV_SHORT"` and `startDate: { year: 2019 }`, calls `readAniListList`, and asserts:
 - `page.entries[0].anime` matches `{ format: "TV_SHORT", startYear: 2019 }`
 - the GraphQL query string passed to `anilistRequest` contains both `format` and `startDate{year}`.
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `npx react-scripts test --watchAll=false --runInBand src/utils/sync/anilistList.test.ts`
 Expected: FAIL — fields are absent from both the mock result and the query.
 
-- [ ] **Step 3: Implement the field plumbing**
+- [x] **Step 3: Implement the field plumbing**
 
 - Add `format?: string` and `startYear?: number` to `LibraryAnime` in `src/hooks/useLibrary.ts`.
 - Add `format?: string` and `startDate?: { year?: number | null }` to `AniListMedia` in `src/utils/sync/anilistList.ts`.
 - Change `LIST_QUERY` there so the `media{...}` selection ends with `... startDate{year} format` (keep the existing fields and request shape).
 - Make the same field addition to the `LIST_QUERY` string in `server/list.cjs` (line ~246). Do not change the mapping — `anime: entry.media` already passes new fields through.
 
-- [ ] **Step 4: Run the test to verify it passes**
+- [x] **Step 4: Run the test to verify it passes**
 
 Run: `npx react-scripts test --watchAll=false --runInBand src/utils/sync/anilistList.test.ts`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/hooks/useLibrary.ts src/utils/sync/anilistList.ts src/utils/sync/anilistList.test.ts server/list.cjs
@@ -78,13 +78,13 @@ git commit -m "feat: carry anime format and start year in list entries"
 **Files:**
 - Modify: `src/components/RandomAnimePicker.tsx`
 - Modify: `src/components/RandomAnimePicker.test.tsx`
-- Create (if absent): `src/components/RandomAnimePicker.tsx` already exists with the wrong spin behavior; rework it.
+- Create: `src/components/RandomAnimePicker.tsx` did not exist at the plan's base commit; build it test-first with the working spin behavior.
 
 **Interfaces:**
 - Consumes: `LibraryAnime[]`; `open: boolean`; `onPlay(anime)`, `onSelect(anime)`, `onClose()` callbacks (already present).
 - Produces: the same component signature, with a working spin and correct metadata.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 In `src/components/RandomAnimePicker.test.tsx`, add/replace tests with these exact assertions:
 - `advanceSpin()` uses `SPIN_DURATION_MS` from the component (export it) — define it in the test as `SPIN_DURATION_MS + 100` so fake timers cover the settle.
@@ -96,12 +96,12 @@ In `src/components/RandomAnimePicker.test.tsx`, add/replace tests with these exa
 - "closing cancels the spin": render open, advance 300ms, click `[aria-label="Close picker"]`, advance past the spin duration, assert `onClose` was called once and no selection is rendered (title stays `—`).
 - "empty list renders nothing": keep the existing test.
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `npx react-scripts test --watchAll=false --runInBand src/components/RandomAnimePicker.test.tsx`
 Expected: FAIL — posters do not change, score is unscaled, format label is `Anime`, timer is not cancelled on close.
 
-- [ ] **Step 3: Rework the component**
+- [x] **Step 3: Rework the component**
 
 - Export `SPIN_DURATION_MS = 2200` and keep `SPIN_INTERVAL_MS = 120`.
 - While `spinning`, render `filtered[spinIndex]?.coverImage?.extraLarge` as the image source, so posters visibly change; render the settled `selected` image only after spinning stops.
@@ -110,12 +110,12 @@ Expected: FAIL — posters do not change, score is unscaled, format label is `An
 - In `handleClose`, clear `timerRef.current` before calling `onClose()`.
 - Honor `prefers-reduced-motion` by settling immediately (skip the timer loop) when `window.matchMedia("(prefers-reduced-motion: reduce)").matches` is true.
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `npx react-scripts test --watchAll=false --runInBand src/components/RandomAnimePicker.test.tsx`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/components/RandomAnimePicker.tsx src/components/RandomAnimePicker.test.tsx
@@ -133,20 +133,20 @@ git commit -m "fix: spin through real posters and show accurate picker metadata"
 - Consumes: class names already emitted by `RandomAnimePicker` and the dice button in `MyList`.
 - Produces: visual styles only; no JS interface changes.
 
-- [ ] **Step 1: Replace the current `.random-picker-*` CSS block**
+- [x] **Step 1: Replace the current `.random-picker-*` CSS block**
 
 Match the supplied description: card ~35vw wide / ~55vh tall (with sensible min/max for small screens), `border-radius: 30px`, background `#0B1020`, subtle radial golden glow near top center, light translucent backdrop (`rgba(10,7,20,.55)` + `blur(6px)`), centered amber `#F0A43A` `Tonight, watch` heading with faint glow, poster with 18–20px radius and soft shadow occupying ~55–60% of card height, 32–36px bold white title, `#AAB0C0` 14–16px metadata row, and a centered horizontal row of three pill buttons ~46px tall with 12–16px gaps: white primary `Play`, dark translucent `Details` and `Spin again`. Keep existing reduced-motion and `@supports not (backdrop-filter)` fallbacks.
 
-- [ ] **Step 2: Style the dice button**
+- [x] **Step 2: Style the dice button**
 
 Give the `.library-filters` dice button a square glass pill matching neighbouring selects, ~44px, with visible focus ring and a disabled state.
 
-- [ ] **Step 3: Verify compilation**
+- [x] **Step 3: Verify compilation**
 
 Run: `npm run build`
 Expected: succeeds (the pre-existing CSS-order warnings are known and acceptable).
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add src/components/dashboard.css
@@ -165,32 +165,32 @@ git commit -m "style: match the random picker overlay to the reference design"
 - Consumes: `<RandomAnimePicker anime={unique} open={pickerOpen} onPlay={...} onSelect={...} onClose={...} />`.
 - Produces: dice button opens the overlay with the current filtered list.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 In `src/components/MyList.test.tsx`, add a test that renders My List with at least one entry, clicks `[aria-label="Pick a random anime from this list"]`, and asserts a `[role="dialog"]` appears containing the `Tonight, watch` heading. Add a second test asserting the dice button is disabled when the list is empty.
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `npx react-scripts test --watchAll=false --runInBand src/components/MyList.test.tsx`
 Expected: FAIL.
 
-- [ ] **Step 3: Wire the button**
+- [x] **Step 3: Wire the button**
 
 Ensure the dice button sits immediately after the sort `StyledSelect` inside `.library-filters`, is disabled when `accounts.busy || accounts.checking || !unique.length`, sets `pickerOpen` true on click, and that `<RandomAnimePicker>` receives `anime={unique}` and `open={pickerOpen}`. Both `onPlay` and `onSelect` call the existing `onSelect(anime)` and set `pickerOpen` false.
 
-- [ ] **Step 4: Run the test to verify it passes**
+- [x] **Step 4: Run the test to verify it passes**
 
 Run: `npx react-scripts test --watchAll=false --runInBand src/components/MyList.test.tsx`
 Expected: PASS.
 
-- [ ] **Step 5: Run all gates**
+- [x] **Step 5: Run all gates**
 
 Run each and confirm:
 - `npm run typecheck` — no errors
 - `npm run test:ci` — all suites pass
 - `npm run build` — succeeds (known CSS-order warnings only)
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/components/MyList.tsx src/components/MyList.test.tsx

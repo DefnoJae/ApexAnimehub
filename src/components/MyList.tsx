@@ -303,7 +303,7 @@ export function MyList({
           aria-label="Pick a random anime from this list"
           title="Pick a random anime"
           onClick={() => setPickerOpen(true)}
-          disabled={!unique.length}
+          disabled={!!accounts.busy || !!accounts.checking || !unique.length}
         >
           <Dice5 size={20} aria-hidden="true" />
         </button>

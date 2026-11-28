@@ -575,3 +575,50 @@ test("the dice button is disabled when the list is empty", () => {
     host.remove();
   }
 });
+
+test("the dice button is disabled while accounts are busy or checking", () => {
+  localStorage.clear();
+  const host = document.createElement("div");
+  document.body.append(host);
+  const root = createRoot(host);
+  const libraryEntries = [
+    {
+      provider: "anilist",
+      anime: {
+        id: 1,
+        title: { english: "Pick me" },
+        coverImage: { extraLarge: "https://example.com/pick.jpg" },
+      },
+      status: "planning",
+      score: 8,
+      progress: 0,
+      updatedAt: 1,
+    },
+  ];
+  try {
+    for (const busyState of [{ busy: true }, { checking: true }]) {
+      act(() =>
+        root.render(
+          <MyList
+            accounts={
+              {
+                ...makeAccounts(),
+                libraryEntries,
+                ...busyState,
+              } as unknown as ReturnType<typeof useAccounts>
+            }
+            onSelect={jest.fn()}
+            onConnect={jest.fn()}
+          />,
+        ),
+      );
+      const dice = host.querySelector<HTMLButtonElement>(
+        '[aria-label="Pick a random anime from this list"]',
+      );
+      expect(dice?.disabled).toBe(true);
+    }
+  } finally {
+    act(() => root.unmount());
+    host.remove();
+  }
+});

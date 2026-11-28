@@ -194,3 +194,88 @@ test("Spin again restarts the animation", () => {
   });
   expect(host.querySelector<HTMLElement>(".random-picker-title")?.textContent).toBe("—");
 });
+
+test("settles on time even when the parent re-renders mid-spin", () => {
+  jest.useFakeTimers();
+  renderPicker();
+  advance(300);
+  act(() =>
+    root.render(
+      <RandomAnimePicker
+        anime={base.slice()}
+        open={true}
+        onPlay={jest.fn()}
+        onSelect={jest.fn()}
+        onClose={jest.fn()}
+      />,
+    ),
+  );
+  advance(SPIN_DURATION_MS + 200 - 300);
+  expect(host.querySelector<HTMLElement>(".random-picker-title")?.textContent).not.toBe("—");
+});
+
+test("renders the picker label as a heading", () => {
+  jest.useFakeTimers();
+  renderPicker();
+  expect(host.querySelector<HTMLElement>("h1.random-picker-tag")?.textContent).toBe(
+    "Tonight, watch",
+  );
+});
+
+test("Escape dismisses the picker", () => {
+  jest.useFakeTimers();
+  const { onClose } = renderPicker();
+  act(() => {
+    host
+      .querySelector<HTMLElement>(".random-picker-modal")!
+      .dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+  });
+  expect(onClose).toHaveBeenCalledTimes(1);
+});
+
+test("Tab focus stays inside the dialog", () => {
+  jest.useFakeTimers();
+  renderPicker();
+  advance(SPIN_DURATION_MS + 200);
+  const buttons = host.querySelectorAll<HTMLElement>(".random-picker-modal button");
+  const last = buttons[buttons.length - 1];
+  act(() => last.focus());
+  act(() => {
+    last.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", bubbles: true }));
+  });
+  expect(document.activeElement).toBe(buttons[0]);
+});
+
+test("focus moves into the dialog on open and returns to the opener on close", () => {
+  jest.useFakeTimers();
+  const opener = document.createElement("button");
+  document.body.append(opener);
+  act(() => opener.focus());
+  const { onClose } = renderPicker();
+  const closeButton = host.querySelector<HTMLElement>('[aria-label="Close picker"]')!;
+  expect(document.activeElement).toBe(closeButton);
+  act(() => closeButton.click());
+  act(() =>
+    root.render(
+      <RandomAnimePicker
+        anime={base}
+        open={false}
+        onPlay={jest.fn()}
+        onSelect={jest.fn()}
+        onClose={onClose}
+      />,
+    ),
+  );
+  expect(document.activeElement).toBe(opener);
+  opener.remove();
+});
+
+test("backdrop click dismisses the picker and cancels the spin", () => {
+  jest.useFakeTimers();
+  const { onClose } = renderPicker();
+  advance(300);
+  act(() => host.querySelector<HTMLElement>(".random-picker-backdrop")!.click());
+  advance(SPIN_DURATION_MS + 200);
+  expect(onClose).toHaveBeenCalledTimes(1);
+  expect(host.querySelector<HTMLElement>(".random-picker-title")?.textContent).toBe("—");
+});

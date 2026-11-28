@@ -44,16 +44,25 @@ export function RandomAnimePicker({
   const [selected, setSelected] = useState<LibraryAnime | null>(null);
   const [spinIndex, setSpinIndex] = useState(0);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const returnFocusRef = useRef<HTMLElement | null>(null);
+  const skipFocusRestoreRef = useRef(false);
 
   const filtered = useMemo(
     () => anime.filter((item) => item.coverImage?.extraLarge && item.title),
     [anime],
   );
+  const filteredRef = useRef(filtered);
+  useEffect(() => {
+    filteredRef.current = filtered;
+  }, [filtered]);
 
   const pickRandom = useCallback(() => {
-    if (filtered.length === 0) return null;
-    return filtered[Math.floor(Math.random() * filtered.length)];
-  }, [filtered]);
+    const list = filteredRef.current;
+    if (list.length === 0) return null;
+    return list[Math.floor(Math.random() * list.length)];
+  }, []);
 
   const settle = useCallback(() => {
     setSelected(pickRandom());
@@ -62,7 +71,8 @@ export function RandomAnimePicker({
   }, [pickRandom]);
 
   const startSpin = useCallback(() => {
-    if (filtered.length === 0) return;
+    const list = filteredRef.current;
+    if (list.length === 0) return;
     if (prefersReducedMotion()) {
       settle();
       return;
@@ -79,14 +89,16 @@ export function RandomAnimePicker({
       }
       let next: number;
       do {
-        next = Math.floor(Math.random() * filtered.length);
-      } while (filtered.length > 1 && next === lastIndex);
+        next = Math.floor(Math.random() * list.length);
+      } while (list.length > 1 && next === lastIndex);
       lastIndex = next;
       setSpinIndex(next);
       timerRef.current = setTimeout(tick, SPIN_INTERVAL_MS);
     };
     timerRef.current = setTimeout(tick, SPIN_INTERVAL_MS);
-  }, [filtered, settle]);
+  }, [settle]);
+
+  const hasEntries = filtered.length > 0;
 
   useEffect(() => {
     if (!open) {
@@ -105,20 +117,58 @@ export function RandomAnimePicker({
         timerRef.current = null;
       }
     };
-  }, [open, startSpin]);
+  }, [open, hasEntries, startSpin]);
 
-  const close = () => {
+  useEffect(() => {
+    if (!open) return;
+    returnFocusRef.current = document.activeElement as HTMLElement | null;
+    skipFocusRestoreRef.current = false;
+    closeButtonRef.current?.focus();
+    return () => {
+      if (!skipFocusRestoreRef.current) {
+        const target = returnFocusRef.current;
+        if (target && document.contains(target)) target.focus();
+      }
+      returnFocusRef.current = null;
+    };
+  }, [open]);
+
+  const close = (restoreFocus = true) => {
     if (timerRef.current) {
       clearTimeout(timerRef.current);
       timerRef.current = null;
     }
+    if (!restoreFocus) skipFocusRestoreRef.current = true;
     onClose();
   };
 
   const choose = (action: (anime: LibraryAnime) => void) => {
     if (!selected || spinning) return;
+    skipFocusRestoreRef.current = true;
     action(selected);
-    close();
+    close(false);
+  };
+
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      event.stopPropagation();
+      close();
+      return;
+    }
+    if (event.key !== "Tab") return;
+    const focusable = Array.from(
+      dialogRef.current?.querySelectorAll<HTMLElement>("button:not(:disabled)") || [],
+    );
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last?.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first?.focus();
+    }
   };
 
   if (!open || filtered.length === 0) return null;
@@ -138,16 +188,27 @@ export function RandomAnimePicker({
 
   return (
     <>
-      <div className="random-picker-backdrop" onClick={close} aria-hidden="true" />
       <div
+        className="random-picker-backdrop"
+        onClick={() => close()}
+        aria-hidden="true"
+      />
+      <div
+        ref={dialogRef}
         className="random-picker-modal"
         role="dialog"
         aria-modal="true"
         aria-label="Pick a random anime"
+        onKeyDown={handleKeyDown}
       >
         <header className="random-picker-header">
-          <span className="random-picker-tag">Tonight, watch</span>
-          <button type="button" aria-label="Close picker" onClick={close}>
+          <h1 className="random-picker-tag">Tonight, watch</h1>
+          <button
+            ref={closeButtonRef}
+            type="button"
+            aria-label="Close picker"
+            onClick={() => close()}
+          >
             <X size={20} />
           </button>
         </header>
