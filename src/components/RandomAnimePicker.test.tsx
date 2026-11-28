@@ -216,6 +216,23 @@ test("does not show a Dub pill without a MAL id", async () => {
   expect(getDubIndex).not.toHaveBeenCalled();
 });
 
+test("uses the picked poster as the blurred glow source", async () => {
+  jest.useFakeTimers();
+  const item: LibraryAnime = {
+    id: 15,
+    title: { english: "Glow" },
+    coverImage: { extraLarge: "https://example.com/glow.jpg" },
+  };
+  renderPicker({ anime: [item] });
+  await act(async () => {
+    jest.advanceTimersByTime(SPIN_DURATION_MS + 200);
+    await Promise.resolve();
+  });
+  const glow = host.querySelector<HTMLElement>(".random-picker-poster-glow")!;
+  expect(glow.style.backgroundImage).toContain("https://example.com/glow.jpg");
+  expect(glow.getAttribute("aria-hidden")).toBe("true");
+});
+
 test("settles on the only entry when the list has one item", () => {
   jest.useFakeTimers();
   const item: LibraryAnime = {

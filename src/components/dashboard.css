@@ -2300,10 +2300,30 @@ input:focus-visible {
   outline-offset: 2px;
 }
 
+.random-picker-poster-frame {
+  position: relative;
+  margin-top: 18px;
+  flex-shrink: 0;
+}
+
+.random-picker-poster-glow {
+  position: absolute;
+  inset: -14px;
+  z-index: 0;
+  border-radius: 34px;
+  background-size: cover;
+  background-position: center;
+  filter: blur(24px) saturate(170%);
+  opacity: 0.62;
+  transform: scale(1.04);
+  pointer-events: none;
+}
+
 .random-picker-poster {
-  height: min(32vh, 360px);
+  position: relative;
+  z-index: 1;
+  height: min(42vh, 440px);
   aspect-ratio: 2 / 3;
-  margin-top: 30px;
   border-radius: 20px;
   overflow: hidden;
   background: #16121c;
@@ -2453,7 +2473,7 @@ input:focus-visible {
     border-radius: 26px;
   }
   .random-picker-poster {
-    height: min(38vh, 320px);
+    height: min(46vh, 380px);
   }
   .random-picker-actions {
     gap: 10px;

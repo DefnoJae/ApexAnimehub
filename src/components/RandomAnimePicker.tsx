@@ -234,16 +234,23 @@ export function RandomAnimePicker({
             <X size={20} />
           </button>
         </header>
-        <div className="random-picker-poster">
-          {poster ? (
-            <img
-              className={`random-picker-image${spinning ? " random-picker-spinning" : ""}`}
-              src={poster}
-              alt={spinning ? "" : selected ? getDisplayTitle(selected) : ""}
-              loading="lazy"
-              decoding="async"
-            />
-          ) : null}
+        <div className="random-picker-poster-frame">
+          <div
+            className="random-picker-poster-glow"
+            aria-hidden="true"
+            style={{ backgroundImage: poster ? `url("${poster}")` : undefined }}
+          />
+          <div className="random-picker-poster">
+            {poster ? (
+              <img
+                className={`random-picker-image${spinning ? " random-picker-spinning" : ""}`}
+                src={poster}
+                alt={spinning ? "" : selected ? getDisplayTitle(selected) : ""}
+                loading="lazy"
+                decoding="async"
+              />
+            ) : null}
+          </div>
         </div>
         <h2 className="random-picker-title">
           {selected ? getDisplayTitle(selected) : "—"}
