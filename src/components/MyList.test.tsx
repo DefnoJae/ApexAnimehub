@@ -581,9 +581,11 @@ test("the dice button opens the random picker with the current list", () => {
     )!;
     expect(dice).not.toBeNull();
     act(() => dice.click());
-    expect(host.querySelector('[role="dialog"]')?.textContent).toContain(
-      "Tonight, watch",
-    );
+    const dialog = host.querySelector('[role="dialog"]');
+    expect(dialog).not.toBeNull();
+    expect(
+      dialog?.querySelector("img.random-picker-image")?.getAttribute("src"),
+    ).toBe("https://example.com/pick.jpg");
   } finally {
     act(() => root.unmount());
     host.remove();
